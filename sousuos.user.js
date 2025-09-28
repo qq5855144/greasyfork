@@ -4,15 +4,15 @@
 // @version      v1.15
 // @description  在页面底部显示一个聚合搜索引擎切换导航，支持自定义引擎和拖拽排序
 // @author       晚风知我意
-// @match        *://*/*keyword=* 
-// @match        *://*/*query=* 
-// @match        *://*/*word=* 
-// @match        *://*/*text=* 
-// @match        *://*/*key=* 
-// @match        *://*/*web=* 
-// @match        *://*/*wd=* 
-// @match        *://*/*kw=* 
-// @match        *://*/*q=* 
+// @match        *://*/*keyword=*
+// @match        *://*/*query=*
+// @match        *://*/*word=*
+// @match        *://*/*text=*
+// @match        *://*/*key=*
+// @match        *://*/*web=*
+// @match        *://*/*wd=*
+// @match        *://*/*kw=*
+// @match        *://*/*q=*
 // @match        *://*/*p=*
 // @grant        unsafeWindow
 // @grant        GM_addStyle
@@ -2005,14 +2005,14 @@ function getKeywords() {
                         keywords = url.searchParams.get(keyItem);
                         if (keywords) {
                             localStorage.setItem("last_successful_keywords", keywords);
-                            sessionStorage.setItem("last_successful_keywords", keywords); 
+                            sessionStorage.setItem("last_successful_keywords", keywords);
                         }
                         return keywords;
                     }
                 }
             }
         }
-        return sessionStorage.getItem("last_successful_keywords") || localStorage.getItem("last_successful_keywords") || ""; 
+        return sessionStorage.getItem("last_successful_keywords") || localStorage.getItem("last_successful_keywords") || "";
     } catch (error) {
         console.error("获取关键词时出错:", error.message, "当前URL:", window.location.href);
         return "";
@@ -2025,7 +2025,7 @@ function monitorInputFields() {
         inputFields.forEach(input => {
             input.addEventListener('input', (event) => {
                 currentInput = event.target.value;
-                sessionStorage.setItem("currentInput", currentInput); 
+                sessionStorage.setItem("currentInput", currentInput);
             });
         });
     }
@@ -2052,7 +2052,7 @@ function monitorInputFields() {
 function updateSearchBoxPosition() {
     const punkJetBox = document.getElementById("punkjet-search-box");
     if (!punkJetBox) return;
-    
+
     punkJetBox.style.bottom = "0px";
     punkJetBox.style.left = "2%";
     punkJetBox.style.width = "96%";
@@ -2062,7 +2062,7 @@ function updateSearchBoxPosition() {
 function extractSearchEngineFromPage() {
     const searchForms = document.querySelectorAll('form[action*="search"], form[action*="query"], form[action*="find"]');
     const searchInputs = document.querySelectorAll('input[type="search"], input[name*="search"], input[name*="query"], input[name*="q"]');
-    
+
     let searchInfo = {
         name: "",
         searchUrl: "",
@@ -2076,16 +2076,16 @@ function extractSearchEngineFromPage() {
         const form = searchForms[0];
         const action = form.getAttribute('action') || '';
         const method = (form.getAttribute('method') || 'get').toLowerCase();
-        
+
         if (action) {
             let baseUrl = action;
             if (!action.startsWith('http')) {
                 baseUrl = new URL(action, window.location.origin).href;
             }
-            
+
             const inputs = form.querySelectorAll('input[name]');
             let keyParam = '';
-            
+
             for (let input of inputs) {
                 const name = input.getAttribute('name');
                 if (name && (name.includes('q') || name.includes('search') || name.includes('query') || name.includes('keyword'))) {
@@ -2093,18 +2093,18 @@ function extractSearchEngineFromPage() {
                     break;
                 }
             }
-            
+
             if (!keyParam && searchInputs.length > 0) {
                 keyParam = searchInputs[0].getAttribute('name') || 'q';
             }
-            
+
             if (keyParam) {
-                searchInfo.searchUrl = method === 'post' ? 
-                    `${baseUrl}?${keyParam}={keyword}` : 
+                searchInfo.searchUrl = method === 'post' ?
+                    `${baseUrl}?${keyParam}={keyword}` :
                     `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}${keyParam}={keyword}`;
                 searchInfo.searchkeyName = [keyParam];
                 searchInfo.found = true;
-                
+
                 const domain = new URL(baseUrl).hostname.replace('www.', '');
                 searchInfo.name = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
                 searchInfo.mark = domain.replace(/\./g, '_');
@@ -2112,12 +2112,12 @@ function extractSearchEngineFromPage() {
             }
         }
     }
-    
+
     if (!searchInfo.found && searchInputs.length > 0) {
         const input = searchInputs[0];
         const name = input.getAttribute('name') || 'q';
         const domain = window.location.hostname.replace('www.', '');
-        
+
         searchInfo.searchUrl = `${window.location.origin}/search?${name}={keyword}`;
         searchInfo.searchkeyName = [name];
         searchInfo.name = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
@@ -2125,11 +2125,10 @@ function extractSearchEngineFromPage() {
         searchInfo.matchUrl = `.*${domain}.*`;
         searchInfo.found = true;
     }
-    
+
     return searchInfo;
 }
 
-// 创建现代化的管理面板
 function createManagementPanel() {
     const panel = document.createElement("div");
     panel.id = "engine-management-panel";
@@ -2139,6 +2138,7 @@ function createManagementPanel() {
     panel.style.transform = "translate(-50%, -50%)";
     panel.style.width = "90%";
     panel.style.maxWidth = "800px";
+    panel.style.height = "90vh";
     panel.style.maxHeight = "90vh";
     panel.style.backgroundColor = "#ffffff";
     panel.style.borderRadius = "15px";
@@ -2148,30 +2148,37 @@ function createManagementPanel() {
     panel.style.display = "none";
     panel.style.overflow = "hidden";
     panel.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+    panel.style.display = "flex";
+    panel.style.flexDirection = "column";
+    panel.style.boxSizing = "border-box";
 
-    // 标题栏
+    // 顶栏 - 固定高度 15vh
     const header = document.createElement("div");
+    header.style.height = "15vh";
+    header.style.minHeight = "80px";
+    header.style.maxHeight = "120px";
     header.style.backgroundColor = "#2c3e50";
     header.style.color = "white";
     header.style.padding = "20px";
     header.style.borderRadius = "15px 15px 0 0";
     header.style.position = "relative";
-    
+    header.style.boxSizing = "border-box";
+    header.style.flexShrink = "0";
+
     const title = document.createElement("h2");
     title.textContent = "📊 搜索引擎管理中心";
     title.style.margin = "0";
     title.style.fontSize = "1.5em";
     title.style.fontWeight = "300";
     header.appendChild(title);
-    
+
     const subtitle = document.createElement("p");
     subtitle.textContent = "管理您的搜索快捷方式";
     subtitle.style.margin = "5px 0 0 0";
     subtitle.style.opacity = "0.8";
     subtitle.style.fontSize = "0.9em";
     header.appendChild(subtitle);
-    
-    // 未保存更改提示
+
     const unsavedIndicator = document.createElement("div");
     unsavedIndicator.id = "unsaved-indicator";
     unsavedIndicator.textContent = "● 有未保存的更改";
@@ -2182,24 +2189,33 @@ function createManagementPanel() {
     unsavedIndicator.style.fontSize = "0.8em";
     unsavedIndicator.style.display = "none";
     header.appendChild(unsavedIndicator);
-    
+
     panel.appendChild(header);
 
-    // 内容区域
+    // 主内容区域 - 固定高度 65vh
     const content = document.createElement("div");
-    content.style.padding = "20px";
-    content.style.overflowY = "auto";
-    content.style.maxHeight = "calc(90vh - 140px)";
+    content.style.height = "65vh";
+    content.style.minHeight = "300px";
+    content.style.position = "relative";
+    content.style.overflow = "hidden";
+    content.style.padding = "0";
+    content.style.boxSizing = "border-box";
+    content.style.display = "flex";
+    content.style.flexDirection = "column";
+    content.style.flexShrink = "0";
 
-    // 快速操作栏 - 重新设计布局
+    // 快速操作栏
     const quickActions = document.createElement("div");
+    quickActions.style.padding = "20px";
     quickActions.style.display = "flex";
     quickActions.style.gap = "10px";
-    quickActions.style.marginBottom = "20px";
     quickActions.style.flexWrap = "wrap";
     quickActions.style.justifyContent = "space-between";
+    quickActions.style.backgroundColor = "#ffffff";
+    quickActions.style.borderBottom = "1px solid #ecf0f1";
+    quickActions.style.boxSizing = "border-box";
+    quickActions.style.flexShrink = "0";
 
-    // 左侧操作按钮组
     const leftActionGroup = document.createElement("div");
     leftActionGroup.style.display = "flex";
     leftActionGroup.style.gap = "10px";
@@ -2211,13 +2227,11 @@ function createManagementPanel() {
     leftActionGroup.appendChild(extractBtn);
     leftActionGroup.appendChild(addBtn);
 
-    // 右侧操作按钮组（保存和重置）
     const rightActionGroup = document.createElement("div");
     rightActionGroup.style.display = "flex";
     rightActionGroup.style.gap = "10px";
     rightActionGroup.style.flexWrap = "wrap";
 
-    // 保存设置按钮 - 现在放在快速操作栏
     const saveBtn = document.createElement("button");
     saveBtn.id = "panel-save-btn";
     saveBtn.innerHTML = "💾 保存设置";
@@ -2250,33 +2264,48 @@ function createManagementPanel() {
     quickActions.appendChild(rightActionGroup);
     content.appendChild(quickActions);
 
-    // 引擎列表区域
+    // 列表区域 - 可滚动
     const listSection = document.createElement("div");
-    
+    listSection.style.flex = "1";
+    listSection.style.overflow = "hidden";
+    listSection.style.padding = "0 20px";
+    listSection.style.boxSizing = "border-box";
+    listSection.style.display = "flex";
+    listSection.style.flexDirection = "column";
+    listSection.style.overflow = "auto"
+
     const listTitle = document.createElement("h3");
     listTitle.textContent = "📋 已配置的搜索引擎";
     listTitle.style.color = "#2c3e50";
-    listTitle.style.marginBottom = "15px";
+    listTitle.style.margin = "15px 0";
     listTitle.style.fontWeight = "500";
+    listTitle.style.flexShrink = "0";
     listSection.appendChild(listTitle);
 
     const engineList = document.createElement("div");
     engineList.id = "engine-management-list";
+    engineList.style.flex = "1";
+    engineList.style.overflowY = "auto";
+    engineList.style.overflowX = "hidden";
     engineList.style.display = "grid";
     engineList.style.gap = "10px";
-    engineList.style.marginBottom = "20px";
+    engineList.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
+    engineList.style.paddingBottom = "10px";
+    engineList.style.boxSizing = "border-box";
     listSection.appendChild(engineList);
 
     content.appendChild(listSection);
 
-    // 添加引擎表单（初始隐藏）
+    // 添加引擎表单区域
     const formSection = document.createElement("div");
     formSection.id = "add-engine-form";
     formSection.style.display = "none";
     formSection.style.backgroundColor = "#f8f9fa";
     formSection.style.padding = "20px";
     formSection.style.borderRadius = "10px";
-    formSection.style.marginTop = "20px";
+    formSection.style.margin = "10px 0";
+    formSection.style.boxSizing = "border-box";
+    formSection.style.flexShrink = "0";
 
     const formTitle = document.createElement("h3");
     formTitle.textContent = "✨ 添加新搜索引擎";
@@ -2288,7 +2317,7 @@ function createManagementPanel() {
     form.style.display = "grid";
     form.style.gap = "15px";
     form.style.gridTemplateColumns = "1fr 1fr";
-    
+
     const fields = [
         { label: "引擎名称", placeholder: "例如: Google", type: "text", id: "engine-name", required: true },
         { label: "唯一标识", placeholder: "例如: google", type: "text", id: "engine-mark", required: true },
@@ -2301,7 +2330,7 @@ function createManagementPanel() {
         if (field.fullWidth) {
             container.style.gridColumn = "1 / -1";
         }
-        
+
         const label = document.createElement("label");
         label.textContent = field.label;
         label.style.display = "block";
@@ -2309,7 +2338,7 @@ function createManagementPanel() {
         label.style.fontWeight = "500";
         label.style.color = "#34495e";
         container.appendChild(label);
-        
+
         const input = document.createElement("input");
         input.type = field.type;
         input.placeholder = field.placeholder;
@@ -2321,13 +2350,13 @@ function createManagementPanel() {
         input.style.borderRadius = "5px";
         input.style.fontSize = "14px";
         container.appendChild(input);
-        
+
         form.appendChild(container);
     });
 
     const iconContainer = document.createElement("div");
     iconContainer.style.gridColumn = "1 / -1";
-    
+
     const iconTitle = document.createElement("h4");
     iconTitle.textContent = "🎨 图标设置";
     iconTitle.style.marginBottom = "10px";
@@ -2347,14 +2376,14 @@ function createManagementPanel() {
     typeLabel.style.marginBottom = "5px";
     typeLabel.style.fontWeight = "500";
     typeGroup.appendChild(typeLabel);
-    
+
     const iconTypeSelect = document.createElement("select");
     iconTypeSelect.id = "icon-type";
     iconTypeSelect.style.width = "100%";
     iconTypeSelect.style.padding = "10px";
     iconTypeSelect.style.border = "1px solid #ddd";
     iconTypeSelect.style.borderRadius = "5px";
-    
+
     ["svg", "image", "text", "emoji"].forEach(type => {
         const option = document.createElement("option");
         option.value = type;
@@ -2371,7 +2400,7 @@ function createManagementPanel() {
     inputLabel.style.marginBottom = "5px";
     inputLabel.style.fontWeight = "500";
     inputGroup.appendChild(inputLabel);
-    
+
     const iconInput = document.createElement("input");
     iconInput.type = "text";
     iconInput.id = "icon-input";
@@ -2403,14 +2432,14 @@ function createManagementPanel() {
     previewContainer.style.gridColumn = "1 / -1";
     previewContainer.style.marginTop = "15px";
     previewContainer.style.textAlign = "center";
-    
+
     const previewLabel = document.createElement("label");
     previewLabel.textContent = "图标预览 (推荐比例 8:5)";
     previewLabel.style.display = "block";
     previewLabel.style.marginBottom = "10px";
     previewLabel.style.fontWeight = "500";
     previewContainer.appendChild(previewLabel);
-    
+
     const iconPreview = document.createElement("div");
     iconPreview.id = "icon-preview";
     iconPreview.style.width = "88px";
@@ -2424,7 +2453,7 @@ function createManagementPanel() {
     iconPreview.style.overflow = "hidden";
     iconPreview.style.background = "#ecf0f1";
     previewContainer.appendChild(iconPreview);
-    
+
     iconContainer.appendChild(previewContainer);
     form.appendChild(iconContainer);
 
@@ -2443,18 +2472,25 @@ function createManagementPanel() {
     formActions.appendChild(cancelFormBtn);
     formSection.appendChild(formActions);
 
-    content.appendChild(formSection);
+    // 将表单添加到列表区域
+    listSection.appendChild(formSection);
 
     panel.appendChild(content);
 
-    // 底部操作栏 - 简化版，只显示选中计数和关闭按钮
+    // 底栏 - 固定高度 20vh
     const footer = document.createElement("div");
+    footer.style.height = "20vh";
+    footer.style.minHeight = "60px";
+    footer.style.maxHeight = "90px";
     footer.style.backgroundColor = "#ecf0f1";
     footer.style.padding = "15px 20px";
     footer.style.borderTop = "1px solid #bdc3c7";
     footer.style.display = "flex";
     footer.style.justifyContent = "space-between";
     footer.style.alignItems = "center";
+    footer.style.boxSizing = "border-box";
+    footer.style.flexShrink = "0";
+    footer.style.borderRadius = "0 0 15px 15px";
 
     const selectedCount = document.createElement("span");
     selectedCount.id = "selected-count";
@@ -2476,7 +2512,7 @@ function createManagementPanel() {
 
     document.body.appendChild(panel);
 
-    // 事件监听
+    // 事件监听器
     extractBtn.addEventListener("click", extractFromCurrentPage);
     addBtn.addEventListener("click", () => showAddForm(true));
     resetBtn.addEventListener("click", resetToDefault);
@@ -2486,7 +2522,6 @@ function createManagementPanel() {
     saveBtn.addEventListener("click", saveEngineSettings);
     closeBtn.addEventListener("click", closeManagementPanel);
 
-    // 点击背景关闭（带确认）
     panel.addEventListener("click", (e) => {
         if (e.target === panel) {
             closeManagementPanel();
@@ -2496,7 +2531,6 @@ function createManagementPanel() {
     return panel;
 }
 
-// 创建操作按钮的辅助函数
 function createActionButton(text, color, title) {
     const button = document.createElement("button");
     button.textContent = text;
@@ -2510,21 +2544,20 @@ function createActionButton(text, color, title) {
     button.style.fontSize = "14px";
     button.style.minWidth = "120px";
     button.style.transition = "all 0.3s ease";
-    
+
     button.addEventListener("mouseenter", () => {
         button.style.transform = "translateY(-2px)";
         button.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
     });
-    
+
     button.addEventListener("mouseleave", () => {
         button.style.transform = "translateY(0)";
         button.style.boxShadow = "none";
     });
-    
+
     return button;
 }
 
-// 关闭管理面板（带确认）
 function closeManagementPanel() {
     if (hasUnsavedChanges) {
         if (confirm("⚠️ 您有未保存的更改，确定要关闭吗？")) {
@@ -2536,28 +2569,26 @@ function closeManagementPanel() {
     }
 }
 
-// 标记有未保存的更改
 function markUnsavedChanges() {
     hasUnsavedChanges = true;
     const indicator = document.getElementById("unsaved-indicator");
     const saveBtn = document.getElementById("panel-save-btn");
-    
+
     if (indicator) {
         indicator.style.display = "block";
     }
-    
+
     if (saveBtn) {
         saveBtn.style.opacity = "1";
         saveBtn.style.pointerEvents = "auto";
-        saveBtn.style.background = "#e67e22"; // 橙色提示有更改
+        saveBtn.style.background = "#e67e22";
         saveBtn.innerHTML = "💾 保存更改";
-        
-        // 添加悬停效果
+
         saveBtn.addEventListener("mouseenter", function() {
             this.style.transform = "translateY(-2px)";
             this.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
         });
-        
+
         saveBtn.addEventListener("mouseleave", function() {
             this.style.transform = "translateY(0)";
             this.style.boxShadow = "none";
@@ -2565,33 +2596,29 @@ function markUnsavedChanges() {
     }
 }
 
-// 清除未保存更改标记
 function clearUnsavedChanges() {
     hasUnsavedChanges = false;
     const indicator = document.getElementById("unsaved-indicator");
     const saveBtn = document.getElementById("panel-save-btn");
-    
+
     if (indicator) {
         indicator.style.display = "none";
     }
-    
+
     if (saveBtn) {
         saveBtn.style.opacity = "0.7";
         saveBtn.style.pointerEvents = "none";
-        saveBtn.style.background = "#95a5a6"; // 恢复灰色
+        saveBtn.style.background = "#95a5a6";
         saveBtn.innerHTML = "💾 保存设置";
-        
-        // 移除悬停效果
+
         saveBtn.onmouseenter = null;
         saveBtn.onmouseleave = null;
-        
-        // 2秒后显示成功状态
+
         setTimeout(() => {
             if (!hasUnsavedChanges) {
                 saveBtn.innerHTML = "✅ 已保存";
                 saveBtn.style.background = "#27ae60";
-                
-                // 2秒后恢复原文本
+
                 setTimeout(() => {
                     if (!hasUnsavedChanges) {
                         saveBtn.innerHTML = "💾 保存设置";
@@ -2606,19 +2633,19 @@ function clearUnsavedChanges() {
 // 从当前页面提取搜索引擎
 function extractFromCurrentPage() {
     const searchInfo = extractSearchEngineFromPage();
-    
+
     if (!searchInfo.found) {
         alert("❌ 无法自动识别当前页面的搜索引擎。请手动添加。");
         return;
     }
-    
+
     showAddForm(true);
-    
+
     document.getElementById("engine-name").value = searchInfo.name;
     document.getElementById("engine-mark").value = searchInfo.mark;
     document.getElementById("engine-url").value = searchInfo.searchUrl;
     document.getElementById("engine-keys").value = searchInfo.searchkeyName.join(",");
-    
+
     const favicon = document.querySelector('link[rel*="icon"]');
     if (favicon) {
         const iconUrl = favicon.href;
@@ -2628,19 +2655,21 @@ function extractFromCurrentPage() {
             previewIcon();
         }
     }
-    
+
     alert(`✅ 已自动识别 ${searchInfo.name} 搜索引擎！请检查并保存。`);
 }
 
 // 显示/隐藏添加表单
 function showAddForm(show) {
     const formSection = document.getElementById("add-engine-form");
-    const listSection = document.querySelector("#engine-management-panel > div:nth-child(2) > div:nth-child(2)");
-    
+    const engineList = document.getElementById("engine-management-list");
+    const listTitle = formSection.previousElementSibling;
+
     if (show) {
         formSection.style.display = "block";
-        listSection.style.display = "none";
-        
+        engineList.style.display = "none";
+        listTitle.style.display = "none";
+
         document.getElementById("engine-name").value = "";
         document.getElementById("engine-mark").value = "";
         document.getElementById("engine-url").value = "";
@@ -2649,7 +2678,8 @@ function showAddForm(show) {
         document.getElementById("icon-preview").innerHTML = "";
     } else {
         formSection.style.display = "none";
-        listSection.style.display = "block";
+        engineList.style.display = "grid";
+        listTitle.style.display = "block";
     }
 }
 
@@ -2658,13 +2688,13 @@ function previewIcon() {
     const type = document.getElementById("icon-type").value;
     const value = document.getElementById("icon-input").value.trim();
     const preview = document.getElementById("icon-preview");
-    
+
     preview.innerHTML = "";
     preview.style.backgroundImage = "none";
     preview.style.backgroundColor = "#ecf0f1";
-    
+
     if (!value) return;
-    
+
     try {
         if (type === "svg") {
             const parser = new DOMParser();
@@ -2674,8 +2704,10 @@ function previewIcon() {
             }
             preview.innerHTML = value;
         } else if (type === "image") {
-            // 修复图片预览
-            preview.innerHTML = `<img src="${value}" style="width: 100%; height: 100%; object-fit: contain;" alt="图标预览" onerror="this.style.display='none'">`;
+            preview.style.backgroundImage = `url(${value})`;
+            preview.style.backgroundSize = "contain";
+            preview.style.backgroundRepeat = "no-repeat";
+            preview.style.backgroundPosition = "center";
         } else if (type === "text") {
             preview.textContent = value.length > 4 ? value.substring(0, 4) : value;
             preview.style.fontSize = value.length > 4 ? "14px" : "18px";
@@ -2698,17 +2730,17 @@ function saveNewEngine() {
     const keys = document.getElementById("engine-keys").value.split(',').map(k => k.trim());
     const iconType = document.getElementById("icon-type").value;
     const iconValue = document.getElementById("icon-input").value.trim();
-    
+
     if (!name || !mark || !url || keys.length === 0) {
         alert("❌ 请填写所有必填字段");
         return;
     }
-    
+
     if (searchUrlMap.some(engine => engine.mark === mark)) {
         alert("❌ 标识已存在，请使用其他标识");
         return;
     }
-    
+
     const newEngine = {
         name,
         searchUrl: url,
@@ -2718,14 +2750,14 @@ function saveNewEngine() {
         svgCode: "",
         custom: true
     };
-    
+
     if (iconValue) {
         if (iconType === "svg") {
             newEngine.svgCode = iconValue;
         } else if (iconType === "image") {
-            // 修复图片类型图标的SVG代码
             newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-                <image href="${iconValue}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet"/>
+                <style>.bg-img {background-image: url(${iconValue}); background-size: contain; background-repeat: no-repeat; background-position: center; width: 100%; height: 100%;}</style>
+                <foreignObject width="100%" height="100%"><div class="bg-img" xmlns="http://www.w3.org/1999/xhtml"></div></foreignObject>
             </svg>`;
         } else if (iconType === "text") {
             newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
@@ -2739,17 +2771,18 @@ function saveNewEngine() {
             </svg>`;
         }
     }
-    
+
     userSearchEngines.push(newEngine);
     GM_setValue("userSearchEngines", userSearchEngines);
-    
+
     searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
-    
+
     const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
     GM_setValue("punk_setup_search", currentSetup + "-" + mark);
-    
+
+    // 标记有更改需要保存
     markUnsavedChanges();
-    
+
     alert("✅ 搜索引擎添加成功!");
     showAddForm(false);
     refreshEngineList();
@@ -2762,9 +2795,10 @@ function resetToDefault() {
         GM_setValue("userSearchEngines", []);
         GM_setValue("punk_setup_search", punkDeafultMark);
         searchUrlMap = [...defaultSearchEngines];
-        
+
+        // 标记有更改需要保存
         markUnsavedChanges();
-        
+
         alert("✅ 已恢复默认设置");
         refreshEngineList();
     }
@@ -2774,9 +2808,9 @@ function resetToDefault() {
 function refreshEngineList() {
     const engineList = document.getElementById("engine-management-list");
     const activeMarks = (GM_getValue("punk_setup_search", punkDeafultMark)).split("-");
-    
+
     engineList.innerHTML = "";
-    
+
     searchUrlMap.forEach((engine, index) => {
         const engineCard = document.createElement("div");
         engineCard.className = "engine-card";
@@ -2789,94 +2823,80 @@ function refreshEngineList() {
             border-radius: 10px;
             transition: all 0.3s ease;
             cursor: grab;
+            min-height: 60px;
+            box-sizing: border-box;
         `;
-        
+
         engineCard.addEventListener("mouseenter", () => {
             engineCard.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
             engineCard.style.transform = "translateY(-2px)";
         });
-        
+
         engineCard.addEventListener("mouseleave", () => {
             engineCard.style.boxShadow = "none";
             engineCard.style.transform = "translateY(0)";
         });
 
+        // 选择复选框
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.dataset.mark = engine.mark;
         checkbox.checked = activeMarks.includes(engine.mark);
         checkbox.style.marginRight = "15px";
         checkbox.style.transform = "scale(1.2)";
-        
+
+        // 复选框更改时标记有未保存更改
         checkbox.addEventListener("change", () => {
             updateSelectedCount();
             markUnsavedChanges();
         });
 
-        // 修复图标预览显示
+        // 引擎图标预览
         const iconPreview = document.createElement("div");
         iconPreview.style.cssText = `
             width: 40px;
             height: 25px;
+            background-image: url('data:image/svg+xml;utf8,${encodeURIComponent(engine.svgCode)}');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
             margin-right: 15px;
             border: 1px solid #eee;
             border-radius: 5px;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            flex-shrink: 0;
         `;
 
-        // 安全地显示图标
-        try {
-            if (engine.svgCode) {
-                if (engine.svgCode.includes('<image href="') || engine.svgCode.includes('<img')) {
-                    // 处理图片类型的图标
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = engine.svgCode;
-                    const image = tempDiv.querySelector('image') || tempDiv.querySelector('img');
-                    if (image) {
-                        const src = image.getAttribute('href') || image.getAttribute('src');
-                        if (src) {
-                            iconPreview.innerHTML = `<img src="${src}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'">`;
-                        }
-                    } else {
-                        iconPreview.innerHTML = engine.svgCode;
-                    }
-                } else {
-                    // 处理SVG代码
-                    iconPreview.innerHTML = engine.svgCode;
-                }
-            } else {
-                // 默认图标
-                iconPreview.innerHTML = `<div style="width:100%;height:100%;background:#ddd;display:flex;align-items:center;justify-content:center;color:#666;font-size:10px;">图标</div>`;
-            }
-        } catch (e) {
-            console.error("图标显示错误:", e);
-            iconPreview.innerHTML = `<div style="width:100%;height:100%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;font-size:10px;">错误</div>`;
-        }
-
+        // 引擎信息
         const infoContainer = document.createElement("div");
         infoContainer.style.flexGrow = "1";
-        
+        infoContainer.style.minWidth = "0";
+
         const name = document.createElement("div");
         name.textContent = engine.name;
         name.style.fontWeight = "bold";
         name.style.color = "#2c3e50";
         name.style.marginBottom = "5px";
-        
+        name.style.whiteSpace = "nowrap";
+        name.style.overflow = "hidden";
+        name.style.textOverflow = "ellipsis";
+
         const url = document.createElement("div");
-        url.textContent = engine.searchUrl.length > 50 ? engine.searchUrl.substring(0, 50) + "..." : engine.searchUrl;
+        url.textContent = engine.searchUrl;
         url.style.fontSize = "0.8em";
         url.style.color = "#7f8c8d";
-        
+        url.style.whiteSpace = "nowrap";
+        url.style.overflow = "hidden";
+        url.style.textOverflow = "ellipsis";
+
         infoContainer.appendChild(name);
         infoContainer.appendChild(url);
 
+        // 操作按钮
         const actions = document.createElement("div");
         actions.style.display = "flex";
         actions.style.gap = "5px";
-        
+        actions.style.flexShrink = "0";
+
         if (engine.custom) {
             const deleteBtn = document.createElement("button");
             deleteBtn.textContent = "🗑️";
@@ -2888,22 +2908,26 @@ function refreshEngineList() {
                 color: white;
                 border-radius: 5px;
                 cursor: pointer;
+                flex-shrink: 0;
             `;
-            
+
             actions.appendChild(deleteBtn);
-            
+
             deleteBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
                 if (confirm(`确定要删除 ${engine.name} 吗?`)) {
                     userSearchEngines = userSearchEngines.filter(e => e.mark !== engine.mark);
                     GM_setValue("userSearchEngines", userSearchEngines);
-                    
+
                     const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
                     const newSetup = currentSetup.split("-").filter(m => m !== engine.mark).join("-");
                     GM_setValue("punk_setup_search", newSetup);
-                    
+
                     searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
+
+                    // 标记有更改需要保存
                     markUnsavedChanges();
+
                     refreshEngineList();
                 }
             });
@@ -2913,10 +2937,10 @@ function refreshEngineList() {
         engineCard.appendChild(iconPreview);
         engineCard.appendChild(infoContainer);
         engineCard.appendChild(actions);
-        
+
         engineList.appendChild(engineCard);
     });
-    
+
     updateSelectedCount();
 }
 
@@ -2931,22 +2955,24 @@ function updateSelectedCount() {
 function saveEngineSettings() {
     const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]');
     const activeMarks = [];
-    
+
     checkboxes.forEach(checkbox => {
         if (checkbox.checked) {
             activeMarks.push(checkbox.dataset.mark);
         }
     });
-    
+
     if (activeMarks.length === 0) {
         alert("⚠️ 请至少选择一个搜索引擎");
         return;
     }
-    
+
     GM_setValue("punk_setup_search", activeMarks.join("-"));
-    
+
+    // 清除未保存更改标记
     clearUnsavedChanges();
-    
+
+    // 延迟关闭面板，让用户看到成功提示
     setTimeout(() => {
         document.getElementById("engine-management-panel").style.display = "none";
         reloadScript();
@@ -2956,10 +2982,11 @@ function saveEngineSettings() {
 // 显示管理面板
 function showManagementPanel() {
     const panel = document.getElementById("engine-management-panel") || createManagementPanel();
-    
+
+    // 重置未保存更改状态
     hasUnsavedChanges = false;
     clearUnsavedChanges();
-    
+
     refreshEngineList();
     panel.style.display = "block";
 }
@@ -2968,55 +2995,56 @@ function showManagementPanel() {
 function enableDragAndSort() {
     const container = document.querySelector('.engine-display');
     if (!container) return;
-    
+
     const buttons = container.querySelectorAll('.engine-button');
-    
+
     buttons.forEach(button => {
         button.draggable = true;
-        
+
         button.addEventListener('dragstart', (e) => {
             currentDraggedButton = button;
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', button.getAttribute('url'));
             button.classList.add('dragging');
         });
-        
+
         button.addEventListener('dragend', () => {
             button.classList.remove('dragging');
             currentDraggedButton = null;
             saveButtonOrder();
         });
-        
+
         button.addEventListener('dragover', (e) => {
             e.preventDefault();
             return false;
         });
-        
+
         button.addEventListener('dragenter', (e) => {
             e.preventDefault();
             button.classList.add('drag-over');
         });
-        
+
         button.addEventListener('dragleave', () => {
             button.classList.remove('drag-over');
         });
-        
+
         button.addEventListener('drop', (e) => {
             e.preventDefault();
             button.classList.remove('drag-over');
-            
+
             if (currentDraggedButton !== button) {
                 const container = button.parentNode;
                 const buttonsArray = Array.from(container.querySelectorAll('.engine-button'));
                 const draggedIndex = buttonsArray.indexOf(currentDraggedButton);
                 const targetIndex = buttonsArray.indexOf(button);
-                
+
                 if (draggedIndex < targetIndex) {
                     container.insertBefore(currentDraggedButton, button.nextSibling);
                 } else {
                     container.insertBefore(currentDraggedButton, button);
                 }
-                
+
+                // 拖拽排序后标记有未保存更改
                 markUnsavedChanges();
             }
             return false;
@@ -3028,14 +3056,14 @@ function enableDragAndSort() {
 function saveButtonOrder() {
     const container = document.querySelector('.engine-display');
     if (!container) return;
-    
+
     const buttons = container.querySelectorAll('.engine-button');
     const newOrder = Array.from(buttons).map(btn => {
         const url = btn.getAttribute('url');
         const engine = searchUrlMap.find(e => e.searchUrl === url);
         return engine ? engine.mark : null;
     }).filter(mark => mark !== null).join('-');
-    
+
     GM_setValue('punk_setup_search', newOrder);
 }
 
@@ -3045,19 +3073,20 @@ function addSearchBox() {
             console.log("引擎容器已存在，跳过添加");
             return;
         }
-        
+
         const punkJetBox = document.createElement("div");
         punkJetBox.id = "punkjet-search-box";
-        punkJetBox.className = "engine-container"; 
-        punkJetBox.style.display = 'flex'; 
+        punkJetBox.className = "engine-container";
+        punkJetBox.style.display = 'flex';
         punkJetBox.style.zIndex = '9999';
         punkJetBox.style.position = 'fixed';
-        
+
         updateSearchBoxPosition();
 
-        const ulList = document.createElement('div'); 
-        ulList.className = "engine-display"; 
+        const ulList = document.createElement('div');
+        ulList.className = "engine-display";
 
+        // 添加设置按钮
         const settingsButton = document.createElement('button');
         settingsButton.className = "engine-settings-button";
         settingsButton.innerHTML = "ν";
@@ -3087,34 +3116,11 @@ function addSearchBox() {
                 let item = searchUrlMap[index];
                 if (item.mark === showList[showListIndex]) {
                     let button = document.createElement('button');
-                    button.className = "engine-button"; 
-                    
-                    // 修复图标显示逻辑
-                    try {
-                        if (item.svgCode) {
-                            if (item.svgCode.includes('<image href="')) {
-                                // 处理图片类型的图标
-                                const tempDiv = document.createElement('div');
-                                tempDiv.innerHTML = item.svgCode;
-                                const image = tempDiv.querySelector('image');
-                                if (image) {
-                                    const src = image.getAttribute('href');
-                                    button.style.backgroundImage = `url('${src}')`;
-                                } else {
-                                    button.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(item.svgCode)}')`;
-                                }
-                            } else {
-                                // 处理SVG代码
-                                button.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(item.svgCode)}')`;
-                            }
-                        }
-                    } catch (e) {
-                        console.error("按钮图标设置错误:", e);
-                    }
-                    
+                    button.className = "engine-button";
+                    button.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(item.svgCode)}')`;
                     button.setAttribute("url", item.searchUrl);
                     button.setAttribute("title", item.name);
-                    button.innerHTML = ''; 
+                    button.innerHTML = '';
 
                     fragment.appendChild(button);
 
@@ -3153,12 +3159,13 @@ function addSearchBox() {
 
                         if (url && keywords) {
                             const finalUrl = url.replace('{keyword}', encodeURIComponent(keywords));
-                            window.open(finalUrl, '_blank'); 
+                            window.open(finalUrl, '_blank');
                         } else {
-                            alert('未找到搜索关键词。'); 
+                            alert('未找到搜索关键词。');
                         }
                     });
 
+                    // 长按事件（打开上下文菜单）
                     button.addEventListener('mousedown', (e) => {
                         longPressTimer = setTimeout(() => {
                             showContextMenu(e, item);
@@ -3183,9 +3190,9 @@ function addSearchBox() {
         document.body.appendChild(punkJetBox);
         containerAdded = true;
         console.log("引擎容器添加成功");
-        
+
         window.addEventListener('resize', updateSearchBoxPosition);
-        
+
         setTimeout(enableDragAndSort, 500);
     } catch (error) {
         console.error("添加搜索框时出错:", error.message);
@@ -3207,7 +3214,7 @@ function showContextMenu(event, engine) {
         z-index: 10001;
         min-width: 120px;
     `;
-    
+
     const hideOption = document.createElement("div");
     hideOption.className = "context-menu-item";
     hideOption.textContent = "👁️ 隐藏引擎";
@@ -3217,15 +3224,15 @@ function showContextMenu(event, engine) {
         border-bottom: 1px solid #f0f0f0;
         transition: background 0.3s;
     `;
-    
+
     hideOption.addEventListener("mouseenter", () => {
         hideOption.style.background = "#f8f9fa";
     });
-    
+
     hideOption.addEventListener("mouseleave", () => {
         hideOption.style.background = "white";
     });
-    
+
     hideOption.addEventListener("click", () => {
         const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
         const newSetup = currentSetup.split("-").filter(m => m !== engine.mark).join("-");
@@ -3234,7 +3241,7 @@ function showContextMenu(event, engine) {
         menu.remove();
     });
     menu.appendChild(hideOption);
-    
+
     if (engine.custom) {
         const deleteOption = document.createElement("div");
         deleteOption.className = "context-menu-item";
@@ -3245,24 +3252,24 @@ function showContextMenu(event, engine) {
             color: #e74c3c;
             transition: background 0.3s;
         `;
-        
+
         deleteOption.addEventListener("mouseenter", () => {
             deleteOption.style.background = "#f8f9fa";
         });
-        
+
         deleteOption.addEventListener("mouseleave", () => {
             deleteOption.style.background = "white";
         });
-        
+
         deleteOption.addEventListener("click", () => {
             if (confirm(`确定要删除 ${engine.name} 吗?`)) {
                 userSearchEngines = userSearchEngines.filter(e => e.mark !== engine.mark);
                 GM_setValue("userSearchEngines", userSearchEngines);
-                
+
                 const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
                 const newSetup = currentSetup.split("-").filter(m => m !== engine.mark).join("-");
                 GM_setValue("punk_setup_search", newSetup);
-                
+
                 searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
                 reloadScript();
             }
@@ -3270,16 +3277,16 @@ function showContextMenu(event, engine) {
         });
         menu.appendChild(deleteOption);
     }
-    
+
     document.body.appendChild(menu);
-    
+
     const closeMenu = (e) => {
         if (!menu.contains(e.target)) {
             menu.remove();
             document.removeEventListener("click", closeMenu);
         }
     };
-    
+
     setTimeout(() => {
         document.addEventListener("click", closeMenu);
     }, 100);
@@ -3290,7 +3297,7 @@ function injectStyle() {
         if (document.querySelector('style#engine-container-style')) {
             return;
         }
-        
+
         const cssNode = document.createElement("style");
         cssNode.id = "engine-container-style";
         cssNode.textContent = `
@@ -3303,7 +3310,7 @@ function injectStyle() {
                 height: 36px;
                 overflow: hidden;
                 justify-content: center;
-                align-items: center; 
+                align-items: center;
                 z-index: 1000;
                 background-color: rgba(255, 255, 255, 0);
                 margin-top: 1px;
@@ -3336,14 +3343,14 @@ function injectStyle() {
             .engine-button {
                 width: 55.5px;
                 height: 32px;
-                padding: 0; 
+                padding: 0;
                 border: 1px solid #f0f0f0;
                 border-radius: 8px;
                 background-color: rgba(255, 255, 255, 1);
                 color: transparent;
                 font-size: 14px;
                 cursor: pointer;
-                margin: 2px; 
+                margin: 2px;
                 background-size: contain;
                 background-repeat: no-repeat;
                 background-position: center;
@@ -3367,17 +3374,17 @@ function injectStyle() {
                 border: 1px solid #ffb61e;
                 color: transparent;
             }
-            
+
             .engine-button.dragging {
                 opacity: 0.5;
                 transform: rotate(5deg);
             }
-            
+
             .engine-button.drag-over {
                 border: 2px dashed #2196F3;
                 background-color: #f0f8ff;
             }
-            
+
             .context-menu-item:hover {
                 background-color: #f8f9fa;
             }
@@ -3411,7 +3418,7 @@ function injectStyle() {
                 }
             }
         `;
-        document.head.appendChild(cssNode); 
+        document.head.appendChild(cssNode);
     } catch (error) {
         console.error("注入样式时出错:", error.message);
     }
@@ -3420,22 +3427,22 @@ function injectStyle() {
 function reloadScript() {
     const punkJetBox = document.getElementById("punkjet-search-box");
     if (punkJetBox) {
-        punkJetBox.remove(); 
+        punkJetBox.remove();
         containerAdded = false;
         console.log("移除现有引擎容器");
     }
-    scriptLoaded = false; 
-    init(); 
+    scriptLoaded = false;
+    init();
 }
 
 setInterval(() => {
     if (isValidScope() && !containerAdded) {
         init();
-    } 
+    }
     else if (!isValidScope() && containerAdded) {
         reloadScript();
     }
-}, 1000); 
+}, 1000);
 
 function init() {
     try {
@@ -3447,13 +3454,13 @@ function init() {
         if (getKeywords() != null) {
             if (!scriptLoaded) {
                 if (!GM_getValue("punk_setup_search")) {
-                    GM_setValue("punk_setup_search", punkDeafultMark); 
+                    GM_setValue("punk_setup_search", punkDeafultMark);
                 }
-                currentInput = sessionStorage.getItem("currentInput") || ""; 
-                monitorInputFields(); 
-                addSearchBox(); 
-                injectStyle(); 
-                scriptLoaded = true; 
+                currentInput = sessionStorage.getItem("currentInput") || "";
+                monitorInputFields();
+                addSearchBox();
+                injectStyle();
+                scriptLoaded = true;
                 console.log("脚本初始化完成");
             }
         }
