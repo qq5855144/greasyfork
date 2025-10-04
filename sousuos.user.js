@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.15
-// @description  在页面底部显示一个聚合搜索引擎切换导航，支持自定义引擎和拖拽排序
+// @version      v1.151
+// @description  在页面底部显示一个聚合搜索引擎切换导航，支持自定义引擎和拖拽排序，(纯AI编写，设置面板布局存在一些问题，感兴趣可以继续优化)
 // @author       晚风知我意
 // @match        *://*/*keyword=*
 // @match        *://*/*query=*
