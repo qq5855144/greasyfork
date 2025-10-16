@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         SVG嗅探器
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  嗅探页面中的SVG资源
+// @version      1.5
+// @description  下载网页中的SVG图片
 // @author       YourName
 // @match        *://*/*
 // @grant        GM_addStyle
@@ -22,7 +22,6 @@
 (function() {
     'use strict';
 
-    // 配置参数
     const CONFIG = {
         buttonSize: 30,
         activeColor: '#3498db',
@@ -32,9 +31,7 @@
         touchDelay: 300
     };
 
-    // 添加主样式
     GM_addStyle(`
-        /* 按钮容器 */
         .radar-container {
             position: fixed;
             z-index: ${CONFIG.zIndex};
@@ -43,7 +40,6 @@
             touch-action: none;
         }
         
-        /* 按钮 */
         .radar-button {
             width: ${CONFIG.buttonSize}px;
             height: ${CONFIG.buttonSize}px;
@@ -77,7 +73,6 @@
             transform: scale(0.95);
         }
         
-        /* 图标 */
         .radar-icon {
             width: 24px;
             height: 24px;
@@ -197,6 +192,21 @@
             transform: translateY(-2px);
         }
         
+        .item-download-btn {
+            padding: 6px 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+        
+        .item-download-btn:hover {
+            background: #2980b9;
+        }
+        
         .modal-content {
             padding: 20px;
             overflow-y: auto;
@@ -209,6 +219,7 @@
             padding: 15px;
             border-bottom: 1px solid #eee;
             transition: background 0.2s;
+            justify-content: space-between;
         }
         
         .svg-item:hover {
@@ -247,6 +258,7 @@
             white-space: nowrap;
             font-size: 1.05rem;
             color: #2c3e50;
+            margin-right: 15px;
         }
         
         .overlay {
@@ -286,33 +298,21 @@
         }
         
         @keyframes radar-scan {
-            0% {
-                transform: rotate(0deg);
-            }
-            100% {
-                transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.6);
-            }
-            70% {
-                box-shadow: 0 0 0 12px rgba(52, 152, 219, 0);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
-            }
+            0% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.6); }
+            70% { box-shadow: 0 0 0 12px rgba(52, 152, 219, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0); }
         }
     `);
 
-    // 创建按钮容器
     const radarContainer = document.createElement('div');
     radarContainer.className = 'radar-container';
     radarContainer.id = 'radarContainer';
     
-    // 创建按钮
     const radarButton = document.createElement('div');
     radarButton.className = 'radar-button';
     radarButton.id = 'radarButton';
@@ -327,7 +327,6 @@
     radarContainer.appendChild(radarButton);
     document.body.appendChild(radarContainer);
 
-    // 创建SVG嗅探模态框
     const svgModal = document.createElement('div');
     svgModal.id = 'svgSnifferModal';
     svgModal.innerHTML = `
@@ -341,7 +340,7 @@
                 <label for="selectAll">全选</label>
             </div>
             <div class="action-buttons">
-                <button class="action-btn download-btn">下载选中</button>
+                <button class="action-btn download-btn" id="batchDownloadBtn">批量下载选中</button>
                 <button class="action-btn copy-btn">复制SVG</button>
             </div>
         </div>
@@ -351,29 +350,26 @@
     `;
     document.body.appendChild(svgModal);
 
-    // 创建遮罩层
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     document.body.appendChild(overlay);
 
-    // 创建复制通知
     const copyNotification = document.createElement('div');
     copyNotification.className = 'copy-notification';
     document.body.appendChild(copyNotification);
 
-    // 全局变量
     let globalSvgItems = [];
+    let svgItemCache = new Map();
     let isDragging = false;
     let startX, startY, startLeft, startTop;
     let dragStartTime = 0;
     let touchTimer = null;
+    let blobUrls = [];
 
-    // 初始化按钮
     function initRadarButton() {
         const domain = location.hostname.replace(/\./g, '-');
         const positionKey = `radarPosition_${domain}`;
         
-        // 设置初始位置
         const savedPosition = GM_getValue(positionKey);
         if (savedPosition) {
             radarContainer.style.left = `${savedPosition.x}px`;
@@ -383,7 +379,6 @@
             radarContainer.style.bottom = `${CONFIG.positionOffset}px`;
         }
         
-        // 设置拖拽事件
         radarContainer.addEventListener('mousedown', startDrag);
         radarContainer.addEventListener('touchstart', startDrag, { passive: false });
         
@@ -394,20 +389,16 @@
         });
     }
 
-    // 开始拖拽
     function startDrag(e) {
         e.preventDefault();
         
-        // 获取初始位置
         const clientX = e.clientX || e.touches[0].clientX;
         const clientY = e.clientY || e.touches[0].clientY;
         
-        // 获取当前计算位置
         const computedStyle = window.getComputedStyle(radarContainer);
         startLeft = parseInt(computedStyle.left) || 0;
         startTop = parseInt(computedStyle.top) || 0;
         
-        // 如果使用right定位，转换为left定位
         if (computedStyle.right !== 'auto') {
             const rightPos = parseInt(computedStyle.right);
             startLeft = window.innerWidth - rightPos - CONFIG.buttonSize;
@@ -419,7 +410,6 @@
         startY = clientY;
         dragStartTime = Date.now();
         
-        // 对于触摸设备，延迟判定是否为拖动
         if (e.type === 'touchstart') {
             touchTimer = setTimeout(() => {
                 isDragging = true;
@@ -429,14 +419,12 @@
             isDragging = true;
         }
         
-        // 添加事件监听
         document.addEventListener('mousemove', drag);
         document.addEventListener('touchmove', drag, { passive: false });
         document.addEventListener('mouseup', endDrag);
         document.addEventListener('touchend', endDrag);
     }
 
-    // 拖拽中
     function drag(e) {
         if (!isDragging) return;
         e.preventDefault();
@@ -446,13 +434,11 @@
         
         const dx = clientX - startX;
         const dy = clientY - startY;
-        
         radarContainer.style.left = `${startLeft + dx}px`;
         radarContainer.style.top = `${startTop + dy}px`;
         radarContainer.style.right = 'auto';
     }
 
-    // 结束拖拽
     function endDrag(e) {
         if (touchTimer) {
             clearTimeout(touchTimer);
@@ -469,13 +455,11 @@
         isDragging = false;
         radarContainer.style.transition = '';
         
-        // 移除事件监听
         document.removeEventListener('mousemove', drag);
         document.removeEventListener('touchmove', drag);
         document.removeEventListener('mouseup', endDrag);
         document.removeEventListener('touchend', endDrag);
         
-        // 保存位置
         const domain = location.hostname.replace(/\./g, '-');
         const positionKey = `radarPosition_${domain}`;
         const rect = radarContainer.getBoundingClientRect();
@@ -485,15 +469,58 @@
         });
     }
 
-    // 收集SVG函数
+    function inlineExternalResources(svg) {
+        const linkElements = svg.querySelectorAll('link[rel="stylesheet"]');
+        linkElements.forEach(link => {
+            try {
+                const href = link.getAttribute('href');
+                if (href) {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', href, false);
+                    xhr.onload = function() {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+                            style.textContent = xhr.responseText;
+                            link.parentNode.replaceChild(style, link);
+                        }
+                    };
+                    xhr.send();
+                }
+            } catch (e) {
+                link.parentNode.removeChild(link);
+            }
+        });
+        
+        const imageElements = svg.querySelectorAll('image');
+        imageElements.forEach(img => {
+            try {
+                const href = img.getAttribute('href') || img.getAttribute('xlink:href');
+                if (href && !href.startsWith('data:')) {
+                    const imgObj = new Image();
+                    imgObj.crossOrigin = 'anonymous';
+                    imgObj.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = imgObj.width;
+                        canvas.height = imgObj.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(imgObj, 0, 0);
+                        const dataUrl = canvas.toDataURL('image/png');
+                        img.setAttribute('href', dataUrl);
+                        img.removeAttribute('xlink:href');
+                    };
+                    imgObj.src = href;
+                }
+            } catch (e) {
+                console.warn('处理SVG图片失败:', e);
+            }
+        });
+    }
+
     function collectSVGs() {
         const svgItems = [];
-        
-        // 收集页面中的SVG元素
         const svgElements = document.querySelectorAll('svg');
         
         svgElements.forEach((svg, index) => {
-            // 尝试获取有意义的名称
             let name = `SVG ${index + 1}`;
             let parent = svg.parentElement;
             while (parent) {
@@ -507,25 +534,24 @@
                 parent = parent.parentElement;
             }
             
-            // 克隆SVG元素以避免修改原始元素
             const clonedSvg = svg.cloneNode(true);
+            inlineExternalResources(clonedSvg);
             
-            // 移除干扰属性
             clonedSvg.removeAttribute('onclick');
             clonedSvg.removeAttribute('onmouseover');
             clonedSvg.removeAttribute('onmouseout');
             
+            const svgId = `svg-${index}-${Date.now()}`;
             svgItems.push({
                 name: name,
                 svg: clonedSvg.outerHTML,
-                id: `svg-${index}-${Date.now()}`
+                id: svgId
             });
         });
         
         return svgItems;
     }
 
-    // 显示SVG列表
     function showSVGList() {
         const modal = document.getElementById('svgSnifferModal');
         const svgList = document.getElementById('svgList');
@@ -534,11 +560,15 @@
         modal.style.display = 'block';
         overlay.style.display = 'block';
         
-        // 使用setTimeout让UI有机会更新
         setTimeout(() => {
             try {
                 const svgItems = collectSVGs();
-                globalSvgItems = svgItems; // 存储到全局变量
+                globalSvgItems = svgItems;
+                svgItemCache.clear();
+                
+                svgItems.forEach(item => {
+                    svgItemCache.set(item.id, item);
+                });
                 
                 if (svgItems.length === 0) {
                     svgList.innerHTML = '<div class="loading">没有找到SVG资源</div>';
@@ -546,16 +576,32 @@
                 }
                 
                 svgList.innerHTML = '';
-                
                 svgItems.forEach(item => {
                     const itemElement = document.createElement('div');
                     itemElement.className = 'svg-item';
                     itemElement.innerHTML = `
-                        <input type="checkbox" class="svg-checkbox" data-id="${item.id}" checked>
-                        <div class="svg-preview">${item.svg}</div>
-                        <div class="svg-name" title="${item.name}">${item.name}</div>
+                        <div style="display: flex; align-items: center;">
+                            <input type="checkbox" class="svg-checkbox" data-id="${item.id}" checked>
+                            <div class="svg-preview">${item.svg}</div>
+                            <div class="svg-name" title="${item.name}">${item.name}</div>
+                        </div>
+                        <button class="item-download-btn" data-svg-id="${item.id}">单独下载</button>
                     `;
                     svgList.appendChild(itemElement);
+                    
+                    const itemDownloadBtn = itemElement.querySelector('.item-download-btn');
+                    itemDownloadBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const svgId = e.currentTarget.dataset.svgId;
+                        const svgItem = svgItemCache.get(svgId);
+                        if (svgItem) {
+                            console.log('触发单个SVG下载:', svgItem.name, svgItem.id);
+                            downloadSingleSVG(svgItem, true);
+                        } else {
+                            showNotification('未找到该SVG资源，请刷新重试', 'error');
+                            console.error('单个下载失败：SVG项未找到，ID=', svgId);
+                        }
+                    });
                 });
             } catch (error) {
                 console.error('SVG扫描错误:', error);
@@ -564,7 +610,149 @@
         }, 300);
     }
 
-    // 增强的下载函数 - 支持多种下载方式
+    function downloadSingleSVG(svgItem, isSingleDownload = false) {
+        console.log('进入单个下载函数:', {
+            name: svgItem.name,
+            id: svgItem.id,
+            isSingle: isSingleDownload,
+            gmDownloadExists: typeof GM_download !== 'undefined',
+            fileSaverExists: typeof saveAs !== 'undefined'
+        });
+        
+        const cleanName = sanitizeFileName(svgItem.name);
+        const svgContent = `<?xml version="1.0" encoding="UTF-8"?>${svgItem.svg}`;
+        const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+        
+        if (isSingleDownload) {
+            try {
+                const url = URL.createObjectURL(blob);
+                blobUrls.push(url);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${cleanName}.svg`;
+                link.style.display = 'none';
+                
+                document.body.appendChild(link);
+                link.dispatchEvent(new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    button: 0
+                }));
+                
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    blobUrls = blobUrls.filter(u => u !== url);
+                }, 100);
+                
+                showNotification(`单独下载成功: ${cleanName}.svg`, 'success');
+                return;
+            } catch (nativeError) {
+                console.warn('原生下载失败，尝试FileSaver:', nativeError);
+            }
+            
+            try {
+                if (typeof saveAs !== 'undefined') {
+                    saveAs(blob, `${cleanName}.svg`);
+                    showNotification(`单独下载成功: ${cleanName}.svg`, 'success');
+                    return;
+                }
+            } catch (fsError) {
+                console.warn('FileSaver下载失败，尝试GM_download:', fsError);
+            }
+            
+            try {
+                if (typeof GM_download !== 'undefined') {
+                    const url = URL.createObjectURL(blob);
+                    blobUrls.push(url);
+                    
+                    GM_download({
+                        url: url,
+                        name: `${cleanName}.svg`,
+                        mimetype: 'image/svg+xml',
+                        onload: () => {
+                            showNotification(`单独下载成功: ${cleanName}.svg`, 'success');
+                            URL.revokeObjectURL(url);
+                            blobUrls = blobUrls.filter(u => u !== url);
+                        },
+                        onerror: (gmError) => {
+                            showNotification('单独下载失败，请检查浏览器权限', 'error');
+                            console.error('GM_download单独下载失败:', gmError);
+                            URL.revokeObjectURL(url);
+                            blobUrls = blobUrls.filter(u => u !== url);
+                        }
+                    });
+                    return;
+                }
+            } catch (gmFinalError) {
+                console.error('所有单独下载方案失败:', gmFinalError);
+                showNotification('单独下载失败，建议复制SVG手动保存', 'error');
+            }
+        }
+        
+        if (typeof GM_download !== 'undefined') {
+            const url = URL.createObjectURL(blob);
+            blobUrls.push(url);
+            
+            GM_download({
+                url: url,
+                name: `${cleanName}.svg`,
+                mimetype: 'image/svg+xml',
+                onload: () => {
+                    if (!isSingleDownload) showNotification(`下载成功: ${cleanName}.svg`, 'success');
+                    URL.revokeObjectURL(url);
+                    blobUrls = blobUrls.filter(u => u !== url);
+                },
+                onerror: (error) => {
+                    console.error('GM_download失败:', error);
+                    if (!isSingleDownload) showNotification('GM_download失败，尝试备用方案', 'warning');
+                    fallbackDownload(blob, `${cleanName}.svg`, isSingleDownload);
+                }
+            });
+            return;
+        }
+        
+        try {
+            saveAs(blob, `${cleanName}.svg`);
+            if (!isSingleDownload) showNotification(`下载成功: ${cleanName}.svg`, 'success');
+        } catch (error) {
+            console.error('下载失败:', error);
+            fallbackDownload(blob, `${cleanName}.svg`, isSingleDownload);
+        }
+    }
+
+    function downloadMultipleSVGs(items) {
+        const zip = new JSZip();
+        items.forEach(item => {
+            const cleanName = sanitizeFileName(item.name);
+            const svgContent = `<?xml version="1.0" encoding="UTF-8"?>${item.svg}`;
+            zip.file(`${cleanName}.svg`, svgContent);
+        });
+        
+        zip.generateAsync({
+            type: 'blob',
+            compression: 'DEFLATE',
+            compressionOptions: { level: 6 }
+        }).then(content => {
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-');
+            const zipName = `svg_collection_${timestamp}.zip`;
+            
+            try {
+                saveAs(content, zipName);
+                showNotification(`批量下载成功: ${zipName}`, 'success');
+            } catch (error) {
+                console.error('ZIP下载失败:', error);
+                fallbackDownload(content, zipName);
+            }
+        }).catch(error => {
+            console.error('ZIP创建失败:', error);
+            showNotification('创建压缩包失败，建议单个下载', 'error');
+            items.slice(0, 3).forEach(item => downloadSingleSVG(item, true));
+        });
+    }
+
     function downloadSelected() {
         const checkboxes = document.querySelectorAll('.svg-checkbox:checked');
         if (checkboxes.length === 0) {
@@ -575,7 +763,7 @@
         const selectedItems = [];
         checkboxes.forEach(checkbox => {
             const id = checkbox.dataset.id;
-            const item = globalSvgItems.find(i => i.id === id);
+            const item = svgItemCache.get(id) || globalSvgItems.find(i => i.id === id);
             if (item) {
                 selectedItems.push(item);
             }
@@ -586,96 +774,54 @@
             return;
         }
         
-        // 根据数量选择下载方式
+        clearBlobUrls();
         if (selectedItems.length === 1) {
-            downloadSingleSVG(selectedItems[0]);
+            downloadSingleSVG(selectedItems[0], false);
         } else {
             downloadMultipleSVGs(selectedItems);
         }
     }
 
-    // 下载单个SVG文件
-    function downloadSingleSVG(item) {
-        const cleanName = sanitizeFileName(item.name);
-        const blob = new Blob([item.svg], { type: 'image/svg+xml' });
-        
-        // 尝试多种下载方式
-        try {
-            // 方式1: 使用GM_download (如果可用)
-            if (typeof GM_download !== 'undefined') {
-                const url = URL.createObjectURL(blob);
-                GM_download({
-                    url: url,
-                    name: `${cleanName}.svg`,
-                    onload: () => URL.revokeObjectURL(url),
-                    onerror: (error) => {
-                        console.error('GM_download failed:', error);
-                        fallbackDownload(blob, `${cleanName}.svg`);
-                    }
-                });
-                return;
-            }
-            
-            // 方式2: 使用FileSaver.js
-            saveAs(blob, `${cleanName}.svg`);
-            
-        } catch (error) {
-            console.error('Download failed:', error);
-            // 方式3: 回退方案 - 创建下载链接
-            fallbackDownload(blob, `${cleanName}.svg`);
-        }
-    }
-
-    // 下载多个SVG文件（ZIP压缩包）
-    function downloadMultipleSVGs(items) {
-        const zip = new JSZip();
-        
-        items.forEach(item => {
-            const cleanName = sanitizeFileName(item.name);
-            zip.file(`${cleanName}.svg`, item.svg);
-        });
-        
-        zip.generateAsync({ type: 'blob' }).then(content => {
-            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-');
-            const zipName = `svg_collection_${timestamp}.zip`;
-            
-            try {
-                // 方式1: 使用FileSaver.js
-                saveAs(content, zipName);
-            } catch (error) {
-                console.error('ZIP download failed:', error);
-                // 方式2: 回退方案
-                fallbackDownload(content, zipName);
-            }
-        }).catch(error => {
-            console.error('ZIP creation failed:', error);
-            showNotification('创建压缩包失败，请尝试逐个下载', 'error');
-        });
-    }
-
-    // 回退下载方案
-    function fallbackDownload(blob, fileName) {
+    function fallbackDownload(blob, fileName, isSingleDownload = false) {
         try {
             const url = URL.createObjectURL(blob);
+            blobUrls.push(url);
+            
             const link = document.createElement('a');
             link.href = url;
             link.download = fileName;
             link.style.display = 'none';
             
             document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const event = new MouseEvent('click', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                button: 0
+            });
+            link.dispatchEvent(event);
             
-            // 清理URL
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                blobUrls = blobUrls.filter(u => u !== url);
+            }, 100);
+            
+            const msg = isSingleDownload ? 
+                `单独下载成功(备用): ${fileName}` : 
+                `下载成功(备用): ${fileName}`;
+            showNotification(msg, 'success');
             
         } catch (error) {
-            console.error('Fallback download failed:', error);
-            showNotification('下载失败，请检查浏览器设置', 'error');
+            console.error('备用下载失败:', error);
+            const msg = isSingleDownload ? 
+                '单独下载失败，请检查浏览器下载权限' : 
+                '下载失败，请检查浏览器下载权限';
+            showNotification(msg, 'error');
+            clearBlobUrls();
         }
     }
 
-    // 文件名清理函数
     function sanitizeFileName(name) {
         return name
             .replace(/[^\\w\\u4e00-\\u9fa5\\-\\s]/g, '_')
@@ -684,7 +830,6 @@
             .trim() || 'unnamed_svg';
     }
 
-    // 增强的通知函数
     function showNotification(message, type = 'info') {
         const colors = {
             info: '#3498db',
@@ -702,7 +847,6 @@
         }, 3000);
     }
 
-    // 复制选中的SVG代码
     function copySelected() {
         const checkboxes = document.querySelectorAll('.svg-checkbox:checked');
         if (checkboxes.length === 0) {
@@ -710,74 +854,81 @@
             return;
         }
         
-        // 构建SVG代码字符串
         let combinedCode = '';
-        
         checkboxes.forEach(checkbox => {
             const id = checkbox.dataset.id;
-            const item = globalSvgItems.find(i => i.id === id);
+            const item = svgItemCache.get(id) || globalSvgItems.find(i => i.id === id);
             if (item) {
                 combinedCode += `${item.svg}\n\n`;
             }
         });
         
-        // 尝试复制到剪贴板
         try {
             GM_setClipboard(combinedCode, 'text');
             showNotification(`已复制 ${checkboxes.length} 个SVG代码`, 'success');
         } catch (e) {
-            // 回退方案
             const textArea = document.createElement('textarea');
             textArea.value = combinedCode;
             document.body.appendChild(textArea);
             textArea.select();
             document.execCommand('copy');
             document.body.removeChild(textArea);
-            showNotification(`已复制 ${checkboxes.length} 个SVG代码 (使用回退方法)`, 'success');
+            showNotification(`已复制 ${checkboxes.length} 个SVG代码 (备用方法)`, 'success');
         }
     }
 
-    // 设置事件监听器
     function setupEventListeners() {
-        // 关闭模态框
         document.querySelector('.close-btn').addEventListener('click', () => {
             document.getElementById('svgSnifferModal').style.display = 'none';
             overlay.style.display = 'none';
+            clearBlobUrls();
+            svgItemCache.clear();
         });
         
-        // 点击遮罩层关闭模态框
         overlay.addEventListener('click', () => {
             document.getElementById('svgSnifferModal').style.display = 'none';
             overlay.style.display = 'none';
+            clearBlobUrls();
+            svgItemCache.clear();
         });
         
-        // 下载按钮
-        document.querySelector('.download-btn').addEventListener('click', downloadSelected);
+        document.getElementById('batchDownloadBtn').addEventListener('click', downloadSelected);
         
-        // 复制按钮
         document.querySelector('.copy-btn').addEventListener('click', copySelected);
         
-        // 全选/取消全选
         document.getElementById('selectAll').addEventListener('change', (e) => {
             const checkboxes = document.querySelectorAll('.svg-checkbox');
             checkboxes.forEach(checkbox => {
                 checkbox.checked = e.target.checked;
             });
         });
+        
+        window.addEventListener('beforeunload', () => {
+            clearBlobUrls();
+            svgItemCache.clear();
+        });
     }
 
-    // 初始化脚本
+    function clearBlobUrls() {
+        blobUrls.forEach(url => {
+            try {
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                console.warn('清理Blob URL失败:', e);
+            }
+        });
+        blobUrls = [];
+    }
+
     function init() {
         initRadarButton();
         setupEventListeners();
         
-        // 确保元素已正确添加到DOM
         setTimeout(() => {
             radarButton.style.display = 'flex';
         }, 100);
     }
 
-    // 启动脚本
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
