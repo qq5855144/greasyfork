@@ -19,8 +19,7 @@
 // @grant        GM_getValue
 // @run-at       document-body
 // @license     MIT
-// @downloadURL https://update.greasyfork.dpdns.org/scripts/513481/%E8%81%9A%E5%90%88%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E%E5%88%87%E6%8D%A2%28%E8%87%AA%E7%94%A8%29.user.js
-// @updateURL https://update.greasyfork.dpdns.org/scripts/513481/%E8%81%9A%E5%90%88%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E%E5%88%87%E6%8D%A2%28%E8%87%AA%E7%94%A8%29.meta.js
+// @downloadURL https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/sousuos.user.js
 // ==/UserScript==
 
 const punkDeafultMark = "Google-Bing-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
