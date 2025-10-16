@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.15
+// @version      v1.17
 // @author       晚风知我意
 // @match        *://*/*keyword=*
 // @match        *://*/*query=*
