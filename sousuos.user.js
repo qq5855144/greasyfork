@@ -19,7 +19,7 @@
 // @grant        GM_getValue
 // @run-at       document-body
 // @license     MIT
-// @downloadURL https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/sousuos.user.js
+// @downloadURL https://raw.githubusercontent.com/qq5855144/greasyfork/main/sousuos.user.js
 // ==/UserScript==
 
 const punkDeafultMark = "Google-Bing-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
