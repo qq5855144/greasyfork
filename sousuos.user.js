@@ -19,7 +19,7 @@
 // @grant        GM_getValue
 // @run-at       document-body
 // @license     MIT
-// @downloadURL https://raw.githubusercontent.com/qq5855144/greasyfork/main/sousuos.user.js
+// @downloadURL https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/sousuos.user.js
 // ==/UserScript==
 
 const punkDeafultMark = "Google-Bing-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
@@ -1856,7 +1856,7 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
 ` },
   {
     name: "GitHub",
-    searchUrl: "https://github.com/search?q={keyword}",
+    searchUrl: "https://github.com/search?q={keyword}+is%3Apublic",
     searchkeyName: ["q"],
     matchUrl: /github\.com.*?search\?q=/,
     mark: "GitHub",
