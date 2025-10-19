@@ -19,7 +19,7 @@
 // @grant        GM_getValue
 // @run-at       document-body
 // @license     MIT
-// @downloadURL https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/sousuos.user.js
+// @description 在页面底部显示一个聚合搜索引擎切换导航，支持自定义引擎和拖拽排序，(设置面板布局存在一些问题，感兴趣可以继续优化)
 // ==/UserScript==
 
 const punkDeafultMark = "Google-Bing-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
