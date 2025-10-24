@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.22
+// @version      v1.25
 // @author       晚风知我意
 // @match        *://*/*searchstring=*
 // @match        *://*/*searchquery=*
@@ -46,6 +46,7 @@
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @icon         https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/shousuo.svg
 // @run-at       document-body
 // @license     MIT
 // @description 在页面底部显示一个聚合搜索引擎切换导航，支持自定义引擎和拖拽排序，(新增搜索栏，具体操作-纸飞机-快捷搜索，支持网址跳转和关键词搜索)
