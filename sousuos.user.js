@@ -2688,10 +2688,11 @@ function createHamburgerMenu() {
             action: showSearchOverlay
         },
         {
-            icon: 'fas fa-cogs',
+            icon: 'far fa-sun',
             text: '引擎管理',
             action: showManagementPanel
         }
+        
     ];
 
     menuItems.forEach(item => {
@@ -3255,7 +3256,7 @@ function extractFromCurrentPage() {
     const searchInfo = extractSearchEngineFromPage();
 
     if (!searchInfo.found) {
-        alert("❌ 无法自动识别当前页面的搜索引擎。请手动添加。");
+        alert(" 无法自动识别当前页面的搜索引擎。请手动添加。");
         return;
     }
 
@@ -3336,7 +3337,7 @@ function previewIcon() {
             preview.style.fontSize = "24px";
         }
     } catch (e) {
-        alert("❌ 图标预览失败: " + e.message);
+        alert(" 图标预览失败: " + e.message);
     }
 }
 
@@ -3349,12 +3350,12 @@ function saveNewEngine() {
     const iconValue = document.getElementById("icon-input").value.trim();
 
     if (!name || !mark || !url || keys.length === 0) {
-        alert("❌ 请填写所有必填字段");
+        alert(" 请填写所有必填字段");
         return;
     }
 
     if (searchUrlMap.some(engine => engine.mark === mark)) {
-        alert("❌ 标识已存在，请使用其他标识");
+        alert(" 标识已存在，请使用其他标识");
         return;
     }
 
@@ -3702,7 +3703,11 @@ hamburgerButton.style.cssText = `
     height: 32px;
     border: 1px solid #f0f0f0;
     border-radius: 7px;
-    background: white;
+    background-color: rgba(255, 255, 255, 1);
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1), 
+                        0px 0px 0px rgba(255, 255, 255, 0.5), 
+                        6px 6px 10px rgba(0, 0, 0, 0.1) inset, 
+                        -6px -6px 10px rgba(255, 255, 255, 0) inset;
     cursor: pointer;
     margin: 3px;
     flex-shrink: 0;
@@ -3819,144 +3824,142 @@ function injectStyle() {
         }
 
         const cssNode = document.createElement("style");
-        cssNode.id = "engine-container-style";
-        cssNode.textContent = `
-        .engine-container {
-            display: flex;
-            position: fixed;
-            bottom: 0px;
-            left: 2%;
-            width: 96%;
-            height: 36px;
-            overflow: hidden;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            background-color: rgba(255, 255, 255, 0);
-            margin-top: 1px;
-            transition: all 0.3s ease;
-            transform: translateY(0);
-            opacity: 1;
-            overflow-y: hidden;
-            overflow-x: visible;
-        }
+cssNode.id = "engine-container-style";
+cssNode.textContent = `
+    .engine-container {
+        display: flex;
+        position: fixed;
+        bottom: 0px;
+        left: 2%;
+        width: 96%;
+        height: 36px;
+        overflow: hidden;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        background-color: rgba(255, 255, 255, 0);
+        margin-top: 1px;
+        transition: all 0.3s ease;
+        transform: translateY(0);
+        opacity: 1;
+        overflow-y: hidden;
+        overflow-x: visible;
+    }
 
-        .engine-container.hidden {
-            transform: translateY(100%);
+    .engine-container.hidden {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    .engine-display {
+        display: flex;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        height: 100%;
+        gap: 0px;
+        flex-grow: 1;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .engine-display::-webkit-scrollbar {
+        display: none;
+    }
+
+    .engine-button {
+        width: 55.5px;
+        height: 32px;
+        padding: 0;
+        border: 1px solid #f0f0f0;
+        border-radius: 8px;
+        background-color: rgba(255, 255, 255, 1);
+        color: transparent;
+        font-size: 14px;
+        cursor: pointer;
+        margin: 2px;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        backdrop-filter: blur(5px);
+        box-shadow: 
+            1px 1px 1px rgba(0, 0, 0, 0.1),
+            0px 0px 0px rgba(255, 255, 255, 0.5),
+            6px 6px 10px rgba(0, 0, 0, 0.1) inset,
+            -6px -6px 10px rgba(255, 255, 255, 0) inset;
+        transition: all 0.3s ease;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+
+    .engine-button:focus {
+        border: 2px dashed #2196F3;
+        background-color: #f0f8ff;
+    }
+
+    .engine-button.selected {
+        border: 2px dashed #2196F3;
+        background-color: #f0f8ff;
+    }
+
+    .engine-button.dragging {
+        opacity: 0.5;
+        transform: rotate(5deg);
+    }
+
+    .engine-button.drag-over {
+        border: 2px dashed #2196F3;
+        background-color: #f0f8ff;
+    }
+
+    .engine-card {
+        transition: all 0.3s ease;
+    }
+
+    #engine-management-panel {
+        animation: slideIn 0.3s ease;
+    }
+
+    #punkjet-hamburger-menu {
+        animation: slideInLeft 0.3s ease;
+    }
+
+    #punkjet-search-overlay {
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translate(-50%, -48%);
+        }
+        to {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+        }
+    }
+
+    @keyframes slideInLeft {
+        from {
+            opacity: 0;
+            transform: translateX(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes fadeIn {
+        from {
             opacity: 0;
         }
-
-        .engine-display {
-            display: flex;
-            overflow-x: auto;
-            overflow-y: hidden;
-            white-space: nowrap;
-            height: 100%;
-            gap: 0px;
-            flex-grow: 1;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
+        to {
+            opacity: 1;
         }
+    }
+`;
 
-        .engine-display::-webkit-scrollbar {
-            display: none;
-        }
-
-        .engine-button {
-            width: 55.5px;
-            height: 32px;
-            padding: 0;
-            border: 1px solid #f0f0f0;
-            border-radius: 8px;
-            background-color: rgba(255, 255, 255, 1);
-            color: transparent;
-            font-size: 14px;
-            cursor: pointer;
-            margin: 2px;
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            backdrop-filter: blur(5px);
-            box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1), 
-                        0px 0px 0px rgba(255, 255, 255, 0.5), 
-                        6px 6px 10px rgba(0, 0, 0, 0.1) inset, 
-                        -6px -6px 10px rgba(255, 255, 255, 0) inset;
-            transition: all 0.3s ease;
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-
-        .engine-button:focus {
-            outline: none;
-            border-color: #ffb61e;
-        }
-
-        .engine-button.selected {
-            border: 1px solid #ffb61e;
-            color: transparent;
-        }
-
-        .engine-button.dragging {
-            opacity: 0.5;
-            transform: rotate(5deg);
-        }
-
-        .engine-button.drag-over {
-            border: 2px dashed #2196F3;
-            background-color: #f0f8ff;
-        }
-
-        .context-menu-item:hover {
-            background-color: #f8f9fa;
-        }
-
-        .engine-card {
-            transition: all 0.3s ease;
-        }
-
-        #engine-management-panel {
-            animation: slideIn 0.3s ease;
-        }
-
-        #punkjet-hamburger-menu {
-            animation: slideInLeft 0.3s ease;  // 改为从左侧滑入
-        }
-
-        #punkjet-search-overlay {
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translate(-50%, -48%);
-            }
-            to {
-                opacity: 1;
-                transform: translate(-50%, -50%);
-            }
-        }
-
-        @keyframes slideInLeft {
-            from {
-                opacity: 0;
-                transform: translateX(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-            to {
-                opacity: 1;
-            }
-        }
-    `;
         document.head.appendChild(cssNode);
     } catch (error) {
         console.error("注入样式时出错:", error.message);
