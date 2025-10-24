@@ -1874,6 +1874,16 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
       <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 40 16"><path fill="#eab308" d="m5.375 2.647l.006-.028l.016-.118l-.74-.004c-.668-.004-.873 0-.891.017c-.009.008-.24.885-.651 2.473c-.196.758-.361 1.363-.367 1.345s-.24-.883-.522-1.922a107 107 0 0 0-.524-1.901c-.01-.01-.906-.014-1.632-.008c-.105.001-.164-.205.938 3.299c.152.485.381 1.172.507 1.526c.146.408.25.724.321.987c.126.501.13.815.103 1.182c-.032.423-.036 3.413-.005 3.463c.024.038 1.425.056 1.558.02c.021-.006.035-.026.045-.139c.033-.097.036-.484.036-2.09V8.698l.09-.283c.059-.185.206-.672.328-1.082l.327-1.09c.529-1.724 1.033-3.419 1.047-3.516l.011-.079zm7.846 2.488v.107h-.017l-.009 2.953l-.009 2.863l-.229.233c-.257.261-.462.361-.648.314c-.203-.051-.197.028-.214-3.356l-.016-3.115h-1.474v.107h-.017v3.38c0 3.621 0 3.619.184 3.982c.146.29.36.431.725.479c.481.064 1-.154 1.481-.622l.209-.203v.351c0 .303.009.353.064.368c.09.025 1.206.027 1.326.002l.1-.021v-.104l.017-.003V5.114l-1.472.02zM9.483 6.661c-.14-.599-.401-1.002-.832-1.28c-.676-.437-1.449-.484-2.165-.13c-.522.258-.859.686-1.032 1.314a1.4 1.4 0 0 0-.047.231c-.044.222-.049.552-.061 2.093c-.018 2.374.01 2.656.307 3.195c.292.529.897.917 1.556.997c.198.024.6-.013.832-.078c.525-.146 1.029-.561 1.252-1.032a1.8 1.8 0 0 0 .189-.604c.065-.353.07-.925.07-2.381c0-1.857-.006-2.06-.068-2.326zM7.802 11.5a.7.7 0 0 1-.515.098c-.135-.029-.318-.241-.374-.434c-.07-.241-.075-3.594-.015-4.251c.1-.329.378-.501.682-.419c.237.064.358.212.427.523c.051.231.057.518.046 2.207c-.007 1.12-.011 1.668-.048 1.962c-.037.185-.099.235-.203.315zm28.142-3.154h.712l-.011-.645c-.011-.592-.02-.659-.099-.82c-.125-.253-.309-.366-.601-.366c-.351 0-.573.17-.678.518c-.045.148-.092 1.167-.058 1.255c.019.049.121.058.735.058m-4.76-1.467a.49.49 0 0 0-.477-.278a.9.9 0 0 0-.508.203l-.127.097v4.634l.127.097c.288.22.604.266.822.12a.48.48 0 0 0 .186-.263c.057-.164.062-.375.055-2.325c-.008-2.032-.012-2.152-.078-2.285"/><path fill="#eab308" d="M40.014 4.791c-.142-1.701-.255-2.253-.605-2.962C38.944.89 38.273.395 37.317.286c-.739-.084-3.521-.203-6.094-.26c-4.456-.099-11.782.092-12.718.331a2.25 2.25 0 0 0-1.094.634c-.591.588-.944 1.432-1.085 2.6c-.323 2.666-.33 5.886-.019 8.649c.134 1.188.41 1.96.928 2.596c.323.397.881.734 1.379.835c.35.071 2.1.169 4.65.26c.38.014 1.385.037 2.235.052c1.77.031 5.025.013 6.886-.039c1.252-.035 3.534-.128 3.961-.161c.12-.009.398-.027.618-.039c.739-.042 1.209-.196 1.65-.543c.571-.449 1.013-1.278 1.2-2.251c.177-.92.295-2.559.319-4.42c.02-1.555-.007-2.393-.119-3.741zM22.27 4.175l-.828.01l-.036 8.83l-.718.009c-.555.008-.724-.001-.737-.036c-.01-.025-.021-2.016-.026-4.424l-.009-4.379l-1.617-.02v-1.38l4.779.019l.02 1.36zm5.077 5.061v3.797h-1.308v-.4c0-.301-.011-.4-.047-.4c-.026 0-.144.099-.263.22c-.259.263-.565.474-.827.572c-.542.203-1.056.084-1.275-.293c-.201-.345-.204-.423-.204-4.005v-3.29h1.307l.01 3.098c.01 3.044.011 3.1.084 3.224c.097.164.244.209.478.144c.138-.038.232-.105.455-.327l.282-.28V5.437h1.308v3.797zm5.102 3.255c-.115.257-.372.508-.583.57c-.549.162-.99.03-1.499-.449c-.158-.149-.305-.269-.327-.269q-.04 0-.041.345v.345h-1.308V2.785h1.308v1.672c0 .919.012 1.672.027 1.672s.153-.122.307-.27c.354-.341.649-.491 1.024-.519c.669-.051 1.068.294 1.25 1.08c.057.245.062.525.062 2.798c0 2.768 0 2.78-.221 3.273zm5.535-1.52a5 5 0 0 1-.077.727c-.182.674-.666 1.152-1.366 1.348c-.942.264-1.98-.168-2.394-.997c-.232-.465-.241-.558-.241-2.831c0-1.853.007-2.081.066-2.334c.168-.715.584-1.178 1.289-1.435c.204-.074.417-.113.63-.117c.761-.016 1.515.393 1.832 1.059c.213.449.24.642.261 1.908l.019 1.136l-2.789.019l-.01.763c-.015 1.077.058 1.408.349 1.603c.244.165.62.152.824-.027c.192-.168.246-.349.265-.877l.017-.463h1.347z"/></svg>
     `
   },
+  
+  {
+"name": "Baidu图片",
+"searchUrl": "https://www.baidu.com/sf/vsearch?pd=image_content&from={source}&atn=page&fr=tab&tn=vsearch&ss=100&sa=tb&rsv_sug4={suggestion}&inputT={input_time}&oq={original_query}&word={keyword}",
+"searchkeyName": ["keyword", "source", "suggestion", "input_time", "original_query"],
+"matchUrl": /baidu\.com\/sf\/vsearch.*?word=/g,
+"mark": "Baidutp",
+"svgCode": ` <svg class="icon" style="width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;" viewBox="-80 -80 1184 1184" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5096" data-spm-anchor-id="a313x.search_index.i1.i0.7d613a81c9IUMe"><path d="M483.84 368.64h30.72v161.28h-71.68c-12.8-2.56-23.04-10.24-30.72-20.48-5.12-7.68-10.24-15.36-10.24-25.6-2.56-10.24-2.56-17.92 0-28.16 2.56-10.24 7.68-20.48 15.36-28.16 5.12-5.12 15.36-10.24 23.04-12.8 2.56 0 7.68-2.56 10.24-2.56h33.28v-43.52m-35.84 71.68c-5.12 2.56-12.8 7.68-15.36 12.8-2.56 5.12-2.56 10.24-2.56 17.92 0 7.68 2.56 15.36 5.12 20.48 5.12 7.68 12.8 10.24 20.48 10.24h25.6v-64h-28.16c0 2.56-2.56 2.56-5.12 2.56z m81.92-25.6h30.72v74.24c0 2.56 0 7.68 2.56 7.68 2.56 2.56 5.12 2.56 10.24 2.56h33.28v-87.04h30.72v112.64H563.2c-7.68 0-15.36-2.56-20.48-7.68-7.68-5.12-10.24-15.36-10.24-23.04-2.56-25.6-2.56-51.2-2.56-79.36z" fill="#FCFBFF" p-id="5097"></path><path d="M468.48 102.4c10.24-2.56 17.92 0 28.16 5.12 12.8 7.68 20.48 20.48 25.6 35.84 7.68 20.48 7.68 46.08-2.56 66.56-5.12 10.24-10.24 20.48-17.92 28.16-7.68 5.12-15.36 10.24-25.6 10.24s-17.92-2.56-25.6-7.68c-10.24-10.24-17.92-23.04-23.04-35.84-5.12-20.48-5.12-43.52 2.56-61.44 5.12-15.36 10.24-25.6 23.04-33.28l15.36-7.68z m138.24 10.24c7.68-2.56 12.8 0 20.48 2.56 7.68 5.12 12.8 12.8 20.48 20.48 7.68 10.24 12.8 23.04 15.36 35.84 2.56 10.24 0 17.92-2.56 28.16-2.56 10.24-7.68 20.48-12.8 30.72-5.12 7.68-12.8 15.36-20.48 20.48-7.68 5.12-17.92 7.68-25.6 5.12-10.24 0-23.04-5.12-30.72-12.8-7.68-7.68-12.8-17.92-15.36-28.16-2.56-10.24-2.56-23.04 0-33.28s5.12-20.48 10.24-28.16c5.12-10.24 12.8-17.92 20.48-23.04 5.12-10.24 12.8-15.36 20.48-17.92z m-245.76 97.28c10.24-2.56 20.48 0 28.16 5.12 12.8 7.68 23.04 17.92 30.72 33.28 2.56 5.12 5.12 10.24 5.12 17.92 2.56 15.36 2.56 30.72-2.56 46.08-2.56 10.24-7.68 20.48-15.36 25.6-10.24 7.68-23.04 12.8-35.84 12.8-10.24 0-20.48-5.12-30.72-10.24-10.24-10.24-17.92-23.04-20.48-35.84-2.56-10.24-2.56-17.92-2.56-28.16 2.56-15.36 7.68-30.72 15.36-46.08 5.12-10.24 15.36-17.92 28.16-20.48z m320 35.84c12.8-2.56 23.04 0 35.84 5.12 10.24 5.12 17.92 12.8 23.04 23.04 5.12 7.68 7.68 17.92 7.68 25.6 0 12.8 0 25.6-2.56 38.4-2.56 10.24-5.12 17.92-10.24 25.6-5.12 7.68-12.8 12.8-23.04 15.36-7.68 2.56-17.92 2.56-25.6 2.56-10.24 0-20.48-5.12-28.16-10.24-7.68-5.12-12.8-12.8-15.36-23.04-2.56-12.8-5.12-25.6-2.56-35.84 0-12.8 2.56-25.6 7.68-38.4 2.56-7.68 10.24-17.92 17.92-23.04 2.56-2.56 7.68-5.12 15.36-5.12z m-161.28 48.64c12.8-2.56 23.04 0 35.84 5.12 17.92 7.68 30.72 23.04 40.96 38.4 12.8 17.92 28.16 33.28 40.96 48.64 15.36 15.36 30.72 28.16 46.08 40.96l7.68 7.68c12.8 12.8 20.48 28.16 20.48 46.08 2.56 17.92-2.56 35.84-10.24 53.76-5.12 12.8-15.36 23.04-25.6 28.16-15.36 7.68-35.84 10.24-53.76 10.24-17.92 0-35.84-5.12-51.2-10.24-20.48-5.12-40.96-7.68-64-5.12-10.24 0-20.48 2.56-28.16 5.12-23.04 2.56-43.52 5.12-66.56 2.56-17.92 0-35.84-10.24-48.64-23.04-7.68-7.68-12.8-17.92-15.36-30.72-2.56-10.24-5.12-20.48-5.12-30.72 0-12.8 5.12-25.6 10.24-35.84 7.68-15.36 23.04-30.72 35.84-40.96 5.12-2.56 7.68-5.12 12.8-10.24 7.68-5.12 15.36-12.8 20.48-17.92 12.8-12.8 25.6-25.6 33.28-40.96 2.56-5.12 5.12-7.68 7.68-12.8 17.92-15.36 35.84-25.6 56.32-28.16m-35.84 74.24v46.08h-33.28c-2.56 0-7.68 0-10.24 2.56-7.68 2.56-15.36 7.68-23.04 12.8-7.68 7.68-12.8 17.92-15.36 28.16-2.56 10.24-2.56 17.92 0 28.16 2.56 7.68 5.12 17.92 10.24 25.6 7.68 10.24 17.92 17.92 30.72 20.48 5.12 2.56 12.8 0 17.92 0h53.76v-161.28c-10.24-2.56-20.48-2.56-30.72-2.56m46.08 46.08v81.92c0 7.68 2.56 17.92 10.24 23.04 5.12 5.12 12.8 7.68 20.48 7.68h74.24v-112.64h-30.72v87.04h-33.28c-2.56 0-7.68 0-10.24-2.56-2.56-2.56-2.56-5.12-2.56-7.68v-74.24c-7.68-2.56-17.92-2.56-28.16-2.56z" fill="#306CFF" p-id="5098"></path><path d="M448 440.32c2.56 0 5.12-2.56 7.68-2.56h28.16v64h-25.6c-7.68 0-17.92-5.12-20.48-10.24-5.12-5.12-5.12-12.8-5.12-20.48 0-5.12 0-12.8 2.56-17.92 2.56-5.12 7.68-10.24 12.8-12.8z" fill="#306CFF" p-id="5099"></path><path d="M294.4 704h33.28v-7.68h43.52v7.68h30.72v23.04h-30.72V768h-43.52v-40.96h-33.28v192H238.08v-250.88H358.4v-10.24h74.24v10.24h87.04v25.6h-225.28v10.24z m0 61.44l7.68-33.28h20.48l-7.68 33.28h-20.48z m102.4 92.16H384l-23.04 61.44h-61.44l25.6-61.44h-25.6v-81.92h53.76l2.56-5.12h64l-2.56 5.12h89.6v81.92h-15.36l-5.12 17.92h12.8v-7.68h12.8l2.56 25.6H460.8v-15.36l7.68-17.92h-15.36v40.96h64v20.48h-122.88l2.56-64z m-17.92-61.44h-25.6v10.24h25.6v-10.24z m-23.04 28.16v12.8h25.6v-12.8h-25.6z m43.52-58.88h-23.04l-5.12-33.28h20.48l7.68 33.28z m2.56 0l7.68-33.28h23.04l-7.68 33.28h-23.04z m33.28-38.4h-30.72v-23.04H435.2v-7.68h43.52v7.68h38.4v23.04h-38.4V768H435.2v-40.96z m20.48 79.36v-10.24h-25.6v10.24h25.6z m0 17.92h-25.6v12.8h25.6v-12.8z m58.88-58.88h-25.6l-7.68-33.28h25.6l7.68 33.28zM545.28 663.04h276.48v256H545.28v-256z m53.76 28.16v202.24H768V691.2h-168.96z m84.48 61.44l20.48-25.6h-102.4l17.92-33.28h56.32l-5.12 7.68h92.16v20.48l-20.48 33.28 25.6 51.2h-61.44l-23.04-46.08-20.48 46.08h-61.44l23.04-51.2-17.92-20.48H665.6l17.92 17.92z m-79.36 58.88l158.72 10.24v25.6l-158.72-10.24v-25.6z m0 64v-25.6l158.72 10.24v25.6l-158.72-10.24z" fill="#306CFF" p-id="5100"></path></svg> `
+},
+  
   {
     name: "淘宝",
     searchUrl: "https://s.taobao.com/search?q={keyword}",
@@ -2016,9 +2026,8 @@ let hasUnsavedChanges = false;
 let scrollTimeout = null;
 let isScrolling = false;
 let hideTimeout = null;
-let touchStartY = null; // 补充触摸起始Y坐标变量
+let touchStartY = null;
 
-// 检查容器是否已存在
 function engineContainerExists() {
     return document.querySelector('.engine-container') !== null;
 }
@@ -2027,14 +2036,12 @@ function isValidScope() {
     return searchUrlMap.some(item => window.location.href.match(item.matchUrl) != null);
 }
 
-// 【修复1：优化关键词提取，优先从URL参数提取，兼容更多搜索参数】
 function getKeywords() {
     try {
         let keywords = "";
         const url = new URL(window.location.href);
         const searchParams = url.searchParams;
         
-        // 1. 优先从URL搜索参数提取（覆盖更多常见参数）
         const commonSearchParams = ['q', 'query', 'search', 'keyword', 'keywords', 'wd', 'key'];
         for (const param of commonSearchParams) {
             if (searchParams.has(param)) {
@@ -2043,7 +2050,6 @@ function getKeywords() {
             }
         }
 
-        // 2. 若URL无参数，尝试从当前页面匹配的搜索引擎配置提取
         if (!keywords) {
             for (let urlItem of searchUrlMap) {
                 if (window.location.href.match(urlItem.matchUrl) != null) {
@@ -2058,7 +2064,6 @@ function getKeywords() {
             }
         }
 
-        // 3. 若仍无结果，从存储中取历史成功关键词
         if (keywords) {
             localStorage.setItem("last_successful_keywords", keywords);
             sessionStorage.setItem("last_successful_keywords", keywords);
@@ -2072,9 +2077,7 @@ function getKeywords() {
     }
 }
 
-// 【修复2：强化输入框监听，确保所有输入框变化都被捕获】
 function monitorInputFields() {
-    // 立即监听现有输入框
     const inputFields = document.querySelectorAll('input[type="text"], input[type="search"], textarea, input#kw');
     inputFields.forEach(input => {
         if (!input.dataset.monitored) {
@@ -2082,19 +2085,15 @@ function monitorInputFields() {
             input.addEventListener('input', (event) => {
                 currentInput = event.target.value.trim();
                 sessionStorage.setItem("currentInput", currentInput);
-                console.log("捕获输入变化:", currentInput); // 调试用
             });
             
-            // 添加change事件监听，确保值变化被捕获
             input.addEventListener('change', (event) => {
                 currentInput = event.target.value.trim();
                 sessionStorage.setItem("currentInput", currentInput);
-                console.log("捕获输入变化(change):", currentInput); // 调试用
             });
         }
     });
 
-    // 监听动态新增的输入框（如SPA页面加载的输入框）
     const observer = new MutationObserver(() => {
         const newInputFields = document.querySelectorAll('input[type="text"], input[type="search"], textarea, input#kw:not([data-monitored])');
         newInputFields.forEach(input => {
@@ -2102,13 +2101,11 @@ function monitorInputFields() {
             input.addEventListener('input', (event) => {
                 currentInput = event.target.value.trim();
                 sessionStorage.setItem("currentInput", currentInput);
-                console.log("动态捕获输入变化:", currentInput); // 调试用
             });
             
             input.addEventListener('change', (event) => {
                 currentInput = event.target.value.trim();
                 sessionStorage.setItem("currentInput", currentInput);
-                console.log("动态捕获输入变化(change):", currentInput); // 调试用
             });
         });
     });
@@ -2121,7 +2118,6 @@ function monitorInputFields() {
     });
 }
 
-// 更新搜索框位置和显示状态
 function updateSearchBoxPosition() {
     const punkJetBox = document.getElementById("punkjet-search-box");
     if (!punkJetBox) return;
@@ -2130,7 +2126,6 @@ function updateSearchBoxPosition() {
     punkJetBox.style.left = "2%";
     punkJetBox.style.width = "96%";
     
-    // 根据可见性设置不同的过渡效果
     if (punkJetBoxVisible) {
         punkJetBox.style.transform = "translateY(0)";
         punkJetBox.style.opacity = "1";
@@ -2140,27 +2135,21 @@ function updateSearchBoxPosition() {
     }
 }
 
-// 显示搜索引擎栏
 function showSearchBox() {
     if (!punkJetBoxVisible) {
         punkJetBoxVisible = true;
         updateSearchBoxPosition();
-        console.log("显示搜索引擎栏");
     }
 }
 
-// 隐藏搜索引擎栏
 function hideSearchBox() {
     if (punkJetBoxVisible) {
         punkJetBoxVisible = false;
         updateSearchBoxPosition();
-        console.log("隐藏搜索引擎栏");
     }
 }
 
-// 立即显示搜索引擎栏（用于点击等交互）
 function showSearchBoxImmediately() {
-    // 清除所有相关的定时器
     if (scrollTimeout) {
         clearTimeout(scrollTimeout);
         scrollTimeout = null;
@@ -2173,68 +2162,63 @@ function showSearchBoxImmediately() {
     showSearchBox();
 }
 
-// 延迟显示搜索引擎栏（10秒后）
 function showSearchBoxDelayed() {
-    // 清除之前的延迟显示定时器
     if (hideTimeout) {
         clearTimeout(hideTimeout);
     }
     
-    // 设置10秒后显示
     hideTimeout = setTimeout(() => {
         showSearchBox();
         hideTimeout = null;
-        console.log("滚动停止10秒后显示搜索引擎栏");
     }, 10000);
 }
 
-// 滚动事件处理
 function handleScroll() {
     const st = window.pageYOffset || document.documentElement.scrollTop;
     
-    // 清除之前的滚动超时
+    const isInteractingWithSearchBar = document.querySelector('.engine-container:hover') !== null;
+    if (isInteractingWithSearchBar) {
+        return;
+    }
+    
     if (scrollTimeout) {
         clearTimeout(scrollTimeout);
     }
     
-    // 设置滚动状态
     isScrolling = true;
     
     if (st > lastScrollTop && st > 50) {
-        // 向下滚动 - 隐藏搜索栏
         hideSearchBox();
     } else {
-        // 向上滚动 - 立即显示搜索栏
         showSearchBoxImmediately();
     }
     
     lastScrollTop = st <= 0 ? 0 : st;
     
-    // 设置滚动结束检测
     scrollTimeout = setTimeout(() => {
         isScrolling = false;
-        // 滚动结束后延迟10秒显示搜索栏
         showSearchBoxDelayed();
     }, 150);
 }
 
-// 触摸事件处理（移动设备）- 补充变量定义修复
 function handleTouchStart(e) {
     touchStartY = e.touches[0].clientY;
 }
 
 function handleTouchMove(e) {
-    if (touchStartY === null) return; // 修复判断逻辑
+    if (touchStartY === null) return;
+    
+    if (e.target.closest('.engine-container')) {
+        return;
+    }
     
     const touchY = e.touches[0].clientY;
     const diff = touchStartY - touchY;
     
-    if (Math.abs(diff) > 10) { // 最小滑动距离
+    if (Math.abs(diff) > 10) {
         if (diff > 0) {
-            // 向上滑动 - 隐藏
             hideSearchBox();
         } else {
-            // 向下滑动 - 立即显示
             showSearchBoxImmediately();
         }
     }
@@ -2242,13 +2226,10 @@ function handleTouchMove(e) {
 
 function handleTouchEnd() {
     touchStartY = null;
-    // 触摸结束后延迟10秒显示搜索栏
     showSearchBoxDelayed();
 }
 
-// 鼠标滚轮事件处理（桌面设备）
 function handleWheel(e) {
-    // 延迟处理以确保滚动方向正确
     setTimeout(() => {
         const st = window.pageYOffset || document.documentElement.scrollTop;
         
@@ -2260,48 +2241,48 @@ function handleWheel(e) {
         
         lastScrollTop = st <= 0 ? 0 : st;
         
-        // 滚轮操作后也设置延迟显示
         showSearchBoxDelayed();
     }, 10);
 }
 
-// 初始化滚动监听
 function initScrollListener() {
-    // 添加滚动事件监听
     window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // 添加鼠标滚轮事件监听（桌面设备）
     window.addEventListener('wheel', handleWheel, { passive: true });
-    
-    // 添加触摸事件监听（移动设备）
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
     window.addEventListener('touchmove', handleTouchMove, { passive: true });
     window.addEventListener('touchend', handleTouchEnd, { passive: true });
     
-    // 点击页面时立即显示搜索栏
     document.addEventListener('click', (e) => {
-        // 排除管理面板内的点击
-        if (!e.target.closest('#engine-management-panel')) {
+        if (!e.target.closest('#engine-management-panel') && !e.target.closest('.engine-container')) {
             showSearchBoxImmediately();
         }
     });
     
-    // 输入框聚焦时立即显示搜索栏
     document.addEventListener('focusin', (e) => {
         if (e.target.matches('input, textarea')) {
             showSearchBoxImmediately();
         }
     });
     
-    // 鼠标移动到搜索栏区域时立即显示
     document.addEventListener('mouseenter', (e) => {
         if (e.target.closest('.engine-container') || e.target.closest('.engine-button')) {
             showSearchBoxImmediately();
         }
     }, true);
+    
+    document.addEventListener('wheel', (e) => {
+        if (e.target.closest('.engine-container')) {
+            e.stopPropagation();
+        }
+    }, { passive: true });
+    
+    document.addEventListener('touchmove', (e) => {
+        if (e.target.closest('.engine-container')) {
+            e.stopPropagation();
+        }
+    }, { passive: true });
 }
 
-// 从当前页面获取搜索引擎信息
 function extractSearchEngineFromPage() {
     const searchForms = document.querySelectorAll('form[action*="search"], form[action*="query"], form[action*="find"]');
     const searchInputs = document.querySelectorAll('input[type="search"], input[name*="search"], input[name*="query"], input[name*="q"]');
@@ -2372,7 +2353,6 @@ function extractSearchEngineFromPage() {
     return searchInfo;
 }
 
-// 创建管理面板（保持不变）
 function createManagementPanel() {
     const panel = document.createElement("div");
     panel.id = "engine-management-panel";
@@ -2396,7 +2376,6 @@ function createManagementPanel() {
     panel.style.flexDirection = "column";
     panel.style.boxSizing = "border-box";
 
-    // 顶栏 - 固定高度 15vh
     const header = document.createElement("div");
     header.style.height = "15vh";
     header.style.minHeight = "80px";
@@ -2436,7 +2415,6 @@ function createManagementPanel() {
 
     panel.appendChild(header);
 
-    // 主内容区域 - 固定高度 65vh
     const content = document.createElement("div");
     content.style.height = "65vh";
     content.style.minHeight = "300px";
@@ -2448,7 +2426,6 @@ function createManagementPanel() {
     content.style.flexDirection = "column";
     content.style.flexShrink = "0";
 
-    // 快速操作栏
     const quickActions = document.createElement("div");
     quickActions.style.padding = "20px";
     quickActions.style.display = "flex";
@@ -2477,1189 +2454,1144 @@ function createManagementPanel() {
     rightActionGroup.style.flexWrap = "wrap";
 
     const saveBtn = document.createElement("button");
-    saveBtn.id
-saveBtn.id = "panel-save-btn";
-        saveBtn.innerHTML = "💾 保存设置";
-        saveBtn.title = "保存当前设置";
-        saveBtn.style.cssText = `
-            padding: 10px 20px;
-            background: #95a5a6;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: all 0.3s ease;
-            opacity: 0.7;
-            pointer-events: none;
-            min-width: 120px;
-            justify-content: center;
-        `;
+    saveBtn.id = "panel-save-btn";
+    saveBtn.innerHTML = "💾 保存设置";
+    saveBtn.title = "保存当前设置";
+    saveBtn.style.cssText = `
+        padding: 10px 20px;
+        background: #95a5a6;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.3s ease;
+        opacity: 0.7;
+        pointer-events: none;
+        min-width: 120px;
+        justify-content: center;
+    `;
 
-        const resetBtn = createActionButton("🔄 恢复默认", "#e74c3c", "恢复默认搜索引擎设置");
+    const resetBtn = createActionButton("🔄 恢复默认", "#e74c3c", "恢复默认搜索引擎设置");
 
-        rightActionGroup.appendChild(saveBtn);
-        rightActionGroup.appendChild(resetBtn);
+    rightActionGroup.appendChild(saveBtn);
+    rightActionGroup.appendChild(resetBtn);
 
-        quickActions.appendChild(leftActionGroup);
-        quickActions.appendChild(rightActionGroup);
-        content.appendChild(quickActions);
+    quickActions.appendChild(leftActionGroup);
+    quickActions.appendChild(rightActionGroup);
+    content.appendChild(quickActions);
 
-        // 列表区域 - 可滚动
-        const listSection = document.createElement("div");
-        listSection.style.flex = "1";
-        listSection.style.overflow = "hidden";
-        listSection.style.padding = "0 20px";
-        listSection.style.boxSizing = "border-box";
-        listSection.style.display = "flex";
-        listSection.style.flexDirection = "column";
-        listSection.style.overflow = "auto"
+    const listSection = document.createElement("div");
+    listSection.style.flex = "1";
+    listSection.style.overflow = "hidden";
+    listSection.style.padding = "0 20px";
+    listSection.style.boxSizing = "border-box";
+    listSection.style.display = "flex";
+    listSection.style.flexDirection = "column";
+    listSection.style.overflow = "auto"
 
-        const listTitle = document.createElement("h3");
-        listTitle.textContent = "📋 已配置的搜索引擎";
-        listTitle.style.color = "#2c3e50";
-        listTitle.style.margin = "15px 0";
-        listTitle.style.fontWeight = "500";
-        listTitle.style.flexShrink = "0";
-        listSection.appendChild(listTitle);
+    const listTitle = document.createElement("h3");
+    listTitle.textContent = "📋 已配置的搜索引擎";
+    listTitle.style.color = "#2c3e50";
+    listTitle.style.margin = "15px 0";
+    listTitle.style.fontWeight = "500";
+    listTitle.style.flexShrink = "0";
+    listSection.appendChild(listTitle);
 
-        const engineList = document.createElement("div");
-        engineList.id = "engine-management-list";
-        engineList.style.flex = "1";
-        engineList.style.overflowY = "auto";
-        engineList.style.overflowX = "hidden";
-        engineList.style.display = "grid";
-        engineList.style.gap = "10px";
-        engineList.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
-        engineList.style.paddingBottom = "10px";
-        engineList.style.boxSizing = "border-box";
-        listSection.appendChild(engineList);
+    const engineList = document.createElement("div");
+    engineList.id = "engine-management-list";
+    engineList.style.flex = "1";
+    engineList.style.overflowY = "auto";
+    engineList.style.overflowX = "hidden";
+    engineList.style.display = "grid";
+    engineList.style.gap = "10px";
+    engineList.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
+    engineList.style.paddingBottom = "10px";
+    engineList.style.boxSizing = "border-box";
+    listSection.appendChild(engineList);
 
-        content.appendChild(listSection);
+    content.appendChild(listSection);
 
-        // 添加引擎表单区域
-        const formSection = document.createElement("div");
-        formSection.id = "add-engine-form";
-        formSection.style.display = "none";
-        formSection.style.backgroundColor = "#f8f9fa";
-        formSection.style.padding = "20px";
-        formSection.style.borderRadius = "10px";
-        formSection.style.margin = "10px 0";
-        formSection.style.boxSizing = "border-box";
-        formSection.style.flexShrink = "0";
+    const formSection = document.createElement("div");
+    formSection.id = "add-engine-form";
+    formSection.style.display = "none";
+    formSection.style.backgroundColor = "#f8f9fa";
+    formSection.style.padding = "20px";
+    formSection.style.borderRadius = "10px";
+    formSection.style.margin = "10px 0";
+    formSection.style.boxSizing = "border-box";
+    formSection.style.flexShrink = "0";
 
-        const formTitle = document.createElement("h3");
-        formTitle.textContent = "✨ 添加新搜索引擎";
-        formTitle.style.color = "#2c3e50";
-        formTitle.style.marginBottom = "15px";
-        formSection.appendChild(formTitle);
+    const formTitle = document.createElement("h3");
+    formTitle.textContent = "✨ 添加新搜索引擎";
+    formTitle.style.color = "#2c3e50";
+    formTitle.style.marginBottom = "15px";
+    formSection.appendChild(formTitle);
 
-        const form = document.createElement("div");
-        form.style.display = "grid";
-        form.style.gap = "15px";
-        form.style.gridTemplateColumns = "1fr 1fr";
+    const form = document.createElement("div");
+    form.style.display = "grid";
+    form.style.gap = "15px";
+    form.style.gridTemplateColumns = "1fr 1fr";
 
-        const fields = [
-            { label: "引擎名称", placeholder: "例如: Google", type: "text", id: "engine-name", required: true },
-            { label: "唯一标识", placeholder: "例如: google", type: "text", id: "engine-mark", required: true },
-            { label: "搜索URL", placeholder: "使用 {keyword} 作为占位符", type: "text", id: "engine-url", required: true, fullWidth: true },
-            { label: "关键词参数", placeholder: "例如: q,query,search", type: "text", id: "engine-keys", required: true, fullWidth: true }
-        ];
+    const fields = [
+        { label: "引擎名称", placeholder: "例如: Google", type: "text", id: "engine-name", required: true },
+        { label: "唯一标识", placeholder: "例如: google", type: "text", id: "engine-mark", required: true },
+        { label: "搜索URL", placeholder: "使用 {keyword} 作为占位符", type: "text", id: "engine-url", required: true, fullWidth: true },
+        { label: "关键词参数", placeholder: "例如: q,query,search", type: "text", id: "engine-keys", required: true, fullWidth: true }
+    ];
 
-        fields.forEach(field => {
-            const container = document.createElement("div");
-            if (field.fullWidth) {
-                container.style.gridColumn = "1 / -1";
-            }
+    fields.forEach(field => {
+        const container = document.createElement("div");
+        if (field.fullWidth) {
+            container.style.gridColumn = "1 / -1";
+        }
 
-            const label = document.createElement("label");
-            label.textContent = field.label;
-            label.style.display = "block";
-            label.style.marginBottom = "5px";
-            label.style.fontWeight = "500";
-            label.style.color = "#34495e";
-            container.appendChild(label);
+        const label = document.createElement("label");
+        label.textContent = field.label;
+        label.style.display = "block";
+        label.style.marginBottom = "5px";
+        label.style.fontWeight = "500";
+        label.style.color = "#34495e";
+        container.appendChild(label);
 
-            const input = document.createElement("input");
-            input.type = field.type;
-            input.placeholder = field.placeholder;
-            input.id = field.id;
-            input.required = field.required;
-            input.style.width = "100%";
-            input.style.padding = "10px";
-            input.style.border = "1px solid #ddd";
-            input.style.borderRadius = "5px";
-            input.style.fontSize = "14px";
-            container.appendChild(input);
+        const input = document.createElement("input");
+        input.type = field.type;
+        input.placeholder = field.placeholder;
+        input.id = field.id;
+        input.required = field.required;
+        input.style.width = "100%";
+        input.style.padding = "10px";
+        input.style.border = "1px solid #ddd";
+        input.style.borderRadius = "5px";
+        input.style.fontSize = "14px";
+        container.appendChild(input);
 
-            form.appendChild(container);
-        });
+        form.appendChild(container);
+    });
 
-        const iconContainer = document.createElement("div");
-        iconContainer.style.gridColumn = "1 / -1";
+    const iconContainer = document.createElement("div");
+    iconContainer.style.gridColumn = "1 / -1";
 
-        const iconTitle = document.createElement("h4");
-        iconTitle.textContent = "🎨 图标设置";
-        iconTitle.style.marginBottom = "10px";
-        iconTitle.style.color = "#34495e";
-        iconContainer.appendChild(iconTitle);
+    const iconTitle = document.createElement("h4");
+    iconTitle.textContent = "🎨 图标设置";
+    iconTitle.style.marginBottom = "10px";
+    iconTitle.style.color = "#34495e";
+    iconContainer.appendChild(iconTitle);
 
-        const iconGrid = document.createElement("div");
-        iconGrid.style.display = "grid";
-        iconGrid.style.gridTemplateColumns = "1fr 2fr 1fr";
-        iconGrid.style.gap = "10px";
-        iconGrid.style.alignItems = "end";
+    const iconGrid = document.createElement("div");
+    iconGrid.style.display = "grid";
+    iconGrid.style.gridTemplateColumns = "1fr 2fr 1fr";
+    iconGrid.style.gap = "10px";
+    iconGrid.style.alignItems = "end";
 
-        const typeGroup = document.createElement("div");
-        const typeLabel = document.createElement("label");
-        typeLabel.textContent = "图标类型";
-        typeLabel.style.display = "block";
-        typeLabel.style.marginBottom = "5px";
-        typeLabel.style.fontWeight = "500";
-        typeGroup.appendChild(typeLabel);
+    const typeGroup = document.createElement("div");
+    const typeLabel = document.createElement("label");
+    typeLabel.textContent = "图标类型";
+    typeLabel.style.display = "block";
+    typeLabel.style.marginBottom = "5px";
+    typeLabel.style.fontWeight = "500";
+    typeGroup.appendChild(typeLabel);
 
-        const iconTypeSelect = document.createElement("select");
-        iconTypeSelect.id = "icon-type";
-        iconTypeSelect.style.width = "100%";
-        iconTypeSelect.style.padding = "10px";
-        iconTypeSelect.style.border = "1px solid #ddd";
-        iconTypeSelect.style.borderRadius = "5px";
+    const iconTypeSelect = document.createElement("select");
+    iconTypeSelect.id = "icon-type";
+    iconTypeSelect.style.width = "100%";
+    iconTypeSelect.style.padding = "10px";
+    iconTypeSelect.style.border = "1px solid #ddd";
+    iconTypeSelect.style.borderRadius = "5px";
 
-        ["svg", "image", "text", "emoji"].forEach(type => {
-            const option = document.createElement("option");
-            option.value = type;
-            option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-            iconTypeSelect.appendChild(option);
-        });
-        typeGroup.appendChild(iconTypeSelect);
-        iconGrid.appendChild(typeGroup);
+    ["svg", "image", "text", "emoji"].forEach(type => {
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+        iconTypeSelect.appendChild(option);
+    });
+    typeGroup.appendChild(iconTypeSelect);
+    iconGrid.appendChild(typeGroup);
 
-        const inputGroup = document.createElement("div");
-        const inputLabel = document.createElement("label");
-        inputLabel.textContent = "图标内容";
-        inputLabel.style.display = "block";
-        inputLabel.style.marginBottom = "5px";
-        inputLabel.style.fontWeight = "500";
-        inputGroup.appendChild(inputLabel);
+    const inputGroup = document.createElement("div");
+    const inputLabel = document.createElement("label");
+    inputLabel.textContent = "图标内容";
+    inputLabel.style.display = "block";
+    inputLabel.style.marginBottom = "5px";
+    inputLabel.style.fontWeight = "500";
+    inputGroup.appendChild(inputLabel);
 
-        const iconInput = document.createElement("input");
-        iconInput.type = "text";
-        iconInput.id = "icon-input";
-        iconInput.placeholder = "SVG代码、图片URL、文字或表情符号";
-        iconInput.style.width = "100%";
-        iconInput.style.padding = "10px";
-        iconInput.style.border = "1px solid #ddd";
-        iconInput.style.borderRadius = "5px";
-        inputGroup.appendChild(iconInput);
-        iconGrid.appendChild(inputGroup);
+    const iconInput = document.createElement("input");
+    iconInput.type = "text";
+    iconInput.id = "icon-input";
+    iconInput.placeholder = "SVG代码、图片URL、文字或表情符号";
+    iconInput.style.width = "100%";
+    iconInput.style.padding = "10px";
+    iconInput.style.border = "1px solid #ddd";
+    iconInput.style.borderRadius = "5px";
+    inputGroup.appendChild(iconInput);
+    iconGrid.appendChild(inputGroup);
 
-        const previewGroup = document.createElement("div");
-        const previewButton = document.createElement("button");
-        previewButton.textContent = "预览图标";
-        previewButton.style.width = "100%";
-        previewButton.style.padding = "10px";
-        previewButton.style.backgroundColor = "#3498db";
-        previewButton.style.color = "white";
-        previewButton.style.border = "none";
-        previewButton.style.borderRadius = "5px";
-        previewButton.style.cursor = "pointer";
-        previewButton.id = "preview-icon";
-        previewGroup.appendChild(previewButton);
-        iconGrid.appendChild(previewGroup);
+    const previewGroup = document.createElement("div");
+    const previewButton = document.createElement("button");
+    previewButton.textContent = "预览图标";
+    previewButton.style.width = "100%";
+    previewButton.style.padding = "10px";
+    previewButton.style.backgroundColor = "#3498db";
+    previewButton.style.color = "white";
+    previewButton.style.border = "none";
+    previewButton.style.borderRadius = "5px";
+    previewButton.style.cursor = "pointer";
+    previewButton.id = "preview-icon";
+    previewGroup.appendChild(previewButton);
+    iconGrid.appendChild(previewGroup);
 
-        iconContainer.appendChild(iconGrid);
+    iconContainer.appendChild(iconGrid);
 
-        const previewContainer = document.createElement("div");
-        previewContainer.style.gridColumn = "1 / -1";
-        previewContainer.style.marginTop = "15px";
-        previewContainer.style.textAlign = "center";
+    const previewContainer = document.createElement("div");
+    previewContainer.style.gridColumn = "1 / -1";
+    previewContainer.style.marginTop = "15px";
+    previewContainer.style.textAlign = "center";
 
-        const previewLabel = document.createElement("label");
-        previewLabel.textContent = "图标预览 (推荐比例 8:5)";
-        previewLabel.style.display = "block";
-        previewLabel.style.marginBottom = "10px";
-        previewLabel.style.fontWeight = "500";
-        previewContainer.appendChild(previewLabel);
+    const previewLabel = document.createElement("label");
+    previewLabel.textContent = "图标预览 (推荐比例 8:5)";
+    previewLabel.style.display = "block";
+    previewLabel.style.marginBottom = "10px";
+    previewLabel.style.fontWeight = "500";
+    previewContainer.appendChild(previewLabel);
 
-        const iconPreview = document.createElement("div");
-        iconPreview.id = "icon-preview";
-        iconPreview.style.width = "88px";
-        iconPreview.style.height = "55px";
-        iconPreview.style.border = "2px dashed #bdc3c7";
-        iconPreview.style.borderRadius = "8px";
-        iconPreview.style.margin = "0 auto";
-        iconPreview.style.display = "flex";
-        iconPreview.style.justifyContent = "center";
-        iconPreview.style.alignItems = "center";
-        iconPreview.style.overflow = "hidden";
-        iconPreview.style.background = "#ecf0f1";
-        previewContainer.appendChild(iconPreview);
+    const iconPreview = document.createElement("div");
+    iconPreview.id = "icon-preview";
+    iconPreview.style.width = "88px";
+    iconPreview.style.height = "55px";
+    iconPreview.style.border = "2px dashed #bdc3c7";
+    iconPreview.style.borderRadius = "8px";
+    iconPreview.style.margin = "0 auto";
+    iconPreview.style.display = "flex";
+    iconPreview.style.justifyContent = "center";
+    iconPreview.style.alignItems = "center";
+    iconPreview.style.overflow = "hidden";
+    iconPreview.style.background = "#ecf0f1";
+    previewContainer.appendChild(iconPreview);
 
-        iconContainer.appendChild(previewContainer);
-        form.appendChild(iconContainer);
+    iconContainer.appendChild(previewContainer);
+    form.appendChild(iconContainer);
 
-        formSection.appendChild(form);
+    formSection.appendChild(form);
 
-        const formActions = document.createElement("div");
-        formActions.style.gridColumn = "1 / -1";
-        formActions.style.display = "flex";
-        formActions.style.gap = "10px";
-        formActions.style.marginTop = "20px";
+    const formActions = document.createElement("div");
+    formActions.style.gridColumn = "1 / -1";
+    formActions.style.display = "flex";
+    formActions.style.gap = "10px";
+    formActions.style.marginTop = "20px";
 
-        const saveFormBtn = createActionButton("💾 保存引擎", "#27ae60", "");
-        const cancelFormBtn = createActionButton("❌ 取消", "#95a5a6", "");
+    const saveFormBtn = createActionButton("💾 保存引擎", "#27ae60", "");
+    const cancelFormBtn = createActionButton("❌ 取消", "#95a5a6", "");
 
-        formActions.appendChild(saveFormBtn);
-        formActions.appendChild(cancelFormBtn);
-        formSection.appendChild(formActions);
+    formActions.appendChild(saveFormBtn);
+    formActions.appendChild(cancelFormBtn);
+    formSection.appendChild(formActions);
 
-        // 将表单添加到列表区域
-        listSection.appendChild(formSection);
+    listSection.appendChild(formSection);
 
-        panel.appendChild(content);
+    panel.appendChild(content);
 
-        // 底栏 - 固定高度 20vh
-        const footer = document.createElement("div");
-        footer.style.height = "20vh";
-        footer.style.minHeight = "60px";
-        footer.style.maxHeight = "90px";
-        footer.style.backgroundColor = "#ecf0f1";
-        footer.style.padding = "15px 20px";
-        footer.style.borderTop = "1px solid #bdc3c7";
-        footer.style.display = "flex";
-        footer.style.justifyContent = "space-between";
-        footer.style.alignItems = "center";
-        footer.style.boxSizing = "border-box";
-        footer.style.flexShrink = "0";
-        footer.style.borderRadius = "0 0 15px 15px";
+    const footer = document.createElement("div");
+    footer.style.height = "20vh";
+    footer.style.minHeight = "60px";
+    footer.style.maxHeight = "90px";
+    footer.style.backgroundColor = "#ecf0f1";
+    footer.style.padding = "15px 20px";
+    footer.style.borderTop = "1px solid #bdc3c7";
+    footer.style.display = "flex";
+    footer.style.justifyContent = "space-between";
+    footer.style.alignItems = "center";
+    footer.style.boxSizing = "border-box";
+    footer.style.flexShrink = "0";
+    footer.style.borderRadius = "0 0 15px 15px";
 
-        const selectedCount = document.createElement("span");
-        selectedCount.id = "selected-count";
-        selectedCount.textContent = "已选择 0 个引擎";
-        selectedCount.style.color = "#7f8c8d";
-        selectedCount.style.fontSize = "0.9em";
-        footer.appendChild(selectedCount);
+    const selectedCount = document.createElement("span");
+    selectedCount.id = "selected-count";
+    selectedCount.textContent = "已选择 0 个引擎";
+    selectedCount.style.color = "#7f8c8d";
+    selectedCount.style.fontSize = "0.9em";
+    footer.appendChild(selectedCount);
 
-        const footerActions = document.createElement("div");
-        footerActions.style.display = "flex";
-        footerActions.style.gap = "10px";
+    const footerActions = document.createElement("div");
+    footerActions.style.display = "flex";
+    footerActions.style.gap = "10px";
 
-        const closeBtn = createActionButton("❌ 关闭", "#95a5a6", "");
+    const closeBtn = createActionButton("❌ 关闭", "#95a5a6", "");
 
-        footerActions.appendChild(closeBtn);
-        footer.appendChild(footerActions);
+    footerActions.appendChild(closeBtn);
+    footer.appendChild(footerActions);
 
-        panel.appendChild(footer);
+    panel.appendChild(footer);
 
-        document.body.appendChild(panel);
+    document.body.appendChild(panel);
 
-        // 事件监听器
-        extractBtn.addEventListener("click", extractFromCurrentPage);
-        addBtn.addEventListener("click", () => showAddForm(true));
-        resetBtn.addEventListener("click", resetToDefault);
-        previewButton.addEventListener("click", previewIcon);
-        saveFormBtn.addEventListener("click", saveNewEngine);
-        cancelFormBtn.addEventListener("click", () => showAddForm(false));
-        saveBtn.addEventListener("click", saveEngineSettings);
-        closeBtn.addEventListener("click", closeManagementPanel);
+    extractBtn.addEventListener("click", extractFromCurrentPage);
+    addBtn.addEventListener("click", () => showAddForm(true));
+    resetBtn.addEventListener("click", resetToDefault);
+    previewButton.addEventListener("click", previewIcon);
+    saveFormBtn.addEventListener("click", saveNewEngine);
+    cancelFormBtn.addEventListener("click", () => showAddForm(false));
+    saveBtn.addEventListener("click", saveEngineSettings);
+    closeBtn.addEventListener("click", closeManagementPanel);
 
-        panel.addEventListener("click", (e) => {
-            if (e.target === panel) {
-                closeManagementPanel();
-            }
-        });
+    panel.addEventListener("click", (e) => {
+        if (e.target === panel) {
+            closeManagementPanel();
+        }
+    });
 
-        return panel;
-    }
+    return panel;
+}
 
-    function createActionButton(text, color, title) {
-        const button = document.createElement("button");
-        button.textContent = text;
-        button.title = title;
-        button.style.padding = "10px 15px";
-        button.style.backgroundColor = color;
-        button.style.color = "white";
-        button.style.border = "none";
-        button.style.borderRadius = "8px";
-        button.style.cursor = "pointer";
-        button.style.fontSize = "14px";
-        button.style.minWidth = "120px";
-        button.style.transition = "all 0.3s ease";
+function createActionButton(text, color, title) {
+    const button = document.createElement("button");
+    button.textContent = text;
+    button.title = title;
+    button.style.padding = "10px 15px";
+    button.style.backgroundColor = color;
+    button.style.color = "white";
+    button.style.border = "none";
+    button.style.borderRadius = "8px";
+    button.style.cursor = "pointer";
+    button.style.fontSize = "14px";
+    button.style.minWidth = "120px";
+    button.style.transition = "all 0.3s ease";
 
-        button.addEventListener("mouseenter", () => {
-            button.style.transform = "translateY(-2px)";
-            button.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
-        });
+    button.addEventListener("mouseenter", () => {
+        button.style.transform = "translateY(-2px)";
+        button.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
+    });
 
-        button.addEventListener("mouseleave", () => {
-            button.style.transform = "translateY(0)";
-            button.style.boxShadow = "none";
-        });
+    button.addEventListener("mouseleave", () => {
+        button.style.transform = "translateY(0)";
+        button.style.boxShadow = "none";
+    });
 
-        return button;
-    }
+    return button;
+}
 
-    function closeManagementPanel() {
-        if (hasUnsavedChanges) {
-            if (confirm("⚠️ 您有未保存的更改，确定要关闭吗？")) {
-                document.getElementById("engine-management-panel").style.display = "none";
-                hasUnsavedChanges = false;
-            }
-        } else {
+function closeManagementPanel() {
+    if (hasUnsavedChanges) {
+        if (confirm("⚠️ 您有未保存的更改，确定要关闭吗？")) {
             document.getElementById("engine-management-panel").style.display = "none";
+            hasUnsavedChanges = false;
         }
+    } else {
+        document.getElementById("engine-management-panel").style.display = "none";
+    }
+}
+
+function markUnsavedChanges() {
+    hasUnsavedChanges = true;
+    const indicator = document.getElementById("unsaved-indicator");
+    const saveBtn = document.getElementById("panel-save-btn");
+
+    if (indicator) {
+        indicator.style.display = "block";
     }
 
-    function markUnsavedChanges() {
-        hasUnsavedChanges = true;
-        const indicator = document.getElementById("unsaved-indicator");
-        const saveBtn = document.getElementById("panel-save-btn");
+    if (saveBtn) {
+        saveBtn.style.opacity = "1";
+        saveBtn.style.pointerEvents = "auto";
+        saveBtn.style.background = "#e67e22";
+        saveBtn.innerHTML = "💾 保存更改";
 
-        if (indicator) {
-            indicator.style.display = "block";
-        }
+        saveBtn.addEventListener("mouseenter", function() {
+            this.style.transform = "translateY(-2px)";
+            this.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
+        });
 
-        if (saveBtn) {
-            saveBtn.style.opacity = "1";
-            saveBtn.style.pointerEvents = "auto";
-            saveBtn.style.background = "#e67e22";
-            saveBtn.innerHTML = "💾 保存更改";
+        saveBtn.addEventListener("mouseleave", function() {
+            this.style.transform = "translateY(0)";
+            this.style.boxShadow = "none";
+        });
+    }
+}
 
-            saveBtn.addEventListener("mouseenter", function() {
-                this.style.transform = "translateY(-2px)";
-                this.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
-            });
+function clearUnsavedChanges() {
+    hasUnsavedChanges = false;
+    const indicator = document.getElementById("unsaved-indicator");
+    const saveBtn = document.getElementById("panel-save-btn");
 
-            saveBtn.addEventListener("mouseleave", function() {
-                this.style.transform = "translateY(0)";
-                this.style.boxShadow = "none";
-            });
-        }
+    if (indicator) {
+        indicator.style.display = "none";
     }
 
-    function clearUnsavedChanges() {
-        hasUnsavedChanges = false;
-        const indicator = document.getElementById("unsaved-indicator");
-        const saveBtn = document.getElementById("panel-save-btn");
+    if (saveBtn) {
+        saveBtn.style.opacity = "0.7";
+        saveBtn.style.pointerEvents = "none";
+        saveBtn.style.background = "#95a5a6";
+        saveBtn.innerHTML = "💾 保存设置";
 
-        if (indicator) {
-            indicator.style.display = "none";
-        }
+        saveBtn.onmouseenter = null;
+        saveBtn.onmouseleave = null;
 
-        if (saveBtn) {
-            saveBtn.style.opacity = "0.7";
-            saveBtn.style.pointerEvents = "none";
-            saveBtn.style.background = "#95a5a6";
-            saveBtn.innerHTML = "💾 保存设置";
+        setTimeout(() => {
+            if (!hasUnsavedChanges) {
+                saveBtn.innerHTML = "✅ 已保存";
+                saveBtn.style.background = "#27ae60";
 
-            saveBtn.onmouseenter = null;
-            saveBtn.onmouseleave = null;
-
-            setTimeout(() => {
-                if (!hasUnsavedChanges) {
-                    saveBtn.innerHTML = "✅ 已保存";
-                    saveBtn.style.background = "#27ae60";
-
-                    setTimeout(() => {
-                        if (!hasUnsavedChanges) {
-                            saveBtn.innerHTML = "💾 保存设置";
-                            saveBtn.style.background = "#95a5a6";
-                        }
-                    }, 2000);
-                }
-            }, 100);
-        }
-    }
-
-    // 从当前页面提取搜索引擎
-    function extractFromCurrentPage() {
-        const searchInfo = extractSearchEngineFromPage();
-
-        if (!searchInfo.found) {
-            alert("❌ 无法自动识别当前页面的搜索引擎。请手动添加。");
-            return;
-        }
-
-        showAddForm(true);
-
-        document.getElementById("engine-name").value = searchInfo.name;
-        document.getElementById("engine-mark").value = searchInfo.mark;
-        document.getElementById("engine-url").value = searchInfo.searchUrl;
-        document.getElementById("engine-keys").value = searchInfo.searchkeyName.join(",");
-
-        const favicon = document.querySelector('link[rel*="icon"]');
-        if (favicon) {
-            const iconUrl = favicon.href;
-            if (!iconUrl.startsWith('data:')) {
-                document.getElementById("icon-type").value = "image";
-                document.getElementById("icon-input").value = iconUrl;
-                previewIcon();
+                setTimeout(() => {
+                    if (!hasUnsavedChanges) {
+                        saveBtn.innerHTML = "💾 保存设置";
+                        saveBtn.style.background = "#95a5a6";
+                    }
+                }, 2000);
             }
-        }
+        }, 100);
+    }
+}
 
-        alert(`✅ 已自动识别 ${searchInfo.name} 搜索引擎！请检查并保存。`);
+function extractFromCurrentPage() {
+    const searchInfo = extractSearchEngineFromPage();
+
+    if (!searchInfo.found) {
+        alert("❌ 无法自动识别当前页面的搜索引擎。请手动添加。");
+        return;
     }
 
-    // 显示/隐藏添加表单
-    function showAddForm(show) {
-        const formSection = document.getElementById("add-engine-form");
-        const engineList = document.getElementById("engine-management-list");
-        const listTitle = formSection.previousElementSibling;
+    showAddForm(true);
 
-        if (show){
-            formSection.style.display = "block";
-            engineList.style.display = "none";
-            listTitle.style.display = "none";
+    document.getElementById("engine-name").value = searchInfo.name;
+    document.getElementById("engine-mark").value = searchInfo.mark;
+    document.getElementById("engine-url").value = searchInfo.searchUrl;
+    document.getElementById("engine-keys").value = searchInfo.searchkeyName.join(",");
 
-            document.getElementById("engine-name").value = "";
-            document.getElementById("engine-mark").value = "";
-            document.getElementById("engine-url").value = "";
-            document.getElementById("engine-keys").value = "";
-            document.getElementById("icon-input").value = "";
-            document.getElementById("icon-preview").innerHTML = "";
-        } else {
-            formSection.style.display = "none";
-            engineList.style.display = "grid";
-            listTitle.style.display = "block";
+    const favicon = document.querySelector('link[rel*="icon"]');
+    if (favicon) {
+        const iconUrl = favicon.href;
+        if (!iconUrl.startsWith('data:')) {
+            document.getElementById("icon-type").value = "image";
+            document.getElementById("icon-input").value = iconUrl;
+            previewIcon();
         }
     }
 
-    // 预览图标
-    function previewIcon() {
-        const type = document.getElementById("icon-type").value;
-        const value = document.getElementById("icon-input").value.trim();
-        const preview = document.getElementById("icon-preview");
+    alert(`✅ 已自动识别 ${searchInfo.name} 搜索引擎！请检查并保存。`);
+}
 
-        preview.innerHTML = "";
-        preview.style.backgroundImage = "none";
-        preview.style.backgroundColor = "#ecf0f1";
+function showAddForm(show) {
+    const formSection = document.getElementById("add-engine-form");
+    const engineList = document.getElementById("engine-management-list");
+    const listTitle = formSection.previousElementSibling;
 
-        if (!value) return;
+    if (show){
+        formSection.style.display = "block";
+        engineList.style.display = "none";
+        listTitle.style.display = "none";
 
-        try {
-            if (type === "svg") {
-                const parser = new DOMParser();
-                const svgDoc = parser.parseFromString(value, "image/svg+xml");
-                if (svgDoc.querySelector("parsererror")) {
-                    throw new Error("无效的SVG代码");
-                }
-                preview.innerHTML = value;
-            } else if (type === "image") {
-                preview.style.backgroundImage = `url(${value})`;
-                preview.style.backgroundSize = "contain";
-                preview.style.backgroundRepeat = "no-repeat";
-                preview.style.backgroundPosition = "center";
-            } else if (type === "text") {
-                preview.textContent = value.length > 4 ? value.substring(0, 4) : value;
-                preview.style.fontSize = value.length > 4 ? "14px" : "18px";
-                preview.style.color = "#2c3e50";
-                preview.style.fontWeight = "bold";
-            } else if (type === "emoji") {
-                preview.textContent = value;
-                preview.style.fontSize = "24px";
+        document.getElementById("engine-name").value = "";
+        document.getElementById("engine-mark").value = "";
+        document.getElementById("engine-url").value = "";
+        document.getElementById("engine-keys").value = "";
+        document.getElementById("icon-input").value = "";
+        document.getElementById("icon-preview").innerHTML = "";
+    } else {
+        formSection.style.display = "none";
+        engineList.style.display = "grid";
+        listTitle.style.display = "block";
+    }
+}
+
+function previewIcon() {
+    const type = document.getElementById("icon-type").value;
+    const value = document.getElementById("icon-input").value.trim();
+    const preview = document.getElementById("icon-preview");
+
+    preview.innerHTML = "";
+    preview.style.backgroundImage = "none";
+    preview.style.backgroundColor = "#ecf0f1";
+
+    if (!value) return;
+
+    try {
+        if (type === "svg") {
+            const parser = new DOMParser();
+            const svgDoc = parser.parseFromString(value, "image/svg+xml");
+            if (svgDoc.querySelector("parsererror")) {
+                throw new Error("无效的SVG代码");
             }
-        } catch (e) {
-            alert("❌ 图标预览失败: " + e.message);
+            preview.innerHTML = value;
+        } else if (type === "image") {
+            preview.style.backgroundImage = `url(${value})`;
+            preview.style.backgroundSize = "contain";
+            preview.style.backgroundRepeat = "no-repeat";
+            preview.style.backgroundPosition = "center";
+        } else if (type === "text") {
+            preview.textContent = value.length > 4 ? value.substring(0, 4) : value;
+            preview.style.fontSize = value.length > 4 ? "14px" : "18px";
+            preview.style.color = "#2c3e50";
+            preview.style.fontWeight = "bold";
+        } else if (type === "emoji") {
+            preview.textContent = value;
+            preview.style.fontSize = "24px";
+        }
+    } catch (e) {
+        alert("❌ 图标预览失败: " + e.message);
+    }
+}
+
+function saveNewEngine() {
+    const name = document.getElementById("engine-name").value.trim();
+    const mark = document.getElementById("engine-mark").value.trim();
+    const url = document.getElementById("engine-url").value.trim();
+    const keys = document.getElementById("engine-keys").value.split(',').map(k => k.trim());
+    const iconType = document.getElementById("icon-type").value;
+    const iconValue = document.getElementById("icon-input").value.trim();
+
+    if (!name || !mark || !url || keys.length === 0) {
+        alert("❌ 请填写所有必填字段");
+        return;
+    }
+
+    if (searchUrlMap.some(engine => engine.mark === mark)) {
+        alert("❌ 标识已存在，请使用其他标识");
+        return;
+    }
+
+    const newEngine = {
+        name,
+        searchUrl: url,
+        searchkeyName: keys,
+        matchUrl: new RegExp(`.*${new URL(url).hostname}.*`),
+        mark,
+        svgCode: "",
+        custom: true
+    };
+
+    if (iconValue) {
+        if (iconType === "svg") {
+            newEngine.svgCode = iconValue;
+        } else if (iconType === "image") {
+            newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                <style>.bg-img {background-image: url(${iconValue}); background-size: contain; background-repeat: no-repeat; background-position: center; width: 100%; height: 100%;}</style>
+                <foreignObject width="100%" height="100%"><div class="bg-img" xmlns="http://www.w3.org/1999/xhtml"></div></foreignObject>
+            </svg>`;
+        } else if (iconType === "text") {
+            newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                <style>.text {font-size: 12px; fill: #333; text-anchor: middle; dominant-baseline: middle; font-weight: bold;}</style>
+                <text x="50%" y="50%" class="text">${iconValue}</text>
+            </svg>`;
+        } else if (iconType === "emoji") {
+            newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                <style>.emoji {font-size: 20px; text-anchor: middle; dominant-baseline: middle;}</style>
+                <text x="50%" y="50%" class="emoji">${iconValue}</text>
+            </svg>`;
         }
     }
 
-    // 保存新引擎
-    function saveNewEngine() {
-        const name = document.getElementById("engine-name").value.trim();
-        const mark = document.getElementById("engine-mark").value.trim();
-        const url = document.getElementById("engine-url").value.trim();
-        const keys = document.getElementById("engine-keys").value.split(',').map(k => k.trim());
-        const iconType = document.getElementById("icon-type").value;
-        const iconValue = document.getElementById("icon-input").value.trim();
+    userSearchEngines.push(newEngine);
+    GM_setValue("userSearchEngines", userSearchEngines);
 
-        if (!name || !mark || !url || keys.length === 0) {
-            alert("❌ 请填写所有必填字段");
-            return;
-        }
+    searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
 
-        if (searchUrlMap.some(engine => engine.mark === mark)) {
-            alert("❌ 标识已存在，请使用其他标识");
-            return;
-        }
+    const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
+    GM_setValue("punk_setup_search", currentSetup + "-" + mark);
 
-        const newEngine = {
-            name,
-            searchUrl: url,
-            searchkeyName: keys,
-            matchUrl: new RegExp(`.*${new URL(url).hostname}.*`),
-            mark,
-            svgCode: "",
-            custom: true
-        };
+    markUnsavedChanges();
 
-        if (iconValue) {
-            if (iconType === "svg") {
-                newEngine.svgCode = iconValue;
-            } else if (iconType === "image") {
-                newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-                    <style>.bg-img {background-image: url(${iconValue}); background-size: contain; background-repeat: no-repeat; background-position: center; width: 100%; height: 100%;}</style>
-                    <foreignObject width="100%" height="100%"><div class="bg-img" xmlns="http://www.w3.org/1999/xhtml"></div></foreignObject>
-                </svg>`;
-            } else if (iconType === "text") {
-                newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-                    <style>.text {font-size: 12px; fill: #333; text-anchor: middle; dominant-baseline: middle; font-weight: bold;}</style>
-                    <text x="50%" y="50%" class="text">${iconValue}</text>
-                </svg>`;
-            } else if (iconType === "emoji") {
-                newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-                    <style>.emoji {font-size: 20px; text-anchor: middle; dominant-baseline: middle;}</style>
-                    <text x="50%" y="50%" class="emoji">${iconValue}</text>
-                </svg>`;
-            }
-        }
+    alert("✅ 搜索引擎添加成功!");
+    showAddForm(false);
+    refreshEngineList();
+}
 
-        userSearchEngines.push(newEngine);
-        GM_setValue("userSearchEngines", userSearchEngines);
+function resetToDefault() {
+    if (confirm("⚠️ 确定要恢复默认设置吗？这将删除所有自定义搜索引擎。")) {
+        userSearchEngines = [];
+        GM_setValue("userSearchEngines", []);
+        GM_setValue("punk_setup_search", punkDeafultMark);
+        searchUrlMap = [...defaultSearchEngines];
 
-        searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
-
-        const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
-        GM_setValue("punk_setup_search", currentSetup + "-" + mark);
-
-        // 标记有更改需要保存
         markUnsavedChanges();
 
-        alert("✅ 搜索引擎添加成功!");
-        showAddForm(false);
+        alert("✅ 已恢复默认设置");
         refreshEngineList();
     }
+}
 
-    // 恢复默认设置
-    function resetToDefault() {
-        if (confirm("⚠️ 确定要恢复默认设置吗？这将删除所有自定义搜索引擎。")) {
-            userSearchEngines = [];
-            GM_setValue("userSearchEngines", []);
-            GM_setValue("punk_setup_search", punkDeafultMark);
-            searchUrlMap = [...defaultSearchEngines];
+function refreshEngineList() {
+    const engineList = document.getElementById("engine-management-list");
+    const activeMarks = (GM_getValue("punk_setup_search", punkDeafultMark)).split("-");
 
-            // 标记有更改需要保存
+    engineList.innerHTML = "";
+
+    searchUrlMap.forEach((engine, index) => {
+        const engineCard = document.createElement("div");
+        engineCard.className = "engine-card";
+        engineCard.style.cssText = `
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: white;
+            border: 2px solid ${activeMarks.includes(engine.mark) ? '#27ae60' : '#ecf0f1'};
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            cursor: grab;
+            min-height: 60px;
+            box-sizing: border-box;
+        `;
+
+        engineCard.addEventListener("mouseenter", () => {
+            engineCard.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+            engineCard.style.transform = "translateY(-2px)";
+        });
+
+        engineCard.addEventListener("mouseleave", () => {
+            engineCard.style.boxShadow = "none";
+            engineCard.style.transform = "translateY(0)";
+        });
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.mark = engine.mark;
+        checkbox.checked = activeMarks.includes(engine.mark);
+        checkbox.style.marginRight = "15px";
+        checkbox.style.transform = "scale(1.2)";
+
+        checkbox.addEventListener("change", () => {
+            updateSelectedCount();
             markUnsavedChanges();
+        });
 
-            alert("✅ 已恢复默认设置");
-            refreshEngineList();
-        }
-    }
+        const iconPreview = document.createElement("div");
+        iconPreview.style.cssText = `
+            width: 40px;
+            height: 25px;
+            background-image: url('data:image/svg+xml;utf8,${encodeURIComponent(engine.svgCode)}');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            margin-right: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            flex-shrink: 0;
+        `;
 
-    // 刷新引擎列表显示
-    function refreshEngineList() {
-        const engineList = document.getElementById("engine-management-list");
-        const activeMarks = (GM_getValue("punk_setup_search", punkDeafultMark)).split("-");
+        const infoContainer = document.createElement("div");
+        infoContainer.style.flexGrow = "1";
+        infoContainer.style.minWidth = "0";
 
-        engineList.innerHTML = "";
+        const name = document.createElement("div");
+        name.textContent = engine.name;
+        name.style.fontWeight = "bold";
+        name.style.color = "#2c3e50";
+        name.style.marginBottom = "5px";
+        name.style.whiteSpace = "nowrap";
+        name.style.overflow = "hidden";
+        name.style.textOverflow = "ellipsis";
 
-        searchUrlMap.forEach((engine, index) => {
-            const engineCard = document.createElement("div");
-            engineCard.className = "engine-card";
-            engineCard.style.cssText = `
-                display: flex;
-                align-items: center;
-                padding: 15px;
-                background: white;
-                border: 2px solid ${activeMarks.includes(engine.mark) ? '#27ae60' : '#ecf0f1'};
-                border-radius: 10px;
-                transition: all 0.3s ease;
-                cursor: grab;
-                min-height: 60px;
-                box-sizing: border-box;
-            `;
+        const url = document.createElement("div");
+        url.textContent = engine.searchUrl;
+        url.style.fontSize = "0.8em";
+        url.style.color = "#7f8c8d";
+        url.style.whiteSpace = "nowrap";
+        url.style.overflow = "hidden";
+        url.style.textOverflow = "ellipsis";
 
-            engineCard.addEventListener("mouseenter", () => {
-                engineCard.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-                engineCard.style.transform = "translateY(-2px)";
-            });
+        infoContainer.appendChild(name);
+        infoContainer.appendChild(url);
 
-            engineCard.addEventListener("mouseleave", () => {
-                engineCard.style.boxShadow = "none";
-                engineCard.style.transform = "translateY(0)";
-            });
+        const actions = document.createElement("div");
+        actions.style.display = "flex";
+        actions.style.gap = "5px";
+        actions.style.flexShrink = "0";
 
-            // 选择复选框
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.dataset.mark = engine.mark;
-            checkbox.checked = activeMarks.includes(engine.mark);
-            checkbox.style.marginRight = "15px";
-            checkbox.style.transform = "scale(1.2)";
-
-            // 复选框更改时标记有未保存更改
-            checkbox.addEventListener("change", () => {
-                updateSelectedCount();
-                markUnsavedChanges();
-            });
-
-            // 引擎图标预览
-            const iconPreview = document.createElement("div");
-            iconPreview.style.cssText = `
-                width: 40px;
-                height: 25px;
-                background-image: url('data:image/svg+xml;utf8,${encodeURIComponent(engine.svgCode)}');
-                background-size: contain;
-                background-repeat: no-repeat;
-                background-position: center;
-                margin-right: 15px;
-                border: 1px solid #eee;
+        if (engine.custom) {
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "🗑️";
+            deleteBtn.title = "删除";
+            deleteBtn.style.cssText = `
+                padding: 5px 10px;
+                border: none;
+                background: #e74c3c;
+                color: white;
                 border-radius: 5px;
+                cursor: pointer;
                 flex-shrink: 0;
             `;
 
-            // 引擎信息
-            const infoContainer = document.createElement("div");
-            infoContainer.style.flexGrow = "1";
-            infoContainer.style.minWidth = "0";
+            actions.appendChild(deleteBtn);
 
-            const name = document.createElement("div");
-            name.textContent = engine.name;
-            name.style.fontWeight = "bold";
-            name.style.color = "#2c3e50";
-            name.style.marginBottom = "5px";
-            name.style.whiteSpace = "nowrap";
-            name.style.overflow = "hidden";
-            name.style.textOverflow = "ellipsis";
+            deleteBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (confirm(`确定要删除 ${engine.name} 吗?`)) {
+                    userSearchEngines = userSearchEngines.filter(e => e.mark !== engine.mark);
+                    GM_setValue("userSearchEngines", userSearchEngines);
 
-            const url = document.createElement("div");
-            url.textContent = engine.searchUrl;
-            url.style.fontSize = "0.8em";
-            url.style.color = "#7f8c8d";
-            url.style.whiteSpace = "nowrap";
-            url.style.overflow = "hidden";
-            url.style.textOverflow = "ellipsis";
+                    const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
+                    const newSetup = currentSetup.split("-").filter(m => m !== engine.mark).join("-");
+                    GM_setValue("punk_setup_search", newSetup);
 
-            infoContainer.appendChild(name);
-            infoContainer.appendChild(url);
+                    searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
 
-            // 操作按钮
-            const actions = document.createElement("div");
-            actions.style.display = "flex";
-            actions.style.gap = "5px";
-            actions.style.flexShrink = "0";
+                    markUnsavedChanges();
 
-            if (engine.custom) {
-                const deleteBtn = document.createElement("button");
-                deleteBtn.textContent = "🗑️";
-                deleteBtn.title = "删除";
-                deleteBtn.style.cssText = `
-                    padding: 5px 10px;
-                    border: none;
-                    background: #e74c3c;
-                    color: white;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    flex-shrink: 0;
-                `;
+                    refreshEngineList();
+                }
+            });
+        }
 
-                actions.appendChild(deleteBtn);
+        engineCard.appendChild(checkbox);
+        engineCard.appendChild(iconPreview);
+        engineCard.appendChild(infoContainer);
+        engineCard.appendChild(actions);
 
-                deleteBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    if (confirm(`确定要删除 ${engine.name} 吗?`)) {
-                        userSearchEngines = userSearchEngines.filter(e => e.mark !== engine.mark);
-                        GM_setValue("userSearchEngines", userSearchEngines);
+        engineList.appendChild(engineCard);
+    });
 
-                        const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
-                        const newSetup = currentSetup.split("-").filter(m => m !== engine.mark).join("-");
-                        GM_setValue("punk_setup_search", newSetup);
+    updateSelectedCount();
+}
 
-                        searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]:checked');
+    const countElement = document.getElementById("selected-count");
+    countElement.textContent = `已选择 ${checkboxes.length} 个引擎`;
+}
 
-                        // 标记有更改需要保存
-                        markUnsavedChanges();
+function saveEngineSettings() {
+    const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]');
+    const activeMarks = [];
 
-                        refreshEngineList();
-                    }
-                });
-            }
+    checkboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+            activeMarks.push(checkbox.dataset.mark);
+        }
+    });
 
-            engineCard.appendChild(checkbox);
-            engineCard.appendChild(iconPreview);
-            engineCard.appendChild(infoContainer);
-            engineCard.appendChild(actions);
-
-            engineList.appendChild(engineCard);
-        });
-
-        updateSelectedCount();
+    if (activeMarks.length === 0) {
+        alert("⚠️ 请至少选择一个搜索引擎");
+        return;
     }
 
-    // 更新选中计数
-    function updateSelectedCount() {
-        const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]:checked');
-        const countElement = document.getElementById("selected-count");
-        countElement.textContent = `已选择 ${checkboxes.length} 个引擎`;
-    }
+    GM_setValue("punk_setup_search", activeMarks.join("-"));
 
-    // 保存引擎设置
-    function saveEngineSettings() {
-        const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]');
-        const activeMarks = [];
+    clearUnsavedChanges();
 
-        checkboxes.forEach(checkbox => {
-            if (checkbox.checked) {
-                activeMarks.push(checkbox.dataset.mark);
-            }
+    setTimeout(() => {
+        document.getElementById("engine-management-panel").style.display = "none";
+        reloadScript();
+    }, 1000);
+}
+
+function showManagementPanel() {
+    const panel = document.getElementById("engine-management-panel") || createManagementPanel();
+
+    hasUnsavedChanges = false;
+    clearUnsavedChanges();
+
+    refreshEngineList();
+    panel.style.display = "block";
+}
+
+function enableDragAndSort() {
+    const container = document.querySelector('.engine-display');
+    if (!container) return;
+
+    const buttons = container.querySelectorAll('.engine-button');
+
+    buttons.forEach(button => {
+        button.draggable = true;
+
+        button.addEventListener('dragstart', (e) => {
+            currentDraggedButton = button;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', button.getAttribute('url'));
+            button.classList.add('dragging');
         });
 
-        if (activeMarks.length === 0) {
-            alert("⚠️ 请至少选择一个搜索引擎");
+        button.addEventListener('dragend', () => {
+            button.classList.remove('dragging');
+            currentDraggedButton = null;
+            saveButtonOrder();
+        });
+
+        button.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            return false;
+        });
+
+        button.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            button.classList.add('drag-over');
+        });
+
+        button.addEventListener('dragleave', () => {
+            button.classList.remove('drag-over');
+        });
+
+        button.addEventListener('drop', (e) => {
+            e.preventDefault();
+            button.classList.remove('drag-over');
+
+            if (currentDraggedButton !== button) {
+                const container = button.parentNode;
+                const buttonsArray = Array.from(container.querySelectorAll('.engine-button'));
+                const draggedIndex = buttonsArray.indexOf(currentDraggedButton);
+                const targetIndex = buttonsArray.indexOf(button);
+
+                if (draggedIndex < targetIndex) {
+                    container.insertBefore(currentDraggedButton, button.nextSibling);
+                } else {
+                    container.insertBefore(currentDraggedButton, button);
+                }
+
+                markUnsavedChanges();
+            }
+            return false;
+        });
+    });
+}
+
+function saveButtonOrder() {
+    const container = document.querySelector('.engine-display');
+    if (!container) return;
+
+    const buttons = container.querySelectorAll('.engine-button');
+    const newOrder = Array.from(buttons).map(btn => {
+        const url = btn.getAttribute('url');
+        const engine = searchUrlMap.find(e => e.searchUrl === url);
+        return engine ? engine.mark : null;
+    }).filter(mark => mark !== null).join('-');
+
+    GM_setValue('punk_setup_search', newOrder);
+}
+
+function addSearchBox() {
+    try {
+        if (engineContainerExists()) {
             return;
         }
 
-        GM_setValue("punk_setup_search", activeMarks.join("-"));
+        const punkJetBox = document.createElement("div");
+        punkJetBox.id = "punkjet-search-box";
+        punkJetBox.className = "engine-container";
+        punkJetBox.style.display = 'flex';
+        punkJetBox.style.zIndex = '9999';
+        punkJetBox.style.position = 'fixed';
+        punkJetBox.style.transition = 'all 0.3s ease';
 
-        // 清除未保存更改标记
-        clearUnsavedChanges();
+        updateSearchBoxPosition();
 
-        // 延迟关闭面板，让用户看到成功提示
-        setTimeout(() => {
-            document.getElementById("engine-management-panel").style.display = "none";
-            reloadScript();
-        }, 1000);
-    }
+        const ulList = document.createElement('div');
+        ulList.className = "engine-display";
+        ulList.style.overflowX = "auto";
+        ulList.style.overflowY = "hidden";
 
-    // 显示管理面板
-    function showManagementPanel() {
-        const panel = document.getElementById("engine-management-panel") || createManagementPanel();
+        const settingsButton = document.createElement('button');
+        settingsButton.className = "engine-settings-button";
+        settingsButton.innerHTML = "ν";
+        settingsButton.title = "管理搜索引擎";
+        settingsButton.style.width = "32px";
+        settingsButton.style.height = "32px";
+        settingsButton.style.border = "1px solid #f0f0f0";
+        settingsButton.style.borderRadius = "7px";
+        settingsButton.style.background = "white";
+        settingsButton.style.cursor = "pointer";
+        settingsButton.style.margin = "3px";
+        settingsButton.style.flexShrink = "0";
+        settingsButton.style.display = "flex";
+        settingsButton.style.justifyContent = "center";
+        settingsButton.style.alignItems = "center";
+        settingsButton.style.fontSize = "18px";
+        settingsButton.addEventListener('click', showManagementPanel);
 
-        // 重置未保存更改状态
-        hasUnsavedChanges = false;
-        clearUnsavedChanges();
+        punkJetBox.appendChild(settingsButton);
 
-        refreshEngineList();
-        panel.style.display = "block";
-    }
+        let fragment = document.createDocumentFragment();
+        let showList = GM_getValue("punk_setup_search", punkDeafultMark);
+        showList = showList.split('-');
 
-    // 拖拽排序功能
-    function enableDragAndSort() {
-        const container = document.querySelector('.engine-display');
-        if (!container) return;
+        for (let showListIndex = 0; showListIndex < showList.length; showListIndex++) {
+            for (let index = 0; index < searchUrlMap.length; index++) {
+                let item = searchUrlMap[index];
+                if (item.mark === showList[showListIndex]) {
+                    let button = document.createElement('button');
+                    button.className = "engine-button";
+                    button.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(item.svgCode)}')`;
+                    button.setAttribute("url", item.searchUrl);
+                    button.setAttribute("title", item.name);
+                    button.innerHTML = '';
 
-        const buttons = container.querySelectorAll('.engine-button');
+                    fragment.appendChild(button);
 
-        buttons.forEach(button => {
-            button.draggable = true;
+                    button.addEventListener('mouseover', () => {
+                        button.style.backgroundColor = 'rgba(241, 241, 241, 1)';
+                        button.style.transform = 'translateY(-2px)';
+                        button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                    });
 
-            button.addEventListener('dragstart', (e) => {
-                currentDraggedButton = button;
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', button.getAttribute('url'));
-                button.classList.add('dragging');
-            });
+                    button.addEventListener('mouseout', () => {
+                        button.style.backgroundColor = 'rgba(240, 240, 244, 1)';
+                        button.style.transform = 'translateY(0)';
+                        button.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
+                    });
 
-            button.addEventListener('dragend', () => {
-                button.classList.remove('dragging');
-                currentDraggedButton = null;
-                saveButtonOrder();
-            });
+                    button.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        const url = button.getAttribute("url");
+                        let keywords = "";
 
-            button.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                return false;
-            });
+                        const allInputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
+                        const baiduInput = document.querySelector('input#kw, input[name="wd"], input[name="word"]');
+                        if (baiduInput && baiduInput.value.trim()) {
+                            keywords = baiduInput.value.trim();
+                        } else {
+                            for (let input of allInputs) {
+                                const inputVal = input.value.trim();
+                                if (inputVal) {
+                                    keywords = inputVal;
+                                    break;
+                                }
+                            }
+                        }
 
-            button.addEventListener('dragenter', (e) => {
-                e.preventDefault();
-                button.classList.add('drag-over');
-            });
+                        if (!keywords) {
+                            keywords = getKeywords().trim();
+                        }
 
-            button.addEventListener('dragleave', () => {
-                button.classList.remove('drag-over');
-            });
+                        if (!keywords) {
+                            keywords = sessionStorage.getItem("currentInput") || "";
+                        }
 
-            button.addEventListener('drop', (e) => {
-                e.preventDefault();
-                button.classList.remove('drag-over');
+                        if (url && keywords) {
+                            const finalUrl = url.replace('{keyword}', encodeURIComponent(keywords));
+                            window.open(finalUrl, '_blank');
+                        } else {
+                            alert('未找到搜索关键词，请先在输入框中输入内容。');
+                        }
+                    });
 
-                if (currentDraggedButton !== button) {
-                    const container = button.parentNode;
-                    const buttonsArray = Array.from(container.querySelectorAll('.engine-button'));
-                    const draggedIndex = buttonsArray.indexOf(currentDraggedButton);
-                    const targetIndex = buttonsArray.indexOf(button);
+                    button.addEventListener('mousedown', (e) => {
+                        longPressTimer = setTimeout(() => {
+                            showContextMenu(e, item);
+                        }, 800);
+                    });
 
-                    if (draggedIndex < targetIndex) {
-                        container.insertBefore(currentDraggedButton, button.nextSibling);
-                    } else {
-                        container.insertBefore(currentDraggedButton, button);
-                    }
+                    button.addEventListener('mouseup', () => {
+                        clearTimeout(longPressTimer);
+                    });
 
-                    // 拖拽排序后标记有未保存更改
-                    markUnsavedChanges();
-                }
-                return false;
-            });
-        });
-    }
+                    button.addEventListener('mouseleave', () => {
+                        clearTimeout(longPressTimer);
+                    });
 
-    // 保存按钮顺序
-    function saveButtonOrder() {
-        const container = document.querySelector('.engine-display');
-        if (!container) return;
-
-        const buttons = container.querySelectorAll('.engine-button');
-        const newOrder = Array.from(buttons).map(btn => {
-            const url = btn.getAttribute('url');
-            const engine = searchUrlMap.find(e => e.searchUrl === url);
-            return engine ? engine.mark : null;
-        }).filter(mark => mark !== null).join('-');
-
-        GM_setValue('punk_setup_search', newOrder);
-    }
-
-    // 【修复3：优化按钮点击事件，优先取输入框最新值】
-    function addSearchBox() {
-        try {
-            if (engineContainerExists()) {
-                console.log("引擎容器已存在，跳过添加");
-                return;
-            }
-
-            const punkJetBox = document.createElement("div");
-            punkJetBox.id = "punkjet-search-box";
-            punkJetBox.className = "engine-container";
-            punkJetBox.style.display = 'flex';
-            punkJetBox.style.zIndex = '9999';
-            punkJetBox.style.position = 'fixed';
-            
-            // 添加过渡效果
-            punkJetBox.style.transition = 'all 0.3s ease';
-
-            updateSearchBoxPosition();
-
-            const ulList = document.createElement('div');
-            ulList.className = "engine-display";
-
-            // 添加设置按钮
-            const settingsButton = document.createElement('button');
-            settingsButton.className = "engine-settings-button";
-            settingsButton.innerHTML = "ν";
-            settingsButton.title = "管理搜索引擎";
-            settingsButton.style.width = "32px";
-            settingsButton.style.height = "32px";
-            settingsButton.style.border = "1px solid #f0f0f0";
-            settingsButton.style.borderRadius = "7px";
-            settingsButton.style.background = "white";
-            settingsButton.style.cursor = "pointer";
-            settingsButton.style.margin = "3px";
-            settingsButton.style.flexShrink = "0";
-            settingsButton.style.display = "flex";
-            settingsButton.style.justifyContent = "center";
-            settingsButton.style.alignItems = "center";
-            settingsButton.style.fontSize = "18px";
-            settingsButton.addEventListener('click', showManagementPanel);
-
-            punkJetBox.appendChild(settingsButton);
-
-            let fragment = document.createDocumentFragment();
-            let showList = GM_getValue("punk_setup_search", punkDeafultMark);
-            showList = showList.split('-');
-
-            for (let showListIndex = 0; showListIndex < showList.length; showListIndex++) {
-                for (let index = 0; index < searchUrlMap.length; index++) {
-                    let item = searchUrlMap[index];
-                    if (item.mark === showList[showListIndex]) {
-                        let button = document.createElement('button');
-                        button.className = "engine-button";
-                        button.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(item.svgCode)}')`;button.setAttribute("url", item.searchUrl);
-                        button.setAttribute("title", item.name);
-                        button.innerHTML = '';
-
-                        fragment.appendChild(button);
-
-                        button.addEventListener('mouseover', () => {
-                            button.style.backgroundColor = 'rgba(241, 241, 241, 1)';
-                            button.style.transform = 'translateY(-2px)';
-                            button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                        });
-
-                        button.addEventListener('mouseout', () => {
-                            button.style.backgroundColor = 'rgba(240, 240, 244, 1)';
-                            button.style.transform = 'translateY(0)';
-                            button.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
-                        });
-
-                        // 【核心修复：按钮点击时优先取页面所有输入框最新值】                        
-button.addEventListener('click', (event) => {
-    event.preventDefault();
-    const url = button.getAttribute("url");
-    let keywords = "";
-
-    // 1. 优先获取当前页面所有输入框的最新值（解决未聚焦输入框值未捕获问题）
-    const allInputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
-    
-    // 特别针对百度搜索框优化
-    const baiduInput = document.querySelector('input#kw, input[name="wd"], input[name="word"]');
-    if (baiduInput && baiduInput.value.trim()) {
-        keywords = baiduInput.value.trim();
-    } else {
-        // 遍历所有输入框，获取第一个非空值
-        for (let input of allInputs) {
-            const inputVal = input.value.trim();
-            if (inputVal) {
-                keywords = inputVal;
-                break; // 取第一个非空输入框值
-            }
-        }
-    }
-
-    // 2. 若输入框无值，尝试从URL参数提取（优化后兼容更多参数）
-    if (!keywords) {
-        keywords = getKeywords().trim();
-    }
-
-    // 3. 若仍无值，读取存储的当前输入记录
-    if (!keywords) {
-        keywords = sessionStorage.getItem("currentInput") || "";
-    }
-
-    if (url && keywords) {
-        const finalUrl = url.replace('{keyword}', encodeURIComponent(keywords));
-        window.open(finalUrl, '_blank');
-    } else {
-        alert('未找到搜索关键词，请先在输入框中输入内容。');
-    }
-});
-
-                        // 长按事件（打开上下文菜单）
-                        button.addEventListener('mousedown', (e) => {
-                            longPressTimer = setTimeout(() => {
-                                showContextMenu(e, item);
-                            }, 800);
-                        });
-
-                        button.addEventListener('mouseup', () => {
-                            clearTimeout(longPressTimer);
-                        });
-
-                        button.addEventListener('mouseleave', () => {
-                            clearTimeout(longPressTimer);
-                        });
-
-                        break;
-                    }
+                    break;
                 }
             }
-
-            ulList.appendChild(fragment);
-            punkJetBox.appendChild(ulList);
-            document.body.appendChild(punkJetBox);
-            containerAdded = true;
-            console.log("引擎容器添加成功");
-
-            // 初始化滚动监听
-            initScrollListener();
-            
-            window.addEventListener('resize', updateSearchBoxPosition);
-
-            setTimeout(enableDragAndSort, 500);
-        } catch (error) {
-            console.error("添加搜索框时出错:", error.message);
         }
+
+        ulList.appendChild(fragment);
+        punkJetBox.appendChild(ulList);
+        document.body.appendChild(punkJetBox);
+        containerAdded = true;
+
+        initScrollListener();
+        
+        window.addEventListener('resize', updateSearchBoxPosition);
+
+        setTimeout(enableDragAndSort, 500);
+    } catch (error) {
+        console.error("添加搜索框时出错:", error.message);
     }
+}
 
-    // 补充上下文菜单函数（原代码缺失，避免报错）
-    function showContextMenu(e, item) {
-        e.preventDefault();
-        // 可根据需求扩展上下文菜单逻辑，此处仅做占位避免函数未定义报错
-        alert(`已触发 ${item.name} 搜索引擎的长按菜单`);
-    }
+function showContextMenu(e, item) {
+    e.preventDefault();
+    alert(`已触发 ${item.name} 搜索引擎的长按菜单`);
+}
 
-    function injectStyle() {
-        try {
-            if (document.querySelector('style#engine-container-style')) {
-                return;
-            }
+function injectStyle() {
+    try {
+        if (document.querySelector('style#engine-container-style')) {
+            return;
+        }
 
-            const cssNode = document.createElement("style");
-            cssNode.id = "engine-container-style";
-            cssNode.textContent = `
-        /* 搜索引擎容器主样式 */
+        const cssNode = document.createElement("style");
+        cssNode.id = "engine-container-style";
+        cssNode.textContent = `
         .engine-container {
             display: flex;
-            position: fixed;           /* 固定定位在页面底部 */
-            bottom: 0px;              /* 距离底部0像素 */
-            left: 2%;                 /* 左侧留2%边距 */
-            width: 96%;               /* 宽度占96% */
-            height: 36px;             /* 固定高度 */
-            overflow: hidden;         /* 隐藏溢出内容 */
-            justify-content: center;  /* 水平居中 */
-            align-items: center;      /* 垂直居中 */
-            z-index: 1000;            /* 高层级确保在最上层 */
-            background-color: rgba(255, 255, 255, 0); /* 透明背景 */
-            margin-top: 1px;          /* 顶部微小边距 */
-            transition: all 0.3s ease; /* 添加过渡效果 */
-            transform: translateY(0); /* 默认位置 */
-            opacity: 1;               /* 默认不透明度 */
+            position: fixed;
+            bottom: 0px;
+            left: 2%;
+            width: 96%;
+            height: 36px;
+            overflow: hidden;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            background-color: rgba(255, 255, 255, 0);
+            margin-top: 1px;
+            transition: all 0.3s ease;
+            transform: translateY(0);
+            opacity: 1;
+            overflow-y: hidden !important;
+            overflow-x: visible !important;
         }
 
-        /* 隐藏状态 */
         .engine-container.hidden {
-            transform: translateY(100%); /* 向下移动隐藏 */
-            opacity: 0;                 /* 完全透明 */
+            transform: translateY(100%);
+            opacity: 0;
         }
 
-        /* 搜索引擎显示区域 */
         .engine-display {
             display: flex;
-            overflow-x: auto;         /* 水平滚动 */
-            white-space: nowrap;      /* 防止换行 */
-            height: 100%;             /* 占满容器高度 */
-            gap: 0px;                 /* 元素间无间隙 */
-            flex-grow: 1;             /* 弹性增长占满剩余空间 */
+            overflow-x: auto;
+            overflow-y: hidden !important;
+            white-space: nowrap;
+            height: 100%;
+            gap: 0px;
+            flex-grow: 1;
+            scrollbar-width: thin;
+            -ms-overflow-style: -ms-autohiding-scrollbar;
+        }        
+
+        .engine-display::-webkit-scrollbar-track {
+            background: transparent;
         }
 
-        /* 搜索引擎按钮基础样式 */
+        .engine-display::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 2px;
+        }
+
+        .engine-display::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.4);
+        }
+
         .engine-button {
-            width: 55.5px;            /* 固定宽度 */
-            height: 32px;             /* 固定高度 */
-            padding: 0;               /* 无内边距 */
-            border: 1px solid #f0f0f0; /* 浅灰色边框 */
-            border-radius: 8px;       /* 圆角 */
-            background-color: rgba(255, 255, 255, 1); /* 白色背景 */
-            color: transparent;       /* 透明文字 */
-            font-size: 14px;          /* 字体大小 */
-            cursor: pointer;          /* 手型光标 */
-            margin: 2px;              /* 外边距 */
-            background-size: contain; /* 背景图片适应 */
-            background-repeat: no-repeat; /* 不重复背景 */
-            background-position: center; /* 背景居中 */
-            backdrop-filter: blur(5px); /* 背景模糊效果 */
-            /* 多层阴影效果：外阴影 + 内阴影 */
+            width: 55.5px;
+            height: 32px;
+            padding: 0;
+            border: 1px solid #f0f0f0;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 1);
+            color: transparent;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 2px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            backdrop-filter: blur(5px);
             box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1), 
                         0px 0px 0px rgba(255, 255, 255, 0.5), 
                         6px 6px 10px rgba(0, 0, 0, 0.1) inset, 
                         -6px -6px 10px rgba(255, 255, 255, 0) inset;
-            transition: all 0.3s ease; /* 平滑过渡效果 */
-            flex-shrink: 0;           /* 禁止收缩 */
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+            overflow: hidden;
         }
 
-        /* 按钮聚焦状态 */
         .engine-button:focus {
-            outline: none;            /* 移除默认轮廓 */
-            border-color: #ffb61e;    /* 橙色边框 */
+            outline: none;
+            border-color: #ffb61e;
         }
 
-        /* 选中状态的按钮 */
         .engine-button.selected {
-            border: 1px solid #ffb61e; /* 橙色边框标识选中 */
-            color: transparent;       /* 保持透明文字 */
+            border: 1px solid #ffb61e;
+            color: transparent;
         }
 
-        /* 拖拽过程中的按钮 */
         .engine-button.dragging {
-            opacity: 0.5;             /* 半透明 */
-            transform: rotate(5deg);  /* 轻微旋转 */
+            opacity: 0.5;
+            transform: rotate(5deg);
         }
 
-        /* 拖拽目标区域的按钮 */
         .engine-button.drag-over {
-            border: 2px dashed #2196F3; /* 蓝色虚线边框 */
-            background-color: #f0f8ff; /* 浅蓝色背景 */
+            border: 2px dashed #2196F3;
+            background-color: #f0f8ff;
         }
 
-        /* 右键菜单项悬停 */
         .context-menu-item:hover {
-            background-color: #f8f9fa; /* 浅灰色背景 */
+            background-color: #f8f9fa;
         }
 
-        /* 搜索引擎卡片基础样式 */
         .engine-card {
-            transition: all 0.3s ease; /* 平滑过渡 */
+            transition: all 0.3s ease;
         }
 
-        /* 搜索引擎管理面板 */
         #engine-management-panel {
-            animation: slideIn 0.3s ease; /* 滑入动画 */
+            animation: slideIn 0.3s ease;
         }
 
-        /* 滑入动画定义 */
         @keyframes slideIn {
             from {
-                opacity: 0;                    /* 开始透明 */
-                transform: translate(-50%, -48%); /* 从下方偏移开始 */
+                opacity: 0;
+                transform: translate(-50%, -48%);
             }
             to {
-                opacity: 1;                    /* 结束不透明 */
-                transform: translate(-50%, -50%); /* 移动到中心 */
+                opacity: 1;
+                transform: translate(-50%, -50%);
             }
         }
     `;
-            document.head.appendChild(cssNode);
-        } catch (error) {
-            console.error("注入样式时出错:", error.message);
-        }
+        document.head.appendChild(cssNode);
+    } catch (error) {
+        console.error("注入样式时出错:", error.message);
     }
+}
 
-    function reloadScript() {
-        const punkJetBox = document.getElementById("punkjet-search-box");
-        if (punkJetBox) {
-            punkJetBox.remove();
-            containerAdded = false;
-            console.log("移除现有引擎容器");
-        }
-        
-        // 清除所有定时器
-        if (scrollTimeout) {
-            clearTimeout(scrollTimeout);
-            scrollTimeout = null;
-        }
-        if (hideTimeout) {
-            clearTimeout(hideTimeout);
-            hideTimeout = null;
-        }
-        
-        // 移除事件监听器
-        window.removeEventListener('scroll', handleScroll);
-        window.removeEventListener('wheel', handleWheel);
-        window.removeEventListener('touchstart', handleTouchStart);
-        window.removeEventListener('touchmove', handleTouchMove);
-        window.removeEventListener('touchend', handleTouchEnd);
-        
-        scriptLoaded = false;
+function reloadScript() {
+    const punkJetBox = document.getElementById("punkjet-search-box");
+    if (punkJetBox) {
+        punkJetBox.remove();
+        containerAdded = false;
+    }
+    
+    if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = null;
+    }
+    if (hideTimeout) {
+        clearTimeout(hideTimeout);
+        hideTimeout = null;
+    }
+    
+    window.removeEventListener('scroll', handleScroll);
+    window.removeEventListener('wheel', handleWheel);
+    window.removeEventListener('touchstart', handleTouchStart);
+    window.removeEventListener('touchmove', handleTouchMove);
+    window.removeEventListener('touchend', handleTouchEnd);
+    
+    scriptLoaded = false;
+    init();
+}
+
+setInterval(() => {
+    if (isValidScope() && !containerAdded) {
         init();
     }
+    else if (!isValidScope() && containerAdded) {
+        reloadScript();
+    }
+}, 1000);
 
-    setInterval(() => {
-        if (isValidScope() && !containerAdded) {
-            init();
-        }
-        else if (!isValidScope() && containerAdded) {
-            reloadScript();
-        }
-    }, 1000);
-
-    function init() {
+function init() {
     try {
         if (containerAdded || scriptLoaded) {
-            console.log("脚本已初始化或容器已存在，跳过");
             return;
         }
 
-        // 无论是否获取到关键词，都初始化监听（确保输入框变化被捕获）
         if (!GM_getValue("punk_setup_search")) {
             GM_setValue("punk_setup_search", punkDeafultMark);
         }
         currentInput = sessionStorage.getItem("currentInput") || "";
-        monitorInputFields(); // 优先初始化输入框监听
+        monitorInputFields();
         addSearchBox();
         injectStyle();
         scriptLoaded = true;
-        console.log("脚本初始化完成");
         
-        // 特别针对百度页面，立即尝试获取一次关键词
         if (window.location.hostname.includes('baidu')) {
             setTimeout(() => {
                 const baiduInput = document.querySelector('input#kw');
                 if (baiduInput && baiduInput.value) {
                     currentInput = baiduInput.value.trim();
                     sessionStorage.setItem("currentInput", currentInput);
-                    console.log("百度页面初始化捕获:", currentInput);
                 }
             }, 500);
         }
@@ -3668,24 +3600,24 @@ button.addEventListener('click', (event) => {
     }
 }
 
-    document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === 'visible') {
-            if (!containerAdded) {
-                init();
-            }
-        }
-    });
-
-    document.addEventListener("pageshow", (event) => {
-        if (event.persisted) {
-            if (!containerAdded) {
-                init();
-            }
-        }
-    });
-
-    document.addEventListener("DOMContentLoaded", () => {
-        if (isValidScope()) {
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === 'visible') {
+        if (!containerAdded) {
             init();
         }
-    });
+    }
+});
+
+document.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+        if (!containerAdded) {
+            init();
+        }
+    }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (isValidScope()) {
+        init();
+    }
+});
