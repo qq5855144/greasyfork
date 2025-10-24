@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.2
+// @version      v1.21
 // @author       晚风知我意
 // @match        *://*/*keyword=*
 // @match        *://*/*query=*
@@ -19,10 +19,10 @@
 // @grant        GM_getValue
 // @run-at       document-body
 // @license     MIT
-// @description 在页面底部显示一个聚合搜索引擎切换导航，支持自定义引擎和拖拽排序，(更新一下github的搜索语法，为搜索引擎栏添加滚动页面时隐藏显示机制，修复从当前页面搜索框内实时获取搜索关键词)
+// @description 在页面底部显示一个聚合搜索引擎切换导航，支持自定义引擎和拖拽排序，(新增搜索栏，具体操作-纸飞机-快捷搜索，支持网址跳转和关键词搜索)
 // ==/UserScript==
 
-const punkDeafultMark = "Google-Bing-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
+const punkDeafultMark = "Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
 const defaultSearchEngines = [
     { name: "谷歌", searchUrl: "https://www.google.com/search?q={keyword}", searchkeyName: ["q"], matchUrl: /google\.com.*?search.*?q=/g, mark: "Google", svgCode: `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
@@ -2013,6 +2013,12 @@ svgCode: `
   },
 ];
 
+// 在脚本开头添加 Font Awesome 引入
+const fontAwesomeLink = document.createElement('link');
+fontAwesomeLink.rel = 'stylesheet';
+fontAwesomeLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css';
+document.head.appendChild(fontAwesomeLink);
+
 let userSearchEngines = GM_getValue("userSearchEngines", []);
 let searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
 let lastScrollTop = 0;
@@ -2027,6 +2033,8 @@ let scrollTimeout = null;
 let isScrolling = false;
 let hideTimeout = null;
 let touchStartY = null;
+let hamburgerMenuOpen = false;
+let searchOverlayVisible = false;
 
 function engineContainerExists() {
     return document.querySelector('.engine-container') !== null;
@@ -2353,6 +2361,369 @@ function extractSearchEngineFromPage() {
     return searchInfo;
 }
 
+// 简化版搜索遮罩层 - Skeuomorphic风格美化
+function createSearchOverlay() {
+    const overlay = document.createElement("div");
+    overlay.id = "punkjet-search-overlay";
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 1);
+        z-index: 9998;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        backdrop-filter: blur(5px);
+    `;
+
+    const searchContainer = document.createElement("div");
+    searchContainer.style.cssText = `
+        width: 90%;
+        max-width: 500px;
+        background: linear-gradient(145deg, #f0f0f0, #ffffff);
+        border-radius: 25px;
+        padding: 30px;
+        box-shadow: 
+            20px 20px 60px rgba(0, 0, 0, 0.1),
+            -20px -20px 60px rgba(255, 255, 255, 0.8),
+            inset 1px 1px 2px rgba(255, 255, 255, 0.6),
+            inset -1px -1px 2px rgba(0, 0, 0, 0.05);
+        position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    `;
+
+    const closeBtn = document.createElement("button");
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: linear-gradient(145deg, #e8e8e8, #ffffff);
+        border: none;
+        font-size: 20px;
+        color: #666;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        box-shadow: 
+            5px 5px 10px rgba(0, 0, 0, 0.1),
+            -5px -5px 10px rgba(255, 255, 255, 0.8),
+            inset 1px 1px 2px rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    `;
+    
+    closeBtn.addEventListener('mouseenter', () => {
+        closeBtn.style.background = 'linear-gradient(145deg, #ff6b6b, #ff5252)';
+        closeBtn.style.color = 'white';
+        closeBtn.style.transform = 'translateY(-2px)';
+    });
+    
+    closeBtn.addEventListener('mouseleave', () => {
+        closeBtn.style.background = 'linear-gradient(145deg, #e8e8e8, #ffffff)';
+        closeBtn.style.color = '#666';
+        closeBtn.style.transform = 'translateY(0)';
+    });
+    
+    closeBtn.addEventListener('click', hideSearchOverlay);
+
+    const title = document.createElement("h2");
+    title.innerHTML = '<i class="fas fa-search"></i> 快捷搜索';
+    title.style.cssText = `
+        margin: 0 0 20px 0;
+        color: #2c3e50;
+        text-align: center;
+        font-size: 24px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    `;
+
+    const searchInput = document.createElement("input");
+searchInput.type = "text";
+searchInput.placeholder = "输入关键词或网址...";
+searchInput.id = "overlay-search-input";
+searchInput.style.cssText = `
+    width: 100%;
+    padding: 12px 15px;
+    box-sizing: border-box;
+    background: linear-gradient(145deg, #f8f9fa, #ffffff);
+    border-radius: 16px;
+    font-size: 16px;
+    color: #2c3e50;
+    outline: none;
+    transition: all 0.3s ease;
+    box-shadow: 
+        inset 4px 4px 8px rgba(0, 0, 0, 0.05),
+        inset -4px -4px 8px rgba(255, 255, 255, 0.8),
+        5px 5px 15px rgba(0, 0, 0, 0.1);
+    height: 48px;
+`;
+
+searchInput.addEventListener('focus', () => {
+    searchInput.style.boxShadow = 
+        'inset 4px 4px 8px rgba(0, 0, 0, 0.08), inset -4px -4px 8px rgba(255, 255, 255, 0.9), 8px 8px 20px rgba(0, 0, 0, 0.15)';
+});
+
+searchInput.addEventListener('blur', () => {
+    searchInput.style.boxShadow = 
+        'inset 4px 4px 8px rgba(0, 0, 0, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.8), 5px 5px 15px rgba(0, 0, 0, 0.1)';
+});
+
+    const tipText = document.createElement("p");
+    tipText.innerHTML = '<i class="fas fa-info-circle"></i> 提示：输入关键词后按回车使用默认搜索引擎搜索，或点击下方搜索引擎按钮选择特定引擎';
+    tipText.style.cssText = `
+        margin: 15px 0 0 0;
+        color: #7f8c8d;
+        font-size: 12px;
+        text-align: center;
+        line-height: 1.4;
+    `;
+
+    searchContainer.appendChild(closeBtn);
+    searchContainer.appendChild(title);
+    searchContainer.appendChild(searchInput);
+    searchContainer.appendChild(tipText);
+    overlay.appendChild(searchContainer);
+
+    // 添加键盘事件 - 回车搜索
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            performOverlaySearch();
+        }
+    });
+
+    // 点击遮罩层关闭
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            hideSearchOverlay();
+        }
+    });
+
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+// 显示搜索遮罩层
+function showSearchOverlay() {
+    const overlay = document.getElementById("punkjet-search-overlay") || createSearchOverlay();
+    const searchInput = document.getElementById("overlay-search-input");
+    
+    overlay.style.display = 'flex';
+    searchOverlayVisible = true;
+    
+    // 聚焦输入框
+    setTimeout(() => {
+        searchInput.focus();
+        searchInput.select();
+    }, 100);
+    
+    // 隐藏汉堡菜单
+    hideHamburgerMenu();
+}
+
+// 隐藏搜索遮罩层
+function hideSearchOverlay() {
+    const overlay = document.getElementById("punkjet-search-overlay");
+    if (overlay) {
+        overlay.style.display = 'none';
+        searchOverlayVisible = false;
+    }
+}
+
+// 执行遮罩层搜索
+function performOverlaySearch() {
+    const searchInput = document.getElementById("overlay-search-input");
+    const query = searchInput.value.trim();
+    
+    if (!query) {
+        searchInput.focus();
+        return;
+    }
+    
+    // 检查是否是URL
+    if (isValidUrl(query)) {
+        window.open(query, '_blank');
+        hideSearchOverlay();
+        return;
+    }
+    
+    // 使用第一个搜索引擎进行搜索
+    const showList = GM_getValue("punk_setup_search", punkDeafultMark).split('-');
+    if (showList.length > 0) {
+        const firstEngine = searchUrlMap.find(item => item.mark === showList[0]);
+        if (firstEngine) {
+            const searchUrl = firstEngine.searchUrl.replace('{keyword}', encodeURIComponent(query));
+            window.open(searchUrl, '_blank');
+            hideSearchOverlay();
+        }
+    }
+}
+
+// 检查是否为有效URL
+function isValidUrl(string) {
+    try {
+        const url = new URL(string);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch (_) {
+        return false;
+    }
+}
+
+// 修改搜索引擎按钮点击事件，支持遮罩层搜索
+function createEngineButtonClickHandler(button, item) {
+    return (event) => {
+        event.preventDefault();
+        const url = button.getAttribute("url");
+        let keywords = "";
+
+        // 如果遮罩层可见且有输入，优先使用遮罩层的输入
+        if (searchOverlayVisible) {
+            const searchInput = document.getElementById("overlay-search-input");
+            if (searchInput && searchInput.value.trim()) {
+                keywords = searchInput.value.trim();
+            }
+        }
+
+        // 如果没有从遮罩层获取到关键词，则使用原来的逻辑
+        if (!keywords) {
+            const allInputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
+            const baiduInput = document.querySelector('input#kw, input[name="wd"], input[name="word"]');
+            if (baiduInput && baiduInput.value.trim()) {
+                keywords = baiduInput.value.trim();
+            } else {
+                for (let input of allInputs) {
+                    const inputVal = input.value.trim();
+                    if (inputVal) {
+                        keywords = inputVal;
+                        break;
+                    }
+                }
+            }
+
+            if (!keywords) {
+                keywords = getKeywords().trim();
+            }
+
+            if (!keywords) {
+                keywords = sessionStorage.getItem("currentInput") || "";
+            }
+        }
+
+        if (url && keywords) {
+            const finalUrl = url.replace('{keyword}', encodeURIComponent(keywords));
+            window.open(finalUrl, '_blank');
+            
+            // 搜索后隐藏遮罩层
+            if (searchOverlayVisible) {
+                hideSearchOverlay();
+            }
+        } else {
+            // 如果没有关键词，显示遮罩层让用户输入
+            showSearchOverlay();
+        }
+    };
+}
+
+function createHamburgerMenu() {
+    const menu = document.createElement("div");
+    menu.id = "punkjet-hamburger-menu";
+    menu.style.cssText = `
+    position: fixed;
+    bottom: 50px;
+    left: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(5px);
+    z-index: 10001;
+    display: none;
+    flex-direction: column;
+    padding: 10px;
+    gap: 5px;
+    min-width: 150px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+`;
+
+    const menuItems = [
+        {
+            icon: 'fas fa-search',
+            text: '快捷搜索',
+            action: showSearchOverlay
+        },
+        {
+            icon: 'fas fa-cogs',
+            text: '引擎管理',
+            action: showManagementPanel
+        }
+    ];
+
+    menuItems.forEach(item => {
+        const menuItem = document.createElement("button");
+        menuItem.innerHTML = `<i class="${item.icon}"></i> ${item.text}`;
+        menuItem.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            border: none;
+            background: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #2c3e50;
+            transition: all 0.3s ease;
+            text-align: left;
+        `;
+        
+        menuItem.addEventListener('mouseenter', () => {
+            menuItem.style.background = 'rgba(52, 152, 219, 0.1)';
+        });
+        
+        menuItem.addEventListener('mouseleave', () => {
+            menuItem.style.background = 'none';
+        });
+        
+        menuItem.addEventListener('click', item.action);
+        
+        menu.appendChild(menuItem);
+    });
+
+    document.body.appendChild(menu);
+    return menu;
+}
+
+// 显示汉堡菜单
+function showHamburgerMenu() {
+    const menu = document.getElementById("punkjet-hamburger-menu") || createHamburgerMenu();
+    menu.style.display = 'flex';
+    hamburgerMenuOpen = true;
+}
+
+// 隐藏汉堡菜单
+function hideHamburgerMenu() {
+    const menu = document.getElementById("punkjet-hamburger-menu");
+    if (menu) {
+        menu.style.display = 'none';
+        hamburgerMenuOpen = false;
+    }
+}
+
+// 切换汉堡菜单
+function toggleHamburgerMenu() {
+    if (hamburgerMenuOpen) {
+        hideHamburgerMenu();
+    } else {
+        showHamburgerMenu();
+    }
+}
+
 function createManagementPanel() {
     const panel = document.createElement("div");
     panel.id = "engine-management-panel";
@@ -2389,7 +2760,7 @@ function createManagementPanel() {
     header.style.flexShrink = "0";
 
     const title = document.createElement("h2");
-    title.textContent = "📊 搜索引擎管理中心";
+    title.innerHTML = '<i class="fas fa-cogs"></i> 搜索引擎管理中心';
     title.style.margin = "0";
     title.style.fontSize = "1.5em";
     title.style.fontWeight = "300";
@@ -2404,7 +2775,7 @@ function createManagementPanel() {
 
     const unsavedIndicator = document.createElement("div");
     unsavedIndicator.id = "unsaved-indicator";
-    unsavedIndicator.textContent = "● 有未保存的更改";
+    unsavedIndicator.innerHTML = '<i class="fas fa-circle"></i> 有未保存的更改';
     unsavedIndicator.style.position = "absolute";
     unsavedIndicator.style.top = "15px";
     unsavedIndicator.style.right = "20px";
@@ -2442,8 +2813,8 @@ function createManagementPanel() {
     leftActionGroup.style.gap = "10px";
     leftActionGroup.style.flexWrap = "wrap";
 
-    const extractBtn = createActionButton("🌐 自动添加", "#3498db", "自动识别当前页面的搜索引擎");
-    const addBtn = createActionButton("➕ 手动添加", "#27ae60", "手动添加新的搜索引擎");
+    const extractBtn = createActionButton('<i class="fas fa-globe"></i> 自动添加', "#3498db", "自动识别当前页面的搜索引擎");
+    const addBtn = createActionButton('<i class="fas fa-plus"></i> 手动添加', "#27ae60", "手动添加新的搜索引擎");
 
     leftActionGroup.appendChild(extractBtn);
     leftActionGroup.appendChild(addBtn);
@@ -2455,7 +2826,7 @@ function createManagementPanel() {
 
     const saveBtn = document.createElement("button");
     saveBtn.id = "panel-save-btn";
-    saveBtn.innerHTML = "💾 保存设置";
+    saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存设置';
     saveBtn.title = "保存当前设置";
     saveBtn.style.cssText = `
         padding: 10px 20px;
@@ -2476,7 +2847,7 @@ function createManagementPanel() {
         justify-content: center;
     `;
 
-    const resetBtn = createActionButton("🔄 恢复默认", "#e74c3c", "恢复默认搜索引擎设置");
+    const resetBtn = createActionButton('<i class="fas fa-undo"></i> 恢复默认', "#e74c3c", "恢复默认搜索引擎设置");
 
     rightActionGroup.appendChild(saveBtn);
     rightActionGroup.appendChild(resetBtn);
@@ -2495,7 +2866,7 @@ function createManagementPanel() {
     listSection.style.overflow = "auto"
 
     const listTitle = document.createElement("h3");
-    listTitle.textContent = "📋 已配置的搜索引擎";
+    listTitle.innerHTML = '<i class="fas fa-list"></i> 已配置的搜索引擎';
     listTitle.style.color = "#2c3e50";
     listTitle.style.margin = "15px 0";
     listTitle.style.fontWeight = "500";
@@ -2527,7 +2898,7 @@ function createManagementPanel() {
     formSection.style.flexShrink = "0";
 
     const formTitle = document.createElement("h3");
-    formTitle.textContent = "✨ 添加新搜索引擎";
+    formTitle.innerHTML = '<i class="fas fa-magic"></i> 添加新搜索引擎';
     formTitle.style.color = "#2c3e50";
     formTitle.style.marginBottom = "15px";
     formSection.appendChild(formTitle);
@@ -2577,7 +2948,7 @@ function createManagementPanel() {
     iconContainer.style.gridColumn = "1 / -1";
 
     const iconTitle = document.createElement("h4");
-    iconTitle.textContent = "🎨 图标设置";
+    iconTitle.innerHTML = '<i class="fas fa-palette"></i> 图标设置';
     iconTitle.style.marginBottom = "10px";
     iconTitle.style.color = "#34495e";
     iconContainer.appendChild(iconTitle);
@@ -2633,7 +3004,7 @@ function createManagementPanel() {
 
     const previewGroup = document.createElement("div");
     const previewButton = document.createElement("button");
-    previewButton.textContent = "预览图标";
+    previewButton.innerHTML = '<i class="fas fa-eye"></i> 预览图标';
     previewButton.style.width = "100%";
     previewButton.style.padding = "10px";
     previewButton.style.backgroundColor = "#3498db";
@@ -2684,8 +3055,8 @@ function createManagementPanel() {
     formActions.style.gap = "10px";
     formActions.style.marginTop = "20px";
 
-    const saveFormBtn = createActionButton("💾 保存引擎", "#27ae60", "");
-    const cancelFormBtn = createActionButton("❌ 取消", "#95a5a6", "");
+    const saveFormBtn = createActionButton('<i class="fas fa-save"></i> 保存引擎', "#27ae60", "");
+    const cancelFormBtn = createActionButton('<i class="fas fa-times"></i> 取消', "#95a5a6", "");
 
     formActions.appendChild(saveFormBtn);
     formActions.appendChild(cancelFormBtn);
@@ -2711,7 +3082,7 @@ function createManagementPanel() {
 
     const selectedCount = document.createElement("span");
     selectedCount.id = "selected-count";
-    selectedCount.textContent = "已选择 0 个引擎";
+    selectedCount.innerHTML = '<i class="fas fa-check-circle"></i> 已选择 0 个引擎';
     selectedCount.style.color = "#7f8c8d";
     selectedCount.style.fontSize = "0.9em";
     footer.appendChild(selectedCount);
@@ -2720,7 +3091,7 @@ function createManagementPanel() {
     footerActions.style.display = "flex";
     footerActions.style.gap = "10px";
 
-    const closeBtn = createActionButton("❌ 关闭", "#95a5a6", "");
+    const closeBtn = createActionButton('<i class="fas fa-times"></i> 关闭', "#95a5a6", "");
 
     footerActions.appendChild(closeBtn);
     footer.appendChild(footerActions);
@@ -2747,9 +3118,9 @@ function createManagementPanel() {
     return panel;
 }
 
-function createActionButton(text, color, title) {
+function createActionButton(html, color, title) {
     const button = document.createElement("button");
-    button.textContent = text;
+    button.innerHTML = html;
     button.title = title;
     button.style.padding = "10px 15px";
     button.style.backgroundColor = color;
@@ -2760,6 +3131,10 @@ function createActionButton(text, color, title) {
     button.style.fontSize = "14px";
     button.style.minWidth = "120px";
     button.style.transition = "all 0.3s ease";
+    button.style.display = "flex";
+    button.style.alignItems = "center";
+    button.style.gap = "5px";
+    button.style.justifyContent = "center";
 
     button.addEventListener("mouseenter", () => {
         button.style.transform = "translateY(-2px)";
@@ -2798,7 +3173,7 @@ function markUnsavedChanges() {
         saveBtn.style.opacity = "1";
         saveBtn.style.pointerEvents = "auto";
         saveBtn.style.background = "#e67e22";
-        saveBtn.innerHTML = "💾 保存更改";
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存更改';
 
         saveBtn.addEventListener("mouseenter", function() {
             this.style.transform = "translateY(-2px)";
@@ -2825,19 +3200,19 @@ function clearUnsavedChanges() {
         saveBtn.style.opacity = "0.7";
         saveBtn.style.pointerEvents = "none";
         saveBtn.style.background = "#95a5a6";
-        saveBtn.innerHTML = "💾 保存设置";
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存设置';
 
         saveBtn.onmouseenter = null;
         saveBtn.onmouseleave = null;
 
         setTimeout(() => {
             if (!hasUnsavedChanges) {
-                saveBtn.innerHTML = "✅ 已保存";
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> 已保存';
                 saveBtn.style.background = "#27ae60";
 
                 setTimeout(() => {
                     if (!hasUnsavedChanges) {
-                        saveBtn.innerHTML = "💾 保存设置";
+                        saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存设置';
                         saveBtn.style.background = "#95a5a6";
                     }
                 }, 2000);
@@ -3102,16 +3477,19 @@ function refreshEngineList() {
 
         if (engine.custom) {
             const deleteBtn = document.createElement("button");
-            deleteBtn.textContent = "🗑️";
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
             deleteBtn.title = "删除";
             deleteBtn.style.cssText = `
-                padding: 5px 10px;
+                padding: 8px 12px;
                 border: none;
                 background: #e74c3c;
                 color: white;
                 border-radius: 5px;
                 cursor: pointer;
                 flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             `;
 
             actions.appendChild(deleteBtn);
@@ -3149,7 +3527,7 @@ function refreshEngineList() {
 function updateSelectedCount() {
     const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]:checked');
     const countElement = document.getElementById("selected-count");
-    countElement.textContent = `已选择 ${checkboxes.length} 个引擎`;
+    countElement.innerHTML = `<i class="fas fa-check-circle"></i> 已选择 ${checkboxes.length} 个引擎`;
 }
 
 function saveEngineSettings() {
@@ -3185,6 +3563,9 @@ function showManagementPanel() {
 
     refreshEngineList();
     panel.style.display = "block";
+    
+    // 隐藏汉堡菜单
+    hideHamburgerMenu();
 }
 
 function enableDragAndSort() {
@@ -3281,25 +3662,43 @@ function addSearchBox() {
         ulList.style.overflowX = "auto";
         ulList.style.overflowY = "hidden";
 
-        const settingsButton = document.createElement('button');
-        settingsButton.className = "engine-settings-button";
-        settingsButton.innerHTML = "ν";
-        settingsButton.title = "管理搜索引擎";
-        settingsButton.style.width = "32px";
-        settingsButton.style.height = "32px";
-        settingsButton.style.border = "1px solid #f0f0f0";
-        settingsButton.style.borderRadius = "7px";
-        settingsButton.style.background = "white";
-        settingsButton.style.cursor = "pointer";
-        settingsButton.style.margin = "3px";
-        settingsButton.style.flexShrink = "0";
-        settingsButton.style.display = "flex";
-        settingsButton.style.justifyContent = "center";
-        settingsButton.style.alignItems = "center";
-        settingsButton.style.fontSize = "18px";
-        settingsButton.addEventListener('click', showManagementPanel);
+        // 修改汉堡菜单按钮 - 使用网格图标和指定颜色
+        const hamburgerButton = document.createElement('button');
+        hamburgerButton.className = "engine-hamburger-button";
+        hamburgerButton.innerHTML = '<i class="fa-solid fa-paper-plane"></i>'; 
+        hamburgerButton.title = "菜单";
+        hamburgerButton.style.cssText = `
+            width: 32px;
+            height: 32px;
+            border: 1px solid #f0f0f0;
+            border-radius: 7px;
+            background: white;
+            cursor: pointer;
+            margin: 3px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            color: #03CD8E;  // 指定颜色
+            transition: all 0.3s ease;
+        `;
+        
+        hamburgerButton.addEventListener('mouseenter', () => {
+            hamburgerButton.style.backgroundColor = 'rgba(241, 241, 241, 1)';
+            hamburgerButton.style.transform = 'translateY(-2px)';
+            hamburgerButton.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        });
+        
+        hamburgerButton.addEventListener('mouseout', () => {
+            hamburgerButton.style.backgroundColor = 'white';
+            hamburgerButton.style.transform = 'translateY(0)';
+            hamburgerButton.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
+        });
+        
+        hamburgerButton.addEventListener('click', toggleHamburgerMenu);
 
-        punkJetBox.appendChild(settingsButton);
+        punkJetBox.appendChild(hamburgerButton);
 
         let fragment = document.createDocumentFragment();
         let showList = GM_getValue("punk_setup_search", punkDeafultMark);
@@ -3330,40 +3729,8 @@ function addSearchBox() {
                         button.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
                     });
 
-                    button.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        const url = button.getAttribute("url");
-                        let keywords = "";
-
-                        const allInputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
-                        const baiduInput = document.querySelector('input#kw, input[name="wd"], input[name="word"]');
-                        if (baiduInput && baiduInput.value.trim()) {
-                            keywords = baiduInput.value.trim();
-                        } else {
-                            for (let input of allInputs) {
-                                const inputVal = input.value.trim();
-                                if (inputVal) {
-                                    keywords = inputVal;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!keywords) {
-                            keywords = getKeywords().trim();
-                        }
-
-                        if (!keywords) {
-                            keywords = sessionStorage.getItem("currentInput") || "";
-                        }
-
-                        if (url && keywords) {
-                            const finalUrl = url.replace('{keyword}', encodeURIComponent(keywords));
-                            window.open(finalUrl, '_blank');
-                        } else {
-                            alert('未找到搜索关键词，请先在输入框中输入内容。');
-                        }
-                    });
+                    // 使用新的点击处理器
+                    button.addEventListener('click', createEngineButtonClickHandler(button, item));
 
                     button.addEventListener('mousedown', (e) => {
                         longPressTimer = setTimeout(() => {
@@ -3392,6 +3759,13 @@ function addSearchBox() {
         initScrollListener();
         
         window.addEventListener('resize', updateSearchBoxPosition);
+
+        // 点击页面其他区域关闭汉堡菜单
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#punkjet-hamburger-menu') && !e.target.closest('.engine-hamburger-button')) {
+                hideHamburgerMenu();
+            }
+        });
 
         setTimeout(enableDragAndSort, 500);
     } catch (error) {
@@ -3429,8 +3803,8 @@ function injectStyle() {
             transition: all 0.3s ease;
             transform: translateY(0);
             opacity: 1;
-            overflow-y: hidden !important;
-            overflow-x: visible !important;
+            overflow-y: hidden;
+            overflow-x: visible;
         }
 
         .engine-container.hidden {
@@ -3441,26 +3815,17 @@ function injectStyle() {
         .engine-display {
             display: flex;
             overflow-x: auto;
-            overflow-y: hidden !important;
+            overflow-y: hidden;
             white-space: nowrap;
             height: 100%;
             gap: 0px;
             flex-grow: 1;
-            scrollbar-width: thin;
-            -ms-overflow-style: -ms-autohiding-scrollbar;
-        }        
-
-        .engine-display::-webkit-scrollbar-track {
-            background: transparent;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
         }
 
-        .engine-display::-webkit-scrollbar-thumb {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 2px;
-        }
-
-        .engine-display::-webkit-scrollbar-thumb:hover {
-            background: rgba(0, 0, 0, 0.4);
+        .engine-display::-webkit-scrollbar {
+            display: none;
         }
 
         .engine-button {
@@ -3519,6 +3884,14 @@ function injectStyle() {
             animation: slideIn 0.3s ease;
         }
 
+        #punkjet-hamburger-menu {
+            animation: slideInLeft 0.3s ease;  // 改为从左侧滑入
+        }
+
+        #punkjet-search-overlay {
+            animation: fadeIn 0.3s ease;
+        }
+
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -3527,6 +3900,26 @@ function injectStyle() {
             to {
                 opacity: 1;
                 transform: translate(-50%, -50%);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
             }
         }
     `;
@@ -3541,6 +3934,18 @@ function reloadScript() {
     if (punkJetBox) {
         punkJetBox.remove();
         containerAdded = false;
+    }
+    
+    // 移除汉堡菜单
+    const hamburgerMenu = document.getElementById("punkjet-hamburger-menu");
+    if (hamburgerMenu) {
+        hamburgerMenu.remove();
+    }
+    
+    // 移除搜索遮罩层
+    const searchOverlay = document.getElementById("punkjet-search-overlay");
+    if (searchOverlay) {
+        searchOverlay.remove();
     }
     
     if (scrollTimeout) {
@@ -3559,6 +3964,8 @@ function reloadScript() {
     window.removeEventListener('touchend', handleTouchEnd);
     
     scriptLoaded = false;
+    hamburgerMenuOpen = false;
+    searchOverlayVisible = false;
     init();
 }
 
