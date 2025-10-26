@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.25
+// @version      v1.27
 // @author       晚风知我意
 // @match        *://*/*searchstring=*
 // @match        *://*/*searchquery=*
@@ -49,7 +49,7 @@
 // @icon         https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/shousuo.svg
 // @run-at       document-body
 // @license     MIT
-// @description 在页面底部显示一个聚合搜索引擎切换导航，支持自定义引擎和拖拽排序，(新增搜索栏，具体操作-纸飞机-快捷搜索，支持网址跳转和关键词搜索)
+// @description * 搜索引擎快捷工具 * 核心功能：页面底部搜索引擎快捷栏、拖拽排序、自定义引擎管理、快捷搜索 
 // ==/UserScript==
 
 const punkDeafultMark = "Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
@@ -2043,2025 +2043,2719 @@ svgCode: `
   },
 ];
 
-// 在脚本开头添加 Font Awesome 引入
-const fontAwesomeLink = document.createElement('link');
-fontAwesomeLink.rel = 'stylesheet';
-fontAwesomeLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css';
-document.head.appendChild(fontAwesomeLink);
 
-let userSearchEngines = GM_getValue("userSearchEngines", []);
-let searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
-let lastScrollTop = 0;
-let punkJetBoxVisible = true;
-let currentInput = "";
-let scriptLoaded = false;
-let containerAdded = false;
-let longPressTimer = null;
-let currentDraggedButton = null;
-let hasUnsavedChanges = false;
-let scrollTimeout = null;
-let isScrolling = false;
-let hideTimeout = null;
-let touchStartY = null;
-let hamburgerMenuOpen = false;
-let searchOverlayVisible = false;
+// ===== 常量定义区 =====
+// 样式类名常量（统一管理，避免硬编码）
+const CLASS_NAMES = Object.freeze({
+    ENGINE_CONTAINER: 'engine-container',
+    ENGINE_DISPLAY: 'engine-display',
+    ENGINE_BUTTON: 'engine-button',
+    HAMBURGER_MENU: 'punkjet-hamburger-menu',
+    SEARCH_OVERLAY: 'punkjet-search-overlay',
+    MANAGEMENT_PANEL: 'engine-management-panel',
+    ENGINE_CARD: 'engine-card',
+    DRAGGING: 'dragging',
+    DRAG_OVER: 'drag-over'
+});
 
-function engineContainerExists() {
-    return document.querySelector('.engine-container') !== null;
-}
+// 存储键名常量（统一管理GM存储键）
+const STORAGE_KEYS = Object.freeze({
+    USER_SEARCH_ENGINES: 'userSearchEngines',
+    PUNK_SETUP_SEARCH: 'punk_setup_search',
+    LAST_SUCCESSFUL_KEYWORDS: 'last_successful_keywords',
+    CURRENT_INPUT: 'currentInput'
+});
 
-function isValidScope() {
-    return searchUrlMap.some(item => window.location.href.match(item.matchUrl) != null);
-}
+// 默认配置（抽离默认值，便于维护）
+const DEFAULT_CONFIG = {
+    PUNK_DEFAULT_MARK: 'baidu-google-bing', // 需与原代码punkDeafultMark保持一致
+    SEARCH_PARAMS: ['q', 'query', 'search', 'keyword', 'keywords', 'wd', 'key'],
+    MONITORED_INPUT_SELECTOR: 'input[type="text"], input[type="search"], textarea, input#kw',
+    CHECK_SCOPE_INTERVAL: 1000,
+    SHOW_SEARCH_BOX_DELAY: 10000,
+    SCROLL_TIMEOUT_DURATION: 150,
+    BAIDU_INPUT_DELAY: 500,
+    DRAG_SORT_DELAY: 500
+};
 
-function getKeywords() {
-    try {
-        let keywords = "";
-        const url = new URL(window.location.href);
-        const searchParams = url.searchParams;
+// ===== 全局状态管理 =====
+// 用对象封装全局状态，避免零散变量污染作用域
+const appState = {
+    userSearchEngines: GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, []),
+    searchUrlMap: [...defaultSearchEngines, ...GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, [])], // defaultSearchEngines为原代码默认引擎数组
+    lastScrollTop: 0,
+    punkJetBoxVisible: true,
+    currentInput: sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '',
+    scriptLoaded: false,
+    containerAdded: false,
+    hasUnsavedChanges: false,
+    scrollTimeout: null,
+    isScrolling: false,
+    hideTimeout: null,
+    touchStartY: null,
+    hamburgerMenuOpen: false,
+    searchOverlayVisible: false
+};
+
+// ===== 可访问性模块 =====
+/**
+ * 可访问性功能模块 - 键盘导航、ARIA标签、焦点管理
+ */
+const accessibility = {
+    /**
+     * 初始化键盘导航支持
+     */
+    initKeyboardNavigation() {
+        document.addEventListener('keydown', (e) => {
+            // Alt+S 打开搜索框
+            if (e.altKey && e.key === 's') {
+                e.preventDefault();
+                searchOverlay.showSearchOverlay();
+            }
+            
+            // ESC 关闭各种弹窗
+            if (e.key === 'Escape') {
+                if (appState.searchOverlayVisible) {
+                    searchOverlay.hideSearchOverlay();
+                }
+                if (appState.hamburgerMenuOpen) {
+                    hamburgerMenu.hideHamburgerMenu();
+                }
+                const panel = document.getElementById(CLASS_NAMES.MANAGEMENT_PANEL);
+                if (panel && panel.style.display === 'block') {
+                    managementPanel.closeManagementPanel();
+                }
+            }
+            
+            // Alt+M 打开菜单
+            if (e.altKey && e.key === 'm') {
+                e.preventDefault();
+                hamburgerMenu.toggleHamburgerMenu();
+            }
+            
+            // Alt+E 打开引擎管理
+            if (e.altKey && e.key === 'e') {
+                e.preventDefault();
+                managementPanel.showManagementPanel();
+            }
+        });
+    },
+    
+    /**
+     * 改进ARIA标签
+     */
+    enhanceAriaLabels() {
+        const buttons = document.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
+        buttons.forEach(button => {
+            const engineName = button.getAttribute('title');
+            button.setAttribute('aria-label', `使用${engineName}搜索`);
+            button.setAttribute('role', 'button');
+            button.setAttribute('tabindex', '0');
+        });
         
-        const commonSearchParams = ['q', 'query', 'search', 'keyword', 'keywords', 'wd', 'key'];
-        for (const param of commonSearchParams) {
-            if (searchParams.has(param)) {
-                keywords = searchParams.get(param).trim();
-                if (keywords) break;
+        // 为汉堡菜单按钮添加ARIA
+        const hamburgerButton = document.querySelector('.engine-hamburger-button');
+        if (hamburgerButton) {
+            hamburgerButton.setAttribute('aria-label', '打开菜单');
+            hamburgerButton.setAttribute('aria-expanded', 'false');
+            hamburgerButton.setAttribute('aria-haspopup', 'true');
+        }
+        
+        // 为搜索遮罩添加ARIA
+        const overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
+        if (overlay) {
+            const searchInput = overlay.querySelector('input');
+            if (searchInput) {
+                searchInput.setAttribute('aria-label', '搜索关键词或网址');
             }
         }
+    },
+    
+    /**
+     * 更新汉堡菜单ARIA状态
+     */
+    updateHamburgerAriaState() {
+        const hamburgerButton = document.querySelector('.engine-hamburger-button');
+        if (hamburgerButton) {
+            hamburgerButton.setAttribute('aria-expanded', appState.hamburgerMenuOpen.toString());
+        }
+    },
+    
+    /**
+     * 焦点管理 - 陷阱焦点在模态框内
+     * @param {HTMLElement} element - 模态框元素
+     */
+    trapFocus(element) {
+        const focusableElements = element.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        
+        if (focusableElements.length === 0) return;
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        
+        const handleKeyDown = (e) => {
+            if (e.key !== 'Tab') return;
+            
+            if (e.shiftKey) {
+                // Shift + Tab
+                if (document.activeElement === firstElement) {
+                    lastElement.focus();
+                    e.preventDefault();
+                }
+            } else {
+                // Tab
+                if (document.activeElement === lastElement) {
+                    firstElement.focus();
+                    e.preventDefault();
+                }
+            }
+        };
+        
+        element.addEventListener('keydown', handleKeyDown);
+        
+        // 存储事件处理器以便清理
+        if (!element._focusTrapHandler) {
+            element._focusTrapHandler = handleKeyDown;
+        }
+        
+        // 初始聚焦到第一个元素
+        setTimeout(() => firstElement.focus(), 100);
+    },
+    
+    /**
+     * 移除焦点陷阱
+     * @param {HTMLElement} element - 模态框元素
+     */
+    removeFocusTrap(element) {
+        if (element._focusTrapHandler) {
+            element.removeEventListener('keydown', element._focusTrapHandler);
+            delete element._focusTrapHandler;
+        }
+    },
+    
+    /**
+     * 初始化可访问性功能
+     */
+    init() {
+        this.initKeyboardNavigation();
+        
+        // 延迟执行ARIA标签增强，等待DOM加载
+        setTimeout(() => {
+            this.enhanceAriaLabels();
+        }, 1000);
+        
+        // 监听DOM变化，动态增强ARIA标签
+        const observer = new MutationObserver(() => {
+            this.enhanceAriaLabels();
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+};
 
-        if (!keywords) {
-            for (let urlItem of searchUrlMap) {
-                if (window.location.href.match(urlItem.matchUrl) != null) {
-                    for (let keyItem of urlItem.searchkeyName) {
-                        if (searchParams.has(keyItem)) {
-                            keywords = searchParams.get(keyItem).trim();
-                            if (keywords) break;
-                        }
-                    }
+// ===== 防抖工具模块 =====
+/**
+ * 防抖工具模块 - 更精细的防抖控制
+ */
+const debounceUtils = {
+    timers: new Map(),
+    
+    /**
+     * 防抖函数
+     * @param {string} key - 防抖标识键
+     * @param {Function} fn - 要执行的函数
+     * @param {number} delay - 延迟时间(ms)
+     * @param {boolean} immediate - 是否立即执行
+     */
+    debounce(key, fn, delay = 300, immediate = false) {
+        // 清除现有定时器
+        if (this.timers.has(key)) {
+            clearTimeout(this.timers.get(key));
+        }
+        
+        // 立即执行模式
+        if (immediate && !this.timers.has(key)) {
+            fn();
+            this.timers.set(key, setTimeout(() => {
+                this.timers.delete(key);
+            }, delay));
+        } else {
+            // 延迟执行模式
+            const timer = setTimeout(() => {
+                fn();
+                this.timers.delete(key);
+            }, delay);
+            this.timers.set(key, timer);
+        }
+    },
+    
+    /**
+     * 节流函数
+     * @param {string} key - 节流标识键
+     * @param {Function} fn - 要执行的函数
+     * @param {number} limit - 时间限制(ms)
+     */
+    throttle(key, fn, limit = 300) {
+        if (!this.timers.has(key)) {
+            fn();
+            this.timers.set(key, setTimeout(() => {
+                this.timers.delete(key);
+            }, limit));
+        }
+    },
+    
+    /**
+     * 清除指定防抖定时器
+     * @param {string} key - 防抖标识键
+     */
+    cancel(key) {
+        if (this.timers.has(key)) {
+            clearTimeout(this.timers.get(key));
+            this.timers.delete(key);
+        }
+    },
+    
+    /**
+     * 清除所有防抖定时器
+     */
+    clearAll() {
+        this.timers.forEach((timer, key) => {
+            clearTimeout(timer);
+            this.timers.delete(key);
+        });
+    }
+};
+
+// ===== 工具函数库 =====
+/**
+ * 工具函数集合 - 封装通用逻辑，提升复用性
+ */
+const utils = {
+    /**
+     * 清除所有定时器
+     */
+    clearAllTimeouts() {
+        if (appState.scrollTimeout) {
+            clearTimeout(appState.scrollTimeout);
+            appState.scrollTimeout = null;
+        }
+        if (appState.hideTimeout) {
+            clearTimeout(appState.hideTimeout);
+            appState.hideTimeout = null;
+        }
+        // 同时清除防抖定时器
+        debounceUtils.clearAll();
+    },
+
+    /**
+     * 检查引擎容器是否已存在
+     * @returns {boolean} 存在返回true，否则false
+     */
+    isEngineContainerExists() {
+        return document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}`) !== null;
+    },
+
+    /**
+     * 检查当前页面是否在有效作用域内（匹配搜索引擎页面）
+     * @returns {boolean} 有效返回true，否则false
+     */
+    isValidScope() {
+        return appState.searchUrlMap.some(item => 
+            window.location.href.match(item.matchUrl) !== null
+        );
+    },
+
+    /**
+     * 验证URL是否有效（http/https协议）
+     * @param {string} string - 待验证的URL字符串
+     * @returns {boolean} 有效返回true，否则false
+     */
+    isValidUrl(string) {
+        try {
+            const url = new URL(string);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch (_) {
+            return false;
+        }
+    },
+
+    /**
+     * 获取当前页面的搜索关键词（从URL参数、输入框、存储中优先级获取）
+     * @returns {string} 搜索关键词
+     */
+    getKeywords() {
+        try {
+            // 1. 从URL参数中提取关键词
+            const url = new URL(window.location.href);
+            const searchParams = url.searchParams;
+            let keywords = '';
+
+            // 优先从通用参数中提取
+            for (const param of DEFAULT_CONFIG.SEARCH_PARAMS) {
+                if (searchParams.has(param)) {
+                    keywords = searchParams.get(param).trim();
                     if (keywords) break;
                 }
             }
-        }
 
-        if (keywords) {
-            localStorage.setItem("last_successful_keywords", keywords);
-            sessionStorage.setItem("last_successful_keywords", keywords);
-        } else {
-            keywords = sessionStorage.getItem("last_successful_keywords") || localStorage.getItem("last_successful_keywords") || "";
-        }
-        return keywords;
-    } catch (error) {
-        console.error("获取关键词时出错:", error.message, "当前URL:", window.location.href);
-        return "";
-    }
-}
-
-function monitorInputFields() {
-    const inputFields = document.querySelectorAll('input[type="text"], input[type="search"], textarea, input#kw');
-    inputFields.forEach(input => {
-        if (!input.dataset.monitored) {
-            input.dataset.monitored = true;
-            input.addEventListener('input', (event) => {
-                currentInput = event.target.value.trim();
-                sessionStorage.setItem("currentInput", currentInput);
-            });
-            
-            input.addEventListener('change', (event) => {
-                currentInput = event.target.value.trim();
-                sessionStorage.setItem("currentInput", currentInput);
-            });
-        }
-    });
-
-    const observer = new MutationObserver(() => {
-        const newInputFields = document.querySelectorAll('input[type="text"], input[type="search"], textarea, input#kw:not([data-monitored])');
-        newInputFields.forEach(input => {
-            input.dataset.monitored = true;
-            input.addEventListener('input', (event) => {
-                currentInput = event.target.value.trim();
-                sessionStorage.setItem("currentInput", currentInput);
-            });
-            
-            input.addEventListener('change', (event) => {
-                currentInput = event.target.value.trim();
-                sessionStorage.setItem("currentInput", currentInput);
-            });
-        });
-    });
-
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: false,
-        characterData: false
-    });
-}
-
-function updateSearchBoxPosition() {
-    const punkJetBox = document.getElementById("punkjet-search-box");
-    if (!punkJetBox) return;
-
-    punkJetBox.style.bottom = "0px";
-    punkJetBox.style.left = "2%";
-    punkJetBox.style.width = "96%";
-    
-    if (punkJetBoxVisible) {
-        punkJetBox.style.transform = "translateY(0)";
-        punkJetBox.style.opacity = "1";
-    } else {
-        punkJetBox.style.transform = "translateY(100%)";
-        punkJetBox.style.opacity = "0";
-    }
-}
-
-function showSearchBox() {
-    if (!punkJetBoxVisible) {
-        punkJetBoxVisible = true;
-        updateSearchBoxPosition();
-    }
-}
-
-function hideSearchBox() {
-    if (punkJetBoxVisible) {
-        punkJetBoxVisible = false;
-        updateSearchBoxPosition();
-    }
-}
-
-function showSearchBoxImmediately() {
-    if (scrollTimeout) {
-        clearTimeout(scrollTimeout);
-        scrollTimeout = null;
-    }
-    if (hideTimeout) {
-        clearTimeout(hideTimeout);
-        hideTimeout = null;
-    }
-    
-    showSearchBox();
-}
-
-function showSearchBoxDelayed() {
-    if (hideTimeout) {
-        clearTimeout(hideTimeout);
-    }
-    
-    hideTimeout = setTimeout(() => {
-        showSearchBox();
-        hideTimeout = null;
-    }, 10000);
-}
-
-function handleScroll() {
-    const st = window.pageYOffset || document.documentElement.scrollTop;
-    
-    const isInteractingWithSearchBar = document.querySelector('.engine-container:hover') !== null;
-    if (isInteractingWithSearchBar) {
-        return;
-    }
-    
-    if (scrollTimeout) {
-        clearTimeout(scrollTimeout);
-    }
-    
-    isScrolling = true;
-    
-    if (st > lastScrollTop && st > 50) {
-        hideSearchBox();
-    } else {
-        showSearchBoxImmediately();
-    }
-    
-    lastScrollTop = st <= 0 ? 0 : st;
-    
-    scrollTimeout = setTimeout(() => {
-        isScrolling = false;
-        showSearchBoxDelayed();
-    }, 150);
-}
-
-function handleTouchStart(e) {
-    touchStartY = e.touches[0].clientY;
-}
-
-function handleTouchMove(e) {
-    if (touchStartY === null) return;
-    
-    if (e.target.closest('.engine-container')) {
-        return;
-    }
-    
-    const touchY = e.touches[0].clientY;
-    const diff = touchStartY - touchY;
-    
-    if (Math.abs(diff) > 10) {
-        if (diff > 0) {
-            hideSearchBox();
-        } else {
-            showSearchBoxImmediately();
-        }
-    }
-}
-
-function handleTouchEnd() {
-    touchStartY = null;
-    showSearchBoxDelayed();
-}
-
-function handleWheel(e) {
-    setTimeout(() => {
-        const st = window.pageYOffset || document.documentElement.scrollTop;
-        
-        if (st > lastScrollTop && st > 50) {
-            hideSearchBox();
-        } else {
-            showSearchBoxImmediately();
-        }
-        
-        lastScrollTop = st <= 0 ? 0 : st;
-        
-        showSearchBoxDelayed();
-    }, 10);
-}
-
-function initScrollListener() {
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('wheel', handleWheel, { passive: true });
-    window.addEventListener('touchstart', handleTouchStart, { passive: true });
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
-    window.addEventListener('touchend', handleTouchEnd, { passive: true });
-    
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('#engine-management-panel') && !e.target.closest('.engine-container')) {
-            showSearchBoxImmediately();
-        }
-    });
-    
-    document.addEventListener('focusin', (e) => {
-        if (e.target.matches('input, textarea')) {
-            showSearchBoxImmediately();
-        }
-    });
-    
-    document.addEventListener('mouseenter', (e) => {
-        if (e.target.closest('.engine-container') || e.target.closest('.engine-button')) {
-            showSearchBoxImmediately();
-        }
-    }, true);
-    
-    document.addEventListener('wheel', (e) => {
-        if (e.target.closest('.engine-container')) {
-            e.stopPropagation();
-        }
-    }, { passive: true });
-    
-    document.addEventListener('touchmove', (e) => {
-        if (e.target.closest('.engine-container')) {
-            e.stopPropagation();
-        }
-    }, { passive: true });
-}
-
-function extractSearchEngineFromPage() {
-    const searchForms = document.querySelectorAll('form[action*="search"], form[action*="query"], form[action*="find"]');
-    const searchInputs = document.querySelectorAll('input[type="search"], input[name*="search"], input[name*="query"], input[name*="q"]');
-
-    let searchInfo = {
-        name: "",
-        searchUrl: "",
-        searchkeyName: [],
-        matchUrl: "",
-        mark: "",
-        found: false
-    };
-
-    if (searchForms.length > 0) {
-        const form = searchForms[0];
-        const action = form.getAttribute('action') || '';
-        const method = (form.getAttribute('method') || 'get').toLowerCase();
-
-        if (action) {
-            let baseUrl = action;
-            if (!action.startsWith('http')) {
-                baseUrl = new URL(action, window.location.origin).href;
-            }
-
-            const inputs = form.querySelectorAll('input[name]');
-            let keyParam = '';
-
-            for (let input of inputs) {
-                const name = input.getAttribute('name');
-                if (name && (name.includes('q') || name.includes('search') || name.includes('query') || name.includes('keyword'))) {
-                    keyParam = name;
-                    break;
+            // 通用参数未提取到，从引擎配置的参数中提取
+            if (!keywords) {
+                for (const urlItem of appState.searchUrlMap) {
+                    if (window.location.href.match(urlItem.matchUrl) !== null) {
+                        for (const keyItem of urlItem.searchkeyName) {
+                            if (searchParams.has(keyItem)) {
+                                keywords = searchParams.get(keyItem).trim();
+                                if (keywords) break;
+                            }
+                        }
+                        if (keywords) break;
+                    }
                 }
             }
 
-            if (!keyParam && searchInputs.length > 0) {
-                keyParam = searchInputs[0].getAttribute('name') || 'q';
+            // 2. 关键词存在时更新存储，不存在时从存储中读取
+            if (keywords) {
+                localStorage.setItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS, keywords);
+                sessionStorage.setItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS, keywords);
+            } else {
+                keywords = sessionStorage.getItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS) || 
+                           localStorage.getItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS) || '';
             }
 
-            if (keyParam) {
-                searchInfo.searchUrl = method === 'post' ?
-                    `${baseUrl}?${keyParam}={keyword}` :
-                    `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}${keyParam}={keyword}`;
-                searchInfo.searchkeyName = [keyParam];
-                searchInfo.found = true;
-
-                const domain = new URL(baseUrl).hostname.replace('www.', '');
-                searchInfo.name = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
-                searchInfo.mark = domain.replace(/\./g, '_');
-                searchInfo.matchUrl = `.*${domain}.*`;
-            }
+            return keywords;
+        } catch (error) {
+            console.error("获取关键词失败:", error.message, "当前URL:", window.location.href);
+            return "";
         }
-    }
+    },
 
-    if (!searchInfo.found && searchInputs.length > 0) {
-        const input = searchInputs[0];
-        const name = input.getAttribute('name') || 'q';
-        const domain = window.location.hostname.replace('www.', '');
-
-        searchInfo.searchUrl = `${window.location.origin}/search?${name}={keyword}`;
-        searchInfo.searchkeyName = [name];
-        searchInfo.name = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
-        searchInfo.mark = domain.replace(/\./g, '_');
-        searchInfo.matchUrl = `.*${domain}.*`;
-        searchInfo.found = true;
-    }
-
-    return searchInfo;
-}
-
-// 简化版搜索遮罩层 - Skeuomorphic风格美化
-function createSearchOverlay() {
-    const overlay = document.createElement("div");
-    overlay.id = "punkjet-search-overlay";
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 1);
-        z-index: 9998;
-        display: none;
-        justify-content: center;
-        align-items: center;
-        backdrop-filter: blur(5px);
-    `;
-
-    const searchContainer = document.createElement("div");
-    searchContainer.style.cssText = `
-        width: 90%;
-        max-width: 500px;
-        background: linear-gradient(145deg, #f0f0f0, #ffffff);
-        border-radius: 25px;
-        padding: 30px;
-        box-shadow: 
-            20px 20px 60px rgba(0, 0, 0, 0.1),
-            -20px -20px 60px rgba(255, 255, 255, 0.8),
-            inset 1px 1px 2px rgba(255, 255, 255, 0.6),
-            inset -1px -1px 2px rgba(0, 0, 0, 0.05);
-        position: relative;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-    `;
-
-    const closeBtn = document.createElement("button");
-    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
-    closeBtn.style.cssText = `
-        position: absolute;
-        top: 15px;
-        right: 15px;
-        background: linear-gradient(145deg, #e8e8e8, #ffffff);
-        border: none;
-        font-size: 20px;
-        color: #666;
-        cursor: pointer;
-        padding: 8px;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s ease;
-        box-shadow: 
-            5px 5px 10px rgba(0, 0, 0, 0.1),
-            -5px -5px 10px rgba(255, 255, 255, 0.8),
-            inset 1px 1px 2px rgba(255, 255, 255, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-    `;
-    
-    closeBtn.addEventListener('mouseenter', () => {
-        closeBtn.style.background = 'linear-gradient(145deg, #ff6b6b, #ff5252)';
-        closeBtn.style.color = 'white';
-        closeBtn.style.transform = 'translateY(-2px)';
-    });
-    
-    closeBtn.addEventListener('mouseleave', () => {
-        closeBtn.style.background = 'linear-gradient(145deg, #e8e8e8, #ffffff)';
-        closeBtn.style.color = '#666';
-        closeBtn.style.transform = 'translateY(0)';
-    });
-    
-    closeBtn.addEventListener('click', hideSearchOverlay);
-
-    const title = document.createElement("h2");
-    title.innerHTML = '<i class="fas fa-search"></i> 快捷搜索';
-    title.style.cssText = `
-        margin: 0 0 20px 0;
-        color: #2c3e50;
-        text-align: center;
-        font-size: 24px;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-    `;
-
-    const searchInput = document.createElement("input");
-searchInput.type = "text";
-searchInput.placeholder = "输入关键词或网址...";
-searchInput.id = "overlay-search-input";
-searchInput.style.cssText = `
-    width: 100%;
-    padding: 12px 15px;
-    box-sizing: border-box;
-    background: linear-gradient(145deg, #f8f9fa, #ffffff);
-    border-radius: 16px;
-    font-size: 16px;
-    color: #2c3e50;
-    outline: none;
-    transition: all 0.3s ease;
-    box-shadow: 
-        inset 4px 4px 8px rgba(0, 0, 0, 0.05),
-        inset -4px -4px 8px rgba(255, 255, 255, 0.8),
-        5px 5px 15px rgba(0, 0, 0, 0.1);
-    height: 48px;
-`;
-
-searchInput.addEventListener('focus', () => {
-    searchInput.style.boxShadow = 
-        'inset 4px 4px 8px rgba(0, 0, 0, 0.08), inset -4px -4px 8px rgba(255, 255, 255, 0.9), 8px 8px 20px rgba(0, 0, 0, 0.15)';
-});
-
-searchInput.addEventListener('blur', () => {
-    searchInput.style.boxShadow = 
-        'inset 4px 4px 8px rgba(0, 0, 0, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.8), 5px 5px 15px rgba(0, 0, 0, 0.1)';
-});
-
-    const tipText = document.createElement("p");
-    tipText.innerHTML = '<i class="fas fa-info-circle"></i> 提示：输入关键词后按回车使用默认搜索引擎搜索，或点击下方搜索引擎按钮选择特定引擎';
-    tipText.style.cssText = `
-        margin: 15px 0 0 0;
-        color: #7f8c8d;
-        font-size: 12px;
-        text-align: center;
-        line-height: 1.4;
-    `;
-
-    searchContainer.appendChild(closeBtn);
-    searchContainer.appendChild(title);
-    searchContainer.appendChild(searchInput);
-    searchContainer.appendChild(tipText);
-    overlay.appendChild(searchContainer);
-
-    // 添加键盘事件 - 回车搜索
-    searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            performOverlaySearch();
-        }
-    });
-
-    // 点击遮罩层关闭
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            hideSearchOverlay();
-        }
-    });
-
-    document.body.appendChild(overlay);
-    return overlay;
-}
-
-// 显示搜索遮罩层
-function showSearchOverlay() {
-    const overlay = document.getElementById("punkjet-search-overlay") || createSearchOverlay();
-    const searchInput = document.getElementById("overlay-search-input");
-    
-    overlay.style.display = 'flex';
-    searchOverlayVisible = true;
-    
-    // 聚焦输入框
-    setTimeout(() => {
-        searchInput.focus();
-        searchInput.select();
-    }, 100);
-    
-    // 隐藏汉堡菜单
-    hideHamburgerMenu();
-}
-
-// 隐藏搜索遮罩层
-function hideSearchOverlay() {
-    const overlay = document.getElementById("punkjet-search-overlay");
-    if (overlay) {
-        overlay.style.display = 'none';
-        searchOverlayVisible = false;
-    }
-}
-
-// 执行遮罩层搜索
-function performOverlaySearch() {
-    const searchInput = document.getElementById("overlay-search-input");
-    const query = searchInput.value.trim();
-    
-    if (!query) {
-        searchInput.focus();
-        return;
-    }
-    
-    // 检查是否是URL
-    if (isValidUrl(query)) {
-        window.open(query, '_blank');
-        hideSearchOverlay();
-        return;
-    }
-    
-    // 使用第一个搜索引擎进行搜索
-    const showList = GM_getValue("punk_setup_search", punkDeafultMark).split('-');
-    if (showList.length > 0) {
-        const firstEngine = searchUrlMap.find(item => item.mark === showList[0]);
-        if (firstEngine) {
-            const searchUrl = firstEngine.searchUrl.replace('{keyword}', encodeURIComponent(query));
-            window.open(searchUrl, '_blank');
-            hideSearchOverlay();
-        }
-    }
-}
-
-// 检查是否为有效URL
-function isValidUrl(string) {
-    try {
-        const url = new URL(string);
-        return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch (_) {
-        return false;
-    }
-}
-
-// 修改搜索引擎按钮点击事件，支持遮罩层搜索
-function createEngineButtonClickHandler(button, item) {
-    return (event) => {
-        event.preventDefault();
-        const url = button.getAttribute("url");
+    /**
+     * 获取搜索关键词（整合遮罩层、输入框、存储多渠道）
+     * @returns {string} 最终搜索关键词
+     */
+    getSearchKeywords() {
         let keywords = "";
 
-        // 如果遮罩层可见且有输入，优先使用遮罩层的输入
-        if (searchOverlayVisible) {
+        // 1. 优先从搜索遮罩层输入框获取
+        if (appState.searchOverlayVisible) {
             const searchInput = document.getElementById("overlay-search-input");
             if (searchInput && searchInput.value.trim()) {
-                keywords = searchInput.value.trim();
+                return searchInput.value.trim();
             }
         }
 
-        // 如果没有从遮罩层获取到关键词，则使用原来的逻辑
+        // 2. 从百度特定输入框获取
+        const baiduInput = document.querySelector('input#kw, input[name="wd"], input[name="word"]');
+        if (baiduInput && baiduInput.value.trim()) {
+            keywords = baiduInput.value.trim();
+            return keywords;
+        }
+
+        // 3. 从页面所有输入框中获取
+        const allInputs = document.querySelectorAll(DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR);
+        for (const input of allInputs) {
+            const inputVal = input.value.trim();
+            if (inputVal) {
+                keywords = inputVal;
+                break;
+            }
+        }
+
+        // 4. 从工具函数提取的关键词中获取
         if (!keywords) {
-            const allInputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
-            const baiduInput = document.querySelector('input#kw, input[name="wd"], input[name="word"]');
-            if (baiduInput && baiduInput.value.trim()) {
-                keywords = baiduInput.value.trim();
-            } else {
-                for (let input of allInputs) {
-                    const inputVal = input.value.trim();
-                    if (inputVal) {
-                        keywords = inputVal;
-                        break;
-                    }
+            keywords = this.getKeywords().trim();
+        }
+
+        // 5. 最后从sessionStorage获取
+        if (!keywords) {
+            keywords = sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || "";
+        }
+
+        return keywords;
+    },
+
+    /**
+     * 更新未保存更改状态（显示指示器、激活保存按钮）
+     */
+    markUnsavedChanges() {
+        appState.hasUnsavedChanges = true;
+        const indicator = document.getElementById("unsaved-indicator");
+        const saveBtn = document.getElementById("panel-save-btn");
+
+        if (indicator) indicator.style.display = "block";
+        if (saveBtn) {
+            saveBtn.style.opacity = "1";
+            saveBtn.style.pointerEvents = "auto";
+            saveBtn.style.background = "#e67e22";
+            saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存更改';
+
+            // 统一hover事件处理
+            const handleHover = function (isEnter) {
+                this.style.transform = isEnter ? "translateY(-2px)" : "translateY(0)";
+                this.style.boxShadow = isEnter ? "0 4px 8px rgba(0,0,0,0.2)" : "none";
+            };
+
+            // 移除旧事件，避免重复绑定
+            saveBtn.removeEventListener("mouseenter", () => {});
+            saveBtn.removeEventListener("mouseleave", () => {});
+            saveBtn.addEventListener("mouseenter", () => handleHover.call(saveBtn, true));
+            saveBtn.addEventListener("mouseleave", () => handleHover.call(saveBtn, false));
+        }
+    },
+
+    /**
+     * 清除未保存更改状态（隐藏指示器、禁用保存按钮）
+     */
+    clearUnsavedChanges() {
+        appState.hasUnsavedChanges = false;
+        const indicator = document.getElementById("unsaved-indicator");
+        const saveBtn = document.getElementById("panel-save-btn");
+
+        if (indicator) indicator.style.display = "none";
+        if (saveBtn) {
+            saveBtn.style.opacity = "0.7";
+            saveBtn.style.pointerEvents = "none";
+            saveBtn.style.background = "#95a5a6";
+            saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存设置';
+
+            // 显示保存成功反馈
+            setTimeout(() => {
+                if (!appState.hasUnsavedChanges) {
+                    saveBtn.innerHTML = this.createInlineSVG('check') + ' 已保存';
+                    saveBtn.style.background = "#27ae60";
+                    setTimeout(() => {
+                        if (!appState.hasUnsavedChanges) {
+                            saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存设置';
+                            saveBtn.style.background = "#95a5a6";
+                        }
+                    }, 2000);
                 }
-            }
-
-            if (!keywords) {
-                keywords = getKeywords().trim();
-            }
-
-            if (!keywords) {
-                keywords = sessionStorage.getItem("currentInput") || "";
-            }
+            }, 100);
         }
+    },
 
-        if (url && keywords) {
-            const finalUrl = url.replace('{keyword}', encodeURIComponent(keywords));
-            window.open(finalUrl, '_blank');
-            
-            // 搜索后隐藏遮罩层
-            if (searchOverlayVisible) {
-                hideSearchOverlay();
-            }
-        } else {
-            // 如果没有关键词，显示遮罩层让用户输入
-            showSearchOverlay();
+    /**
+     * 更新已选引擎数量显示
+     */
+    updateSelectedCount() {
+        const checkboxes = document.querySelectorAll(`#engine-management-list input[type="checkbox"]:checked`);
+        const countElement = document.getElementById("selected-count");
+        if (countElement) {
+            countElement.innerHTML = this.createInlineSVG('check-circle') + ` 已选择 ${checkboxes.length} 个引擎`;
         }
-    };
-}
+    },
 
-function createHamburgerMenu() {
-    const menu = document.createElement("div");
-    menu.id = "punkjet-hamburger-menu";
-    menu.style.cssText = `
-    position: fixed;
-    bottom: 50px;
-    left: 20px;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 15px;
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
-    backdrop-filter: blur(5px);
-    z-index: 10001;
-    display: none;
-    flex-direction: column;
-    padding: 10px;
-    gap: 5px;
-    min-width: 150px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-`;
+    /**
+     * 保存引擎按钮排序（更新到GM存储）
+     */
+    saveButtonOrder() {
+        const container = document.querySelector(`.${CLASS_NAMES.ENGINE_DISPLAY}`);
+        if (!container) return;
 
-    const menuItems = [
-        {
-            icon: 'fas fa-search',
-            text: '快捷搜索',
-            action: showSearchOverlay
-        },
-        {
-            icon: 'far fa-sun',
-            text: '引擎管理',
-            action: showManagementPanel
-        }
+        const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
+        const newOrder = Array.from(buttons)
+            .map(btn => btn.getAttribute('data-mark'))
+            .filter(mark => mark !== null)
+            .join('-');
+
+        GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, newOrder);
+    },
+
+    /**
+     * 创建内联SVG图标（替代Font Awesome）
+     * @param {string} iconName - 图标名称
+     * @param {string} color - 图标颜色
+     * @returns {string} SVG字符串
+     */
+    createInlineSVG(iconName, color = 'currentColor') {
+        const icons = {
+            search: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+            </svg>`,
+            cog: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+                <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
+            </svg>`,
+            save: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
+            </svg>`,
+            check: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
+            </svg>`,
+            'check-circle': `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                <path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/>
+            </svg>`,
+            times: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+            </svg>`,
+            plus: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+            </svg>`,
+            globe: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.5-6.923c-.67.204-1.335.82-1.887 1.855A7.97 7.97 0 0 0 5.145 4H7.5V1.077zM4.09 4a9.267 9.267 0 0 1 .64-1.539 6.7 6.7 0 0 1 .597-.933A7.025 7.025 0 0 0 2.255 4H4.09zm-.582 3.5c.03-.877.138-1.718.312-2.5H1.026a6.8 6.8 0 0 0-.34 2.5h2.49zM4.847 5.12c.38-.59.853-1.108 1.4-1.536.165-.13.335-.252.51-.367a6.7 6.7 0 0 1-.597.933A9.252 9.252 0 0 0 5.794 5.5H4.847zM8.5 1.077V4h1.191a7.9 7.9 0 0 0-1.318-1.142C8.072 2.702 7.78 2.275 8.5 1.077zM9.92 5.5H8.754a9.3 9.3 0 0 1-.64 1.539 6.7 6.7 0 0 1-.597.933c.23-.174.48-.34.743-.492.547-.428 1.02-.946 1.4-1.536zM13.974 7.5H11.49c.174.782.282 1.623.312 2.5h2.49a6.8 6.8 0 0 0 .34-2.5zm-1.487 3.5c-.165.13-.335.252-.51.367.13-.195.248-.4.352-.614.204-.67.382-1.375.429-2.153h2.205a6.7 6.7 0 0 1-.34 2.5h-2.136zm-2.572 2.072c.67-.204 1.335-.82 1.887-1.855.165.38.31.767.429 1.153H8.5v2.923zM11.145 12a7.9 7.9 0 0 0 1.318-1.142c.272.208.56.396.86.572a7.025 7.025 0 0 1-2.178 1.57h.001z"/>
+            </svg>`,
+            undo: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+            </svg>`,
+            eye: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+            </svg>`,
+            trash: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+            </svg>`,
+            list: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
+            </svg>`,
+            magic: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M9.5 2.672a.5.5 0 1 0 1 0V.843a.5.5 0 0 0-1 0v1.829zm4.5.035A.5.5 0 0 0 13.293 2L12 3.293a.5.5 0 1 0 .707.707L14 2.707zM7.293 4A.5.5 0 1 0 8 3.293L6.707 2A.5.5 0 0 0 6 2.707L7.293 4zm-.621 2.5a.5.5 0 1 0 0-1H4.843a.5.5 0 1 0 0 1h1.829zm8.485 0a.5.5 0 1 0 0-1h-1.829a.5.5 0 0 0 0 1h1.829zM13.293 10A.5.5 0 1 0 14 9.293L12.707 8a.5.5 0 1 0-.707.707L13.293 10zM9.5 11.157a.5.5 0 0 0 1 0V9.328a.5.5 0 0 0-1 0v1.829zm1.854-5.097a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L8.646 5.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0l1.293-1.293zm-3 3a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L.646 13.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0L8.354 9.06z"/>
+            </svg>`,
+            palette: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M8 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm4 3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5.5 7a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm.5 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+                <path d="M16 8c0 3.15-1.866 2.585-3.567 2.07C11.42 9.763 10.465 9.473 10 10c-.603.683-.475 1.819-.351 2.92C9.826 14.495 9.996 16 8 16a8 8 0 1 1 8-8zm-8 7c.611 0 .654-.171.655-.176.078-.146.124-.464.07-1.119-.014-.168-.037-.37-.061-.591-.052-.464-.112-1.005-.118-1.462-.01-.707.083-1.61.704-2.314.369-.417.845-.578 1.272-.618.404-.038.812.026 1.16.104.343.077.702.186 1.025.284l.028.008c.346.105.658.199.953.266.653.148.904.083.991.024C14.717 9.38 15 9.161 15 8a7 7 0 1 0-7 7z"/>
+            </svg>`,
+            circle: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+            </svg>`,
+            'paper-plane': `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11zm-6.636 13.727L14.354 1.88 2.833 6.735l3.178 4.995 3.207-4.857z"/>
+            </svg>`,
+            'info-circle': `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+            </svg>`
+        };
         
-    ];
+        return icons[iconName] || icons['circle'];
+    }
+};
 
-    menuItems.forEach(item => {
-        const menuItem = document.createElement("button");
-        menuItem.innerHTML = `<i class="${item.icon}"></i> ${item.text}`;
-        menuItem.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 15px;
-            border: none;
-            background: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            color: #2c3e50;
-            transition: all 0.3s ease;
-            text-align: left;
-        `;
+// ===== DOM操作模块 =====
+/**
+ * DOM操作集合 - 封装DOM创建、样式注入、事件绑定等逻辑
+ */
+const domHandler = {
+    /**
+     * 注入核心样式（确保只注入一次）
+     */
+    injectStyle() {
+        if (document.querySelector(`style#${CLASS_NAMES.ENGINE_CONTAINER}-style`)) return;
         
-        menuItem.addEventListener('mouseenter', () => {
-            menuItem.style.background = 'rgba(52, 152, 219, 0.1)';
-        });
-        
-        menuItem.addEventListener('mouseleave', () => {
-            menuItem.style.background = 'none';
-        });
-        
-        menuItem.addEventListener('click', item.action);
-        
-        menu.appendChild(menuItem);
-    });
-
-    document.body.appendChild(menu);
-    return menu;
-}
-
-// 显示汉堡菜单
-function showHamburgerMenu() {
-    const menu = document.getElementById("punkjet-hamburger-menu") || createHamburgerMenu();
-    menu.style.display = 'flex';
-    hamburgerMenuOpen = true;
-}
-
-// 隐藏汉堡菜单
-function hideHamburgerMenu() {
-    const menu = document.getElementById("punkjet-hamburger-menu");
-    if (menu) {
-        menu.style.display = 'none';
-        hamburgerMenuOpen = false;
-    }
-}
-
-// 切换汉堡菜单
-function toggleHamburgerMenu() {
-    if (hamburgerMenuOpen) {
-        hideHamburgerMenu();
-    } else {
-        showHamburgerMenu();
-    }
-}
-
-function createManagementPanel() {
-    const panel = document.createElement("div");
-    panel.id = "engine-management-panel";
-    panel.style.position = "fixed";
-    panel.style.top = "50%";
-    panel.style.left = "50%";
-    panel.style.transform = "translate(-50%, -50%)";
-    panel.style.width = "90%";
-    panel.style.maxWidth = "800px";
-    panel.style.height = "90vh";
-    panel.style.maxHeight = "90vh";
-    panel.style.backgroundColor = "#ffffff";
-    panel.style.borderRadius = "15px";
-    panel.style.boxShadow = "0 10px 30px rgba(0,0,0,0.3)";
-    panel.style.padding = "0";
-    panel.style.zIndex = "10000";
-    panel.style.display = "none";
-    panel.style.overflow = "hidden";
-    panel.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
-    panel.style.display = "flex";
-    panel.style.flexDirection = "column";
-    panel.style.boxSizing = "border-box";
-
-    const header = document.createElement("div");
-    header.style.height = "15vh";
-    header.style.minHeight = "80px";
-    header.style.maxHeight = "120px";
-    header.style.backgroundColor = "#2c3e50";
-    header.style.color = "white";
-    header.style.padding = "20px";
-    header.style.borderRadius = "15px 15px 0 0";
-    header.style.position = "relative";
-    header.style.boxSizing = "border-box";
-    header.style.flexShrink = "0";
-
-    const title = document.createElement("h2");
-    title.innerHTML = '<i class="fas fa-cogs"></i> 搜索引擎管理中心';
-    title.style.margin = "0";
-    title.style.fontSize = "1.5em";
-    title.style.fontWeight = "300";
-    header.appendChild(title);
-
-    const subtitle = document.createElement("p");
-    subtitle.textContent = "管理您的搜索快捷方式";
-    subtitle.style.margin = "5px 0 0 0";
-    subtitle.style.opacity = "0.8";
-    subtitle.style.fontSize = "0.9em";
-    header.appendChild(subtitle);
-
-    const unsavedIndicator = document.createElement("div");
-    unsavedIndicator.id = "unsaved-indicator";
-    unsavedIndicator.innerHTML = '<i class="fas fa-circle"></i> 有未保存的更改';
-    unsavedIndicator.style.position = "absolute";
-    unsavedIndicator.style.top = "15px";
-    unsavedIndicator.style.right = "20px";
-    unsavedIndicator.style.color = "#e74c3c";
-    unsavedIndicator.style.fontSize = "0.8em";
-    unsavedIndicator.style.display = "none";
-    header.appendChild(unsavedIndicator);
-
-    panel.appendChild(header);
-
-    const content = document.createElement("div");
-    content.style.height = "65vh";
-    content.style.minHeight = "300px";
-    content.style.position = "relative";
-    content.style.overflow = "hidden";
-    content.style.padding = "0";
-    content.style.boxSizing = "border-box";
-    content.style.display = "flex";
-    content.style.flexDirection = "column";
-    content.style.flexShrink = "0";
-
-    const quickActions = document.createElement("div");
-    quickActions.style.padding = "20px";
-    quickActions.style.display = "flex";
-    quickActions.style.gap = "10px";
-    quickActions.style.flexWrap = "wrap";
-    quickActions.style.justifyContent = "space-between";
-    quickActions.style.backgroundColor = "#ffffff";
-    quickActions.style.borderBottom = "1px solid #ecf0f1";
-    quickActions.style.boxSizing = "border-box";
-    quickActions.style.flexShrink = "0";
-
-    const leftActionGroup = document.createElement("div");
-    leftActionGroup.style.display = "flex";
-    leftActionGroup.style.gap = "10px";
-    leftActionGroup.style.flexWrap = "wrap";
-
-    const extractBtn = createActionButton('<i class="fas fa-globe"></i> 自动添加', "#3498db", "自动识别当前页面的搜索引擎");
-    const addBtn = createActionButton('<i class="fas fa-plus"></i> 手动添加', "#27ae60", "手动添加新的搜索引擎");
-
-    leftActionGroup.appendChild(extractBtn);
-    leftActionGroup.appendChild(addBtn);
-
-    const rightActionGroup = document.createElement("div");
-    rightActionGroup.style.display = "flex";
-    rightActionGroup.style.gap = "10px";
-    rightActionGroup.style.flexWrap = "wrap";
-
-    const saveBtn = document.createElement("button");
-    saveBtn.id = "panel-save-btn";
-    saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存设置';
-    saveBtn.title = "保存当前设置";
-    saveBtn.style.cssText = `
-        padding: 10px 20px;
-        background: #95a5a6;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        transition: all 0.3s ease;
-        opacity: 0.7;
-        pointer-events: none;
-        min-width: 120px;
-        justify-content: center;
-    `;
-
-    const resetBtn = createActionButton('<i class="fas fa-undo"></i> 恢复默认', "#e74c3c", "恢复默认搜索引擎设置");
-
-    rightActionGroup.appendChild(saveBtn);
-    rightActionGroup.appendChild(resetBtn);
-
-    quickActions.appendChild(leftActionGroup);
-    quickActions.appendChild(rightActionGroup);
-    content.appendChild(quickActions);
-
-    const listSection = document.createElement("div");
-    listSection.style.flex = "1";
-    listSection.style.overflow = "hidden";
-    listSection.style.padding = "0 20px";
-    listSection.style.boxSizing = "border-box";
-    listSection.style.display = "flex";
-    listSection.style.flexDirection = "column";
-    listSection.style.overflow = "auto"
-
-    const listTitle = document.createElement("h3");
-    listTitle.innerHTML = '<i class="fas fa-list"></i> 已配置的搜索引擎';
-    listTitle.style.color = "#2c3e50";
-    listTitle.style.margin = "15px 0";
-    listTitle.style.fontWeight = "500";
-    listTitle.style.flexShrink = "0";
-    listSection.appendChild(listTitle);
-
-    const engineList = document.createElement("div");
-    engineList.id = "engine-management-list";
-    engineList.style.flex = "1";
-    engineList.style.overflowY = "auto";
-    engineList.style.overflowX = "hidden";
-    engineList.style.display = "grid";
-    engineList.style.gap = "10px";
-    engineList.style.gridTemplateColumns = "repeat(auto-fill, minmax(300px, 1fr))";
-    engineList.style.paddingBottom = "10px";
-    engineList.style.boxSizing = "border-box";
-    listSection.appendChild(engineList);
-
-    content.appendChild(listSection);
-
-    const formSection = document.createElement("div");
-    formSection.id = "add-engine-form";
-    formSection.style.display = "none";
-    formSection.style.backgroundColor = "#f8f9fa";
-    formSection.style.padding = "20px";
-    formSection.style.borderRadius = "10px";
-    formSection.style.margin = "10px 0";
-    formSection.style.boxSizing = "border-box";
-    formSection.style.flexShrink = "0";
-
-    const formTitle = document.createElement("h3");
-    formTitle.innerHTML = '<i class="fas fa-magic"></i> 添加新搜索引擎';
-    formTitle.style.color = "#2c3e50";
-    formTitle.style.marginBottom = "15px";
-    formSection.appendChild(formTitle);
-
-    const form = document.createElement("div");
-    form.style.display = "grid";
-    form.style.gap = "15px";
-    form.style.gridTemplateColumns = "1fr 1fr";
-
-    const fields = [
-        { label: "引擎名称", placeholder: "例如: Google", type: "text", id: "engine-name", required: true },
-        { label: "唯一标识", placeholder: "例如: google", type: "text", id: "engine-mark", required: true },
-        { label: "搜索URL", placeholder: "使用 {keyword} 作为占位符", type: "text", id: "engine-url", required: true, fullWidth: true },
-        { label: "关键词参数", placeholder: "例如: q,query,search", type: "text", id: "engine-keys", required: true, fullWidth: true }
-    ];
-
-    fields.forEach(field => {
-        const container = document.createElement("div");
-        if (field.fullWidth) {
-            container.style.gridColumn = "1 / -1";
-        }
-
-        const label = document.createElement("label");
-        label.textContent = field.label;
-        label.style.display = "block";
-        label.style.marginBottom = "5px";
-        label.style.fontWeight = "500";
-        label.style.color = "#34495e";
-        container.appendChild(label);
-
-        const input = document.createElement("input");
-        input.type = field.type;
-        input.placeholder = field.placeholder;
-        input.id = field.id;
-        input.required = field.required;
-        input.style.width = "100%";
-        input.style.padding = "10px";
-        input.style.border = "1px solid #ddd";
-        input.style.borderRadius = "5px";
-        input.style.fontSize = "14px";
-        container.appendChild(input);
-
-        form.appendChild(container);
-    });
-
-    const iconContainer = document.createElement("div");
-    iconContainer.style.gridColumn = "1 / -1";
-
-    const iconTitle = document.createElement("h4");
-    iconTitle.innerHTML = '<i class="fas fa-palette"></i> 图标设置';
-    iconTitle.style.marginBottom = "10px";
-    iconTitle.style.color = "#34495e";
-    iconContainer.appendChild(iconTitle);
-
-    const iconGrid = document.createElement("div");
-    iconGrid.style.display = "grid";
-    iconGrid.style.gridTemplateColumns = "1fr 2fr 1fr";
-    iconGrid.style.gap = "10px";
-    iconGrid.style.alignItems = "end";
-
-    const typeGroup = document.createElement("div");
-    const typeLabel = document.createElement("label");
-    typeLabel.textContent = "图标类型";
-    typeLabel.style.display = "block";
-    typeLabel.style.marginBottom = "5px";
-    typeLabel.style.fontWeight = "500";
-    typeGroup.appendChild(typeLabel);
-
-    const iconTypeSelect = document.createElement("select");
-    iconTypeSelect.id = "icon-type";
-    iconTypeSelect.style.width = "100%";
-    iconTypeSelect.style.padding = "10px";
-    iconTypeSelect.style.border = "1px solid #ddd";
-    iconTypeSelect.style.borderRadius = "5px";
-
-    ["svg", "image", "text", "emoji"].forEach(type => {
-        const option = document.createElement("option");
-        option.value = type;
-        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-        iconTypeSelect.appendChild(option);
-    });
-    typeGroup.appendChild(iconTypeSelect);
-    iconGrid.appendChild(typeGroup);
-
-    const inputGroup = document.createElement("div");
-    const inputLabel = document.createElement("label");
-    inputLabel.textContent = "图标内容";
-    inputLabel.style.display = "block";
-    inputLabel.style.marginBottom = "5px";
-    inputLabel.style.fontWeight = "500";
-    inputGroup.appendChild(inputLabel);
-
-    const iconInput = document.createElement("input");
-    iconInput.type = "text";
-    iconInput.id = "icon-input";
-    iconInput.placeholder = "SVG代码、图片URL、文字或表情符号";
-    iconInput.style.width = "100%";
-    iconInput.style.padding = "10px";
-    iconInput.style.border = "1px solid #ddd";
-    iconInput.style.borderRadius = "5px";
-    inputGroup.appendChild(iconInput);
-    iconGrid.appendChild(inputGroup);
-
-    const previewGroup = document.createElement("div");
-    const previewButton = document.createElement("button");
-    previewButton.innerHTML = '<i class="fas fa-eye"></i> 预览图标';
-    previewButton.style.width = "100%";
-    previewButton.style.padding = "10px";
-    previewButton.style.backgroundColor = "#3498db";
-    previewButton.style.color = "white";
-    previewButton.style.border = "none";
-    previewButton.style.borderRadius = "5px";
-    previewButton.style.cursor = "pointer";
-    previewButton.id = "preview-icon";
-    previewGroup.appendChild(previewButton);
-    iconGrid.appendChild(previewGroup);
-
-    iconContainer.appendChild(iconGrid);
-
-    const previewContainer = document.createElement("div");
-    previewContainer.style.gridColumn = "1 / -1";
-    previewContainer.style.marginTop = "15px";
-    previewContainer.style.textAlign = "center";
-
-    const previewLabel = document.createElement("label");
-    previewLabel.textContent = "图标预览 (推荐比例 8:5)";
-    previewLabel.style.display = "block";
-    previewLabel.style.marginBottom = "10px";
-    previewLabel.style.fontWeight = "500";
-    previewContainer.appendChild(previewLabel);
-
-    const iconPreview = document.createElement("div");
-    iconPreview.id = "icon-preview";
-    iconPreview.style.width = "88px";
-    iconPreview.style.height = "55px";
-    iconPreview.style.border = "2px dashed #bdc3c7";
-    iconPreview.style.borderRadius = "8px";
-    iconPreview.style.margin = "0 auto";
-    iconPreview.style.display = "flex";
-    iconPreview.style.justifyContent = "center";
-    iconPreview.style.alignItems = "center";
-    iconPreview.style.overflow = "hidden";
-    iconPreview.style.background = "#ecf0f1";
-    previewContainer.appendChild(iconPreview);
-
-    iconContainer.appendChild(previewContainer);
-    form.appendChild(iconContainer);
-
-    formSection.appendChild(form);
-
-    const formActions = document.createElement("div");
-    formActions.style.gridColumn = "1 / -1";
-    formActions.style.display = "flex";
-    formActions.style.gap = "10px";
-    formActions.style.marginTop = "20px";
-
-    const saveFormBtn = createActionButton('<i class="fas fa-save"></i> 保存引擎', "#27ae60", "");
-    const cancelFormBtn = createActionButton('<i class="fas fa-times"></i> 取消', "#95a5a6", "");
-
-    formActions.appendChild(saveFormBtn);
-    formActions.appendChild(cancelFormBtn);
-    formSection.appendChild(formActions);
-
-    listSection.appendChild(formSection);
-
-    panel.appendChild(content);
-
-    const footer = document.createElement("div");
-    footer.style.height = "20vh";
-    footer.style.minHeight = "60px";
-    footer.style.maxHeight = "90px";
-    footer.style.backgroundColor = "#ecf0f1";
-    footer.style.padding = "15px 20px";
-    footer.style.borderTop = "1px solid #bdc3c7";
-    footer.style.display = "flex";
-    footer.style.justifyContent = "space-between";
-    footer.style.alignItems = "center";
-    footer.style.boxSizing = "border-box";
-    footer.style.flexShrink = "0";
-    footer.style.borderRadius = "0 0 15px 15px";
-
-    const selectedCount = document.createElement("span");
-    selectedCount.id = "selected-count";
-    selectedCount.innerHTML = '<i class="fas fa-check-circle"></i> 已选择 0 个引擎';
-    selectedCount.style.color = "#7f8c8d";
-    selectedCount.style.fontSize = "0.9em";
-    footer.appendChild(selectedCount);
-
-    const footerActions = document.createElement("div");
-    footerActions.style.display = "flex";
-    footerActions.style.gap = "10px";
-
-    const closeBtn = createActionButton('<i class="fas fa-times"></i> 关闭', "#95a5a6", "");
-
-    footerActions.appendChild(closeBtn);
-    footer.appendChild(footerActions);
-
-    panel.appendChild(footer);
-
-    document.body.appendChild(panel);
-
-    extractBtn.addEventListener("click", extractFromCurrentPage);
-    addBtn.addEventListener("click", () => showAddForm(true));
-    resetBtn.addEventListener("click", resetToDefault);
-    previewButton.addEventListener("click", previewIcon);
-    saveFormBtn.addEventListener("click", saveNewEngine);
-    cancelFormBtn.addEventListener("click", () => showAddForm(false));
-    saveBtn.addEventListener("click", saveEngineSettings);
-    closeBtn.addEventListener("click", closeManagementPanel);
-
-    panel.addEventListener("click", (e) => {
-        if (e.target === panel) {
-            closeManagementPanel();
-        }
-    });
-
-    return panel;
-}
-
-function createActionButton(html, color, title) {
-    const button = document.createElement("button");
-    button.innerHTML = html;
-    button.title = title;
-    button.style.padding = "10px 15px";
-    button.style.backgroundColor = color;
-    button.style.color = "white";
-    button.style.border = "none";
-    button.style.borderRadius = "8px";
-    button.style.cursor = "pointer";
-    button.style.fontSize = "14px";
-    button.style.minWidth = "120px";
-    button.style.transition = "all 0.3s ease";
-    button.style.display = "flex";
-    button.style.alignItems = "center";
-    button.style.gap = "5px";
-    button.style.justifyContent = "center";
-
-    button.addEventListener("mouseenter", () => {
-        button.style.transform = "translateY(-2px)";
-        button.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
-    });
-
-    button.addEventListener("mouseleave", () => {
-        button.style.transform = "translateY(0)";
-        button.style.boxShadow = "none";
-    });
-
-    return button;
-}
-
-function closeManagementPanel() {
-    if (hasUnsavedChanges) {
-        if (confirm("⚠️ 您有未保存的更改，确定要关闭吗？")) {
-            document.getElementById("engine-management-panel").style.display = "none";
-            hasUnsavedChanges = false;
-        }
-    } else {
-        document.getElementById("engine-management-panel").style.display = "none";
-    }
-}
-
-function markUnsavedChanges() {
-    hasUnsavedChanges = true;
-    const indicator = document.getElementById("unsaved-indicator");
-    const saveBtn = document.getElementById("panel-save-btn");
-
-    if (indicator) {
-        indicator.style.display = "block";
-    }
-
-    if (saveBtn) {
-        saveBtn.style.opacity = "1";
-        saveBtn.style.pointerEvents = "auto";
-        saveBtn.style.background = "#e67e22";
-        saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存更改';
-
-        saveBtn.addEventListener("mouseenter", function() {
-            this.style.transform = "translateY(-2px)";
-            this.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
-        });
-
-        saveBtn.addEventListener("mouseleave", function() {
-            this.style.transform = "translateY(0)";
-            this.style.boxShadow = "none";
-        });
-    }
-}
-
-function clearUnsavedChanges() {
-    hasUnsavedChanges = false;
-    const indicator = document.getElementById("unsaved-indicator");
-    const saveBtn = document.getElementById("panel-save-btn");
-
-    if (indicator) {
-        indicator.style.display = "none";
-    }
-
-    if (saveBtn) {
-        saveBtn.style.opacity = "0.7";
-        saveBtn.style.pointerEvents = "none";
-        saveBtn.style.background = "#95a5a6";
-        saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存设置';
-
-        saveBtn.onmouseenter = null;
-        saveBtn.onmouseleave = null;
-
-        setTimeout(() => {
-            if (!hasUnsavedChanges) {
-                saveBtn.innerHTML = '<i class="fas fa-check"></i> 已保存';
-                saveBtn.style.background = "#27ae60";
-
-                setTimeout(() => {
-                    if (!hasUnsavedChanges) {
-                        saveBtn.innerHTML = '<i class="fas fa-save"></i> 保存设置';
-                        saveBtn.style.background = "#95a5a6";
-                    }
-                }, 2000);
-            }
-        }, 100);
-    }
-}
-
-function extractFromCurrentPage() {
-    const searchInfo = extractSearchEngineFromPage();
-
-    if (!searchInfo.found) {
-        alert(" 无法自动识别当前页面的搜索引擎。请手动添加。");
-        return;
-    }
-
-    showAddForm(true);
-
-    document.getElementById("engine-name").value = searchInfo.name;
-    document.getElementById("engine-mark").value = searchInfo.mark;
-    document.getElementById("engine-url").value = searchInfo.searchUrl;
-    document.getElementById("engine-keys").value = searchInfo.searchkeyName.join(",");
-
-    const favicon = document.querySelector('link[rel*="icon"]');
-    if (favicon) {
-        const iconUrl = favicon.href;
-        if (!iconUrl.startsWith('data:')) {
-            document.getElementById("icon-type").value = "image";
-            document.getElementById("icon-input").value = iconUrl;
-            previewIcon();
-        }
-    }
-
-    alert(`✅ 已自动识别 ${searchInfo.name} 搜索引擎！请检查并保存。`);
-}
-
-function showAddForm(show) {
-    const formSection = document.getElementById("add-engine-form");
-    const engineList = document.getElementById("engine-management-list");
-    const listTitle = formSection.previousElementSibling;
-
-    if (show){
-        formSection.style.display = "block";
-        engineList.style.display = "none";
-        listTitle.style.display = "none";
-
-        document.getElementById("engine-name").value = "";
-        document.getElementById("engine-mark").value = "";
-        document.getElementById("engine-url").value = "";
-        document.getElementById("engine-keys").value = "";
-        document.getElementById("icon-input").value = "";
-        document.getElementById("icon-preview").innerHTML = "";
-    } else {
-        formSection.style.display = "none";
-        engineList.style.display = "grid";
-        listTitle.style.display = "block";
-    }
-}
-
-function previewIcon() {
-    const type = document.getElementById("icon-type").value;
-    const value = document.getElementById("icon-input").value.trim();
-    const preview = document.getElementById("icon-preview");
-
-    preview.innerHTML = "";
-    preview.style.backgroundImage = "none";
-    preview.style.backgroundColor = "#ecf0f1";
-
-    if (!value) return;
-
-    try {
-        if (type === "svg") {
-            const parser = new DOMParser();
-            const svgDoc = parser.parseFromString(value, "image/svg+xml");
-            if (svgDoc.querySelector("parsererror")) {
-                throw new Error("无效的SVG代码");
-            }
-            preview.innerHTML = value;
-        } else if (type === "image") {
-            preview.style.backgroundImage = `url(${value})`;
-            preview.style.backgroundSize = "contain";
-            preview.style.backgroundRepeat = "no-repeat";
-            preview.style.backgroundPosition = "center";
-        } else if (type === "text") {
-            preview.textContent = value.length > 4 ? value.substring(0, 4) : value;
-            preview.style.fontSize = value.length > 4 ? "14px" : "18px";
-            preview.style.color = "#2c3e50";
-            preview.style.fontWeight = "bold";
-        } else if (type === "emoji") {
-            preview.textContent = value;
-            preview.style.fontSize = "24px";
-        }
-    } catch (e) {
-        alert(" 图标预览失败: " + e.message);
-    }
-}
-
-function saveNewEngine() {
-    const name = document.getElementById("engine-name").value.trim();
-    const mark = document.getElementById("engine-mark").value.trim();
-    const url = document.getElementById("engine-url").value.trim();
-    const keys = document.getElementById("engine-keys").value.split(',').map(k => k.trim());
-    const iconType = document.getElementById("icon-type").value;
-    const iconValue = document.getElementById("icon-input").value.trim();
-
-    if (!name || !mark || !url || keys.length === 0) {
-        alert(" 请填写所有必填字段");
-        return;
-    }
-
-    if (searchUrlMap.some(engine => engine.mark === mark)) {
-        alert(" 标识已存在，请使用其他标识");
-        return;
-    }
-
-    const newEngine = {
-        name,
-        searchUrl: url,
-        searchkeyName: keys,
-        matchUrl: new RegExp(`.*${new URL(url).hostname}.*`),
-        mark,
-        svgCode: "",
-        custom: true
-    };
-
-    if (iconValue) {
-        if (iconType === "svg") {
-            newEngine.svgCode = iconValue;
-        } else if (iconType === "image") {
-            newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-                <style>.bg-img {background-image: url(${iconValue}); background-size: contain; background-repeat: no-repeat; background-position: center; width: 100%; height: 100%;}</style>
-                <foreignObject width="100%" height="100%"><div class="bg-img" xmlns="http://www.w3.org/1999/xhtml"></div></foreignObject>
-            </svg>`;
-        } else if (iconType === "text") {
-            newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-                <style>.text {font-size: 12px; fill: #333; text-anchor: middle; dominant-baseline: middle; font-weight: bold;}</style>
-                <text x="50%" y="50%" class="text">${iconValue}</text>
-            </svg>`;
-        } else if (iconType === "emoji") {
-            newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-                <style>.emoji {font-size: 20px; text-anchor: middle; dominant-baseline: middle;}</style>
-                <text x="50%" y="50%" class="emoji">${iconValue}</text>
-            </svg>`;
-        }
-    }
-
-    userSearchEngines.push(newEngine);
-    GM_setValue("userSearchEngines", userSearchEngines);
-
-    searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
-
-    const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
-    GM_setValue("punk_setup_search", currentSetup + "-" + mark);
-
-    markUnsavedChanges();
-
-    alert("✅ 搜索引擎添加成功!");
-    showAddForm(false);
-    refreshEngineList();
-}
-
-function resetToDefault() {
-    if (confirm("⚠️ 确定要恢复默认设置吗？这将删除所有自定义搜索引擎。")) {
-        userSearchEngines = [];
-        GM_setValue("userSearchEngines", []);
-        GM_setValue("punk_setup_search", punkDeafultMark);
-        searchUrlMap = [...defaultSearchEngines];
-
-        markUnsavedChanges();
-
-        alert("✅ 已恢复默认设置");
-        refreshEngineList();
-    }
-}
-
-function refreshEngineList() {
-    const engineList = document.getElementById("engine-management-list");
-    const activeMarks = (GM_getValue("punk_setup_search", punkDeafultMark)).split("-");
-
-    engineList.innerHTML = "";
-
-    searchUrlMap.forEach((engine, index) => {
-        const engineCard = document.createElement("div");
-        engineCard.className = "engine-card";
-        engineCard.style.cssText = `
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            background: white;
-            border: 2px solid ${activeMarks.includes(engine.mark) ? '#27ae60' : '#ecf0f1'};
-            border-radius: 10px;
-            transition: all 0.3s ease;
-            cursor: grab;
-            min-height: 60px;
-            box-sizing: border-box;
-        `;
-
-        engineCard.addEventListener("mouseenter", () => {
-            engineCard.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-            engineCard.style.transform = "translateY(-2px)";
-        });
-
-        engineCard.addEventListener("mouseleave", () => {
-            engineCard.style.boxShadow = "none";
-            engineCard.style.transform = "translateY(0)";
-        });
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.dataset.mark = engine.mark;
-        checkbox.checked = activeMarks.includes(engine.mark);
-        checkbox.style.marginRight = "15px";
-        checkbox.style.transform = "scale(1.2)";
-
-        checkbox.addEventListener("change", () => {
-            updateSelectedCount();
-            markUnsavedChanges();
-        });
-
-        const iconPreview = document.createElement("div");
-        iconPreview.style.cssText = `
-            width: 40px;
-            height: 25px;
-            background-image: url('data:image/svg+xml;utf8,${encodeURIComponent(engine.svgCode)}');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            margin-right: 15px;
-            border: 1px solid #eee;
-            border-radius: 5px;
-            flex-shrink: 0;
-        `;
-
-        const infoContainer = document.createElement("div");
-        infoContainer.style.flexGrow = "1";
-        infoContainer.style.minWidth = "0";
-
-        const name = document.createElement("div");
-        name.textContent = engine.name;
-        name.style.fontWeight = "bold";
-        name.style.color = "#2c3e50";
-        name.style.marginBottom = "5px";
-        name.style.whiteSpace = "nowrap";
-        name.style.overflow = "hidden";
-        name.style.textOverflow = "ellipsis";
-
-        const url = document.createElement("div");
-        url.textContent = engine.searchUrl;
-        url.style.fontSize = "0.8em";
-        url.style.color = "#7f8c8d";
-        url.style.whiteSpace = "nowrap";
-        url.style.overflow = "hidden";
-        url.style.textOverflow = "ellipsis";
-
-        infoContainer.appendChild(name);
-        infoContainer.appendChild(url);
-
-        const actions = document.createElement("div");
-        actions.style.display = "flex";
-        actions.style.gap = "5px";
-        actions.style.flexShrink = "0";
-
-        if (engine.custom) {
-            const deleteBtn = document.createElement("button");
-            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-            deleteBtn.title = "删除";
-            deleteBtn.style.cssText = `
-                padding: 8px 12px;
-                border: none;
-                background: #e74c3c;
-                color: white;
-                border-radius: 5px;
-                cursor: pointer;
-                flex-shrink: 0;
+        const cssNode = document.createElement("style");
+        cssNode.id = `${CLASS_NAMES.ENGINE_CONTAINER}-style`;
+        cssNode.textContent = `
+            .${CLASS_NAMES.ENGINE_CONTAINER} {
                 display: flex;
-                align-items: center;
+                position: fixed;
+                bottom: 0px;
+                left: 2%;
+                width: 96%;
+                height: 36px;
+                overflow: hidden;
                 justify-content: center;
-            `;
-
-            actions.appendChild(deleteBtn);
-
-            deleteBtn.addEventListener("click", (e) => {
-                e.stopPropagation();
-                if (confirm(`确定要删除 ${engine.name} 吗?`)) {
-                    userSearchEngines = userSearchEngines.filter(e => e.mark !== engine.mark);
-                    GM_setValue("userSearchEngines", userSearchEngines);
-
-                    const currentSetup = GM_getValue("punk_setup_search", punkDeafultMark);
-                    const newSetup = currentSetup.split("-").filter(m => m !== engine.mark).join("-");
-                    GM_setValue("punk_setup_search", newSetup);
-
-                    searchUrlMap = [...defaultSearchEngines, ...userSearchEngines];
-
-                    markUnsavedChanges();
-
-                    refreshEngineList();
-                }
-            });
-        }
-
-        engineCard.appendChild(checkbox);
-        engineCard.appendChild(iconPreview);
-        engineCard.appendChild(infoContainer);
-        engineCard.appendChild(actions);
-
-        engineList.appendChild(engineCard);
-    });
-
-    updateSelectedCount();
-}
-
-function updateSelectedCount() {
-    const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]:checked');
-    const countElement = document.getElementById("selected-count");
-    countElement.innerHTML = `<i class="fas fa-check-circle"></i> 已选择 ${checkboxes.length} 个引擎`;
-}
-
-function saveEngineSettings() {
-    const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]');
-    const activeMarks = [];
-
-    checkboxes.forEach(checkbox => {
-        if (checkbox.checked) {
-            activeMarks.push(checkbox.dataset.mark);
-        }
-    });
-
-    if (activeMarks.length === 0) {
-        alert("⚠️ 请至少选择一个搜索引擎");
-        return;
-    }
-
-    GM_setValue("punk_setup_search", activeMarks.join("-"));
-
-    clearUnsavedChanges();
-
-    setTimeout(() => {
-        document.getElementById("engine-management-panel").style.display = "none";
-        reloadScript();
-    }, 1000);
-}
-
-function showManagementPanel() {
-    const panel = document.getElementById("engine-management-panel") || createManagementPanel();
-
-    hasUnsavedChanges = false;
-    clearUnsavedChanges();
-
-    refreshEngineList();
-    panel.style.display = "block";
-    
-    // 隐藏汉堡菜单
-    hideHamburgerMenu();
-}
-
-function enableDragAndSort() {
-    const container = document.querySelector('.engine-display');
-    if (!container) return;
-
-    const buttons = container.querySelectorAll('.engine-button');
-
-    buttons.forEach(button => {
-        button.draggable = true;
-
-        button.addEventListener('dragstart', (e) => {
-            currentDraggedButton = button;
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', button.getAttribute('url'));
-            button.classList.add('dragging');
-        });
-
-        button.addEventListener('dragend', () => {
-            button.classList.remove('dragging');
-            currentDraggedButton = null;
-            saveButtonOrder();
-        });
-
-        button.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            return false;
-        });
-
-        button.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            button.classList.add('drag-over');
-        });
-
-        button.addEventListener('dragleave', () => {
-            button.classList.remove('drag-over');
-        });
-
-        button.addEventListener('drop', (e) => {
-            e.preventDefault();
-            button.classList.remove('drag-over');
-
-            if (currentDraggedButton !== button) {
-                const container = button.parentNode;
-                const buttonsArray = Array.from(container.querySelectorAll('.engine-button'));
-                const draggedIndex = buttonsArray.indexOf(currentDraggedButton);
-                const targetIndex = buttonsArray.indexOf(button);
-
-                if (draggedIndex < targetIndex) {
-                    container.insertBefore(currentDraggedButton, button.nextSibling);
-                } else {
-                    container.insertBefore(currentDraggedButton, button);
-                }
-
-                markUnsavedChanges();
+                align-items: center;
+                z-index: 1000;
+                background-color: rgba(255, 255, 255, 0);
+                margin-top: 1px;
+                transition: all 0.3s ease;
+                transform: translateY(0);
+                opacity: 1;
+                overflow-y: hidden;
+                overflow-x: visible;
             }
-            return false;
+            .${CLASS_NAMES.ENGINE_CONTAINER}.hidden {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            .${CLASS_NAMES.ENGINE_DISPLAY} {
+                display: flex;
+                overflow-x: auto;
+                overflow-y: hidden;
+                white-space: nowrap;
+                height: 100%;
+                gap: 0px;
+                flex-grow: 1;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            .${CLASS_NAMES.ENGINE_DISPLAY}::-webkit-scrollbar {
+                display: none;
+            }
+            .${CLASS_NAMES.ENGINE_BUTTON} {
+                width: 55.5px;
+                height: 32px;
+                padding: 0;
+                border: 1px solid #f0f0f0;
+                border-radius: 8px;
+                background-color: rgba(255, 255, 255, 1);
+                color: transparent;
+                font-size: 14px;
+                cursor: pointer;
+                margin: 2px;
+                background-size: contain;
+                background-repeat: no-repeat;
+                background-position: center;
+                backdrop-filter: blur(5px);
+                box-shadow: 
+                    1px 1px 1px rgba(0, 0, 0, 0.1),
+                    0px 0px 0px rgba(255, 255, 255, 0.5),
+                    6px 6px 10px rgba(0, 0, 0, 0.1) inset,
+                    -6px -6px 10px rgba(255, 255, 255, 0) inset;
+                transition: all 0.3s ease;
+                flex-shrink: 0;
+                overflow: hidden;
+            }
+            .${CLASS_NAMES.ENGINE_BUTTON}:focus {
+                border: 2px dashed #2196F3;
+                background-color: #f0f8ff;
+            }
+            .${CLASS_NAMES.ENGINE_BUTTON}.selected {
+                border: 2px dashed #2196F3;
+                background-color: #f0f8ff;
+            }
+            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAGGING} {
+                opacity: 0.5;
+                transform: rotate(5deg);
+            }
+            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAG_OVER} {
+                border: 2px dashed #2196F3;
+                background-color: #f0f8ff;
+            }
+            .${CLASS_NAMES.ENGINE_CARD} {
+                transition: all 0.3s ease;
+            }
+            #${CLASS_NAMES.MANAGEMENT_PANEL} {
+                animation: slideIn 0.3s ease;
+            }
+            #${CLASS_NAMES.HAMBURGER_MENU} {
+                animation: slideInLeft 0.3s ease;
+            }
+            #${CLASS_NAMES.SEARCH_OVERLAY} {
+                animation: fadeIn 0.3s ease;
+            }
+            @keyframes slideIn {
+                from { opacity: 0; transform: translate(-50%, -48%); }
+                to { opacity: 1; transform: translate(-50%, -50%); }
+            }
+            @keyframes slideInLeft {
+                from { opacity: 0; transform: translateX(-10px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+        `;
+        document.head.appendChild(cssNode);
+    },
+
+    /**
+     * 监控页面输入框（实时同步输入内容到sessionStorage）
+     */
+    monitorInputFields() {
+        const setupInputMonitoring = (input) => {
+            if (input.dataset.monitored) return;
+            input.dataset.monitored = true;
+
+            const updateCurrentInput = (event) => {
+                // 使用防抖优化输入监控
+                debounceUtils.debounce('input_monitor', () => {
+                    appState.currentInput = event.target.value.trim();
+                    sessionStorage.setItem(STORAGE_KEYS.CURRENT_INPUT, appState.currentInput);
+                }, 500);
+            };
+
+            input.addEventListener('input', updateCurrentInput);
+            input.addEventListener('change', updateCurrentInput);
+        };
+
+        // 1. 初始化现有输入框监控
+        document.querySelectorAll(DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR)
+            .forEach(setupInputMonitoring);
+
+        // 2. 监听动态添加的输入框（MutationObserver）
+        const observer = new MutationObserver(() => {
+            document.querySelectorAll(`${DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR}:not([data-monitored])`)
+                .forEach(setupInputMonitoring);
         });
-    });
-}
 
-function saveButtonOrder() {
-    const container = document.querySelector('.engine-display');
-    if (!container) return;
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    },
 
-    const buttons = container.querySelectorAll('.engine-button');
-    const newOrder = Array.from(buttons).map(btn => {
-        const url = btn.getAttribute('url');
-        const engine = searchUrlMap.find(e => e.searchUrl === url);
-        return engine ? engine.mark : null;
-    }).filter(mark => mark !== null).join('-');
+    /**
+     * 更新搜索框位置与显示状态
+     */
+    updateSearchBoxPosition() {
+        const punkJetBox = document.getElementById("punkjet-search-box");
+        if (!punkJetBox) return;
 
-    GM_setValue('punk_setup_search', newOrder);
-}
+        // 基础位置配置
+        punkJetBox.style.bottom = "0px";
+        punkJetBox.style.left = "2%";
+        punkJetBox.style.width = "96%";
 
-function addSearchBox() {
-    try {
-        if (engineContainerExists()) {
-            return;
-        }
+        // 显示/隐藏状态切换
+        punkJetBox.style.transform = appState.punkJetBoxVisible 
+            ? "translateY(0)" 
+            : "translateY(100%)";
+        punkJetBox.style.opacity = appState.punkJetBoxVisible ? "1" : "0";
+    },
 
-        const punkJetBox = document.createElement("div");
-        punkJetBox.id = "punkjet-search-box";
-        punkJetBox.className = "engine-container";
-        punkJetBox.style.display = 'flex';
-        punkJetBox.style.zIndex = '9999';
-        punkJetBox.style.position = 'fixed';
-        punkJetBox.style.transition = 'all 0.3s ease';
+    /**
+     * 创建搜索引擎按钮
+     * @param {Object} item - 搜索引擎配置项
+     * @returns {HTMLButtonElement} 引擎按钮DOM元素
+     */
+    createEngineButton(item) {
+        const button = document.createElement('button');
+        button.className = CLASS_NAMES.ENGINE_BUTTON;
+        button.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(item.svgCode)}')`;
+        button.setAttribute("url", item.searchUrl);
+        button.setAttribute("title", item.name);
+        button.setAttribute("data-mark", item.mark);
+        button.innerHTML = '';
 
-        updateSearchBoxPosition();
+        // 鼠标hover事件
+        const handleMouseEnter = () => {
+            button.style.backgroundColor = 'rgba(241, 241, 241, 1)';
+            button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        };
 
-        const ulList = document.createElement('div');
-        ulList.className = "engine-display";
-        ulList.style.overflowX = "auto";
-        ulList.style.overflowY = "hidden";
+        const handleMouseLeave = () => {
+            button.style.backgroundColor = 'rgba(240, 240, 244, 1)';
+            button.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
+        };
 
-        // 修改汉堡菜单按钮 - 使用网格图标和指定颜色
+        button.addEventListener('mouseover', handleMouseEnter);
+        button.addEventListener('mouseout', handleMouseLeave);
+
+        // 点击事件（调用搜索逻辑）
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            const url = button.getAttribute("url");
+            const keywords = utils.getSearchKeywords();
+
+            if (url && keywords) {
+                const finalUrl = url.replace('{keyword}', encodeURIComponent(keywords));
+                window.open(finalUrl, '_blank');
+                if (appState.searchOverlayVisible) {
+                    searchOverlay.hideSearchOverlay();
+                }
+            } else {
+                searchOverlay.showSearchOverlay();
+            }
+        });
+
+        return button;
+    },
+
+    /**
+     * 创建汉堡菜单按钮
+     * @returns {HTMLButtonElement} 汉堡菜单按钮DOM元素
+     */
+    createHamburgerButton() {
         const hamburgerButton = document.createElement('button');
-hamburgerButton.className = "engine-hamburger-button";
-hamburgerButton.innerHTML = '<i class="fa-solid fa-paper-plane"></i>'; 
-hamburgerButton.title = "菜单";
-hamburgerButton.style.cssText = `
-    width: 32px;
-    height: 32px;
-    border: 1px solid #f0f0f0;
-    border-radius: 7px;
-    background-color: rgba(255, 255, 255, 1);
-    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1), 
+        hamburgerButton.className = "engine-hamburger-button";
+        hamburgerButton.innerHTML = utils.createInlineSVG('paper-plane');
+        hamburgerButton.title = "菜单 (Alt+M)";
+        hamburgerButton.style.cssText = `
+            width: 32px;
+            height: 32px;
+            border: 1px solid #f0f0f0;
+            border-radius: 7px;
+            background-color: rgba(255, 255, 255, 1);
+            box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1), 
                         0px 0px 0px rgba(255, 255, 255, 0.5), 
                         6px 6px 10px rgba(0, 0, 0, 0.1) inset, 
                         -6px -6px 10px rgba(255, 255, 255, 0) inset;
-    cursor: pointer;
-    margin: 3px;
-    flex-shrink: 0;
-    display: flex;
-    justify-content: center; 
-    align-items: center;      
-    font-size: 16px;
-    color: #999999;
-    transition: all 0.3s ease;
-    padding: 0;              
-`;
+            cursor: pointer;
+            margin: 3px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center; 
+            align-items: center;      
+            font-size: 16px;
+            color: #999999;
+            transition: all 0.3s ease;
+            padding: 0;              
+        `;
 
-// 确保图标本身没有影响对齐的样式
-hamburgerButton.innerHTML = '<i class="fa-solid fa-paper-plane" style="display: block; line-height: 1;"></i>';
-        
+        // 鼠标hover效果
         hamburgerButton.addEventListener('mouseenter', () => {
             hamburgerButton.style.backgroundColor = 'rgba(241, 241, 241, 1)';
             hamburgerButton.style.transform = 'translateY(-2px)';
             hamburgerButton.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
         });
-        
+
         hamburgerButton.addEventListener('mouseout', () => {
             hamburgerButton.style.backgroundColor = 'white';
             hamburgerButton.style.transform = 'translateY(0)';
             hamburgerButton.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
         });
-        
-        hamburgerButton.addEventListener('click', toggleHamburgerMenu);
 
-        punkJetBox.appendChild(hamburgerButton);
+        // 点击切换汉堡菜单
+        hamburgerButton.addEventListener('click', () => {
+            appState.hamburgerMenuOpen 
+                ? hamburgerMenu.hideHamburgerMenu() 
+                : hamburgerMenu.showHamburgerMenu();
+        });
 
-        let fragment = document.createDocumentFragment();
-        let showList = GM_getValue("punk_setup_search", punkDeafultMark);
-        showList = showList.split('-');
+        return hamburgerButton;
+    },
 
-        for (let showListIndex = 0; showListIndex < showList.length; showListIndex++) {
-            for (let index = 0; index < searchUrlMap.length; index++) {
-                let item = searchUrlMap[index];
-                if (item.mark === showList[showListIndex]) {
-                    let button = document.createElement('button');
-                    button.className = "engine-button";
-                    button.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(item.svgCode)}')`;
-                    button.setAttribute("url", item.searchUrl);
-                    button.setAttribute("title", item.name);
-                    button.innerHTML = '';
+    /**
+     * 添加搜索框到页面（核心UI组件）
+     */
+    addSearchBox() {
+        try {
+            if (utils.isEngineContainerExists()) return;
 
+            // 1. 创建主容器
+            const punkJetBox = document.createElement("div");
+            punkJetBox.id = "punkjet-search-box";
+            punkJetBox.className = CLASS_NAMES.ENGINE_CONTAINER;
+            punkJetBox.style.cssText = `
+                display: flex;
+                z-index: 9999;
+                position: fixed;
+                transition: all 0.3s ease;
+            `;
+            this.updateSearchBoxPosition();
+
+            // 2. 创建引擎按钮容器（横向滚动）
+            const ulList = document.createElement('div');
+            ulList.className = CLASS_NAMES.ENGINE_DISPLAY;
+            ulList.style.cssText = `
+                overflow-x: auto;
+                overflow-y: hidden;
+                display: flex;
+                flex-grow: 1;
+            `;
+
+            // 3. 添加汉堡菜单按钮
+            const hamburgerButton = this.createHamburgerButton();
+            punkJetBox.appendChild(hamburgerButton);
+
+            // 4. 添加引擎按钮（从配置中读取）
+            const fragment = document.createDocumentFragment();
+            const showList = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-');
+            
+            showList.forEach(showMark => {
+                const item = appState.searchUrlMap.find(engine => engine.mark === showMark);
+                if (item) {
+                    const button = this.createEngineButton(item);
                     fragment.appendChild(button);
+                }
+            });
 
-                    button.addEventListener('mouseover', () => {
-                        button.style.backgroundColor = 'rgba(241, 241, 241, 1)';
-                        button.style.transform = 'translateY(-2px)';
-                        button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                    });
+            ulList.appendChild(fragment);
+            punkJetBox.appendChild(ulList);
+            document.body.appendChild(punkJetBox);
 
-                    button.addEventListener('mouseout', () => {
-                        button.style.backgroundColor = 'rgba(240, 240, 244, 1)';
-                        button.style.transform = 'translateY(0)';
-                        button.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
-                    });
+            // 5. 更新状态与绑定事件
+            appState.containerAdded = true;
+            this.initScrollListener();
+            window.addEventListener('resize', () => this.updateSearchBoxPosition());
 
-                    // 使用新的点击处理器
-                    button.addEventListener('click', createEngineButtonClickHandler(button, item));
+            // 6. 点击页面其他区域关闭汉堡菜单
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest(`#${CLASS_NAMES.HAMBURGER_MENU}`) && 
+                    !e.target.closest('.engine-hamburger-button')) {
+                    hamburgerMenu.hideHamburgerMenu();
+                }
+            });
 
-                    button.addEventListener('mousedown', (e) => {
-                        longPressTimer = setTimeout(() => {
-                            showContextMenu(e, item);
-                        }, 800);
-                    });
+            // 7. 延迟启用拖拽排序
+            setTimeout(() => this.enableDragAndSort(), DEFAULT_CONFIG.DRAG_SORT_DELAY);
+        } catch (error) {
+            console.error("添加搜索框失败:", error.message);
+        }
+    },
 
-                    button.addEventListener('mouseup', () => {
-                        clearTimeout(longPressTimer);
-                    });
+    /**
+     * 启用引擎按钮拖拽排序功能
+     */
+    enableDragAndSort() {
+        const container = document.querySelector(`.${CLASS_NAMES.ENGINE_DISPLAY}`);
+        if (!container) return;
 
-                    button.addEventListener('mouseleave', () => {
-                        clearTimeout(longPressTimer);
-                    });
+        const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
+        buttons.forEach(button => {
+            button.draggable = true;
 
-                    break;
+            // 拖拽开始
+            button.addEventListener('dragstart', (e) => {
+                button.classList.add(CLASS_NAMES.DRAGGING);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', button.getAttribute('url'));
+            });
+
+            // 拖拽结束
+            button.addEventListener('dragend', () => {
+                button.classList.remove(CLASS_NAMES.DRAGGING);
+                utils.saveButtonOrder();
+            });
+
+            // 拖拽经过
+            button.addEventListener('dragover', (e) => e.preventDefault());
+
+            // 拖拽进入
+            button.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                button.classList.add(CLASS_NAMES.DRAG_OVER);
+            });
+
+            // 拖拽离开
+            button.addEventListener('dragleave', () => {
+                button.classList.remove(CLASS_NAMES.DRAG_OVER);
+            });
+
+            // 拖拽放下
+            button.addEventListener('drop', (e) => {
+                e.preventDefault();
+                button.classList.remove(CLASS_NAMES.DRAG_OVER);
+                const draggingButton = document.querySelector(`.${CLASS_NAMES.DRAGGING}`);
+
+                if (draggingButton && draggingButton !== button) {
+                    const buttonsArray = Array.from(container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`));
+                    const draggedIndex = buttonsArray.indexOf(draggingButton);
+                    const targetIndex = buttonsArray.indexOf(button);
+
+                    // 根据索引位置插入
+                    if (draggedIndex < targetIndex) {
+                        container.insertBefore(draggingButton, button.nextSibling);
+                    } else {
+                        container.insertBefore(draggingButton, button);
+                    }
+
+                    utils.markUnsavedChanges();
+                }
+            });
+        });
+    },
+
+    /**
+     * 初始化滚动/触摸事件监听（控制搜索框显示/隐藏）
+     */
+    initScrollListener() {
+        const passiveOptions = { passive: true };
+
+        // 1. 滚动事件 - 使用防抖优化
+        const handleScroll = () => {
+            const st = window.pageYOffset || document.documentElement.scrollTop;
+            const isInteractingWithSearchBar = document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}:hover`) !== null;
+            
+            if (isInteractingWithSearchBar) return;
+
+            utils.clearAllTimeouts();
+            appState.isScrolling = true;
+
+            // 使用防抖处理滚动显示/隐藏
+            debounceUtils.debounce('scroll_hide', () => {
+                // 向下滚动且距离顶部>50px：隐藏搜索框
+                if (st > appState.lastScrollTop && st > 50) {
+                    this.hideSearchBox();
+                } else {
+                    this.showSearchBoxImmediately();
+                }
+
+                appState.lastScrollTop = st <= 0 ? 0 : st;
+            }, 50);
+
+            // 滚动停止后延迟显示搜索框
+            appState.scrollTimeout = setTimeout(() => {
+                appState.isScrolling = false;
+                this.showSearchBoxDelayed();
+            }, DEFAULT_CONFIG.SCROLL_TIMEOUT_DURATION);
+        };
+
+        // 2. 触摸事件 - 使用节流优化
+        const handleTouchStart = (e) => {
+            appState.touchStartY = e.touches[0].clientY;
+        };
+
+        const handleTouchMove = (e) => {
+            if (appState.touchStartY === null) return;
+            if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
+
+            const touchY = e.touches[0].clientY;
+            const diff = appState.touchStartY - touchY;
+
+            // 使用节流处理触摸移动
+            debounceUtils.throttle('touch_move', () => {
+                // 滑动距离>10px时触发显示/隐藏
+                if (Math.abs(diff) > 10) {
+                    diff > 0 ? this.hideSearchBox() : this.showSearchBoxImmediately();
+                }
+            }, 100);
+        };
+
+        const handleTouchEnd = () => {
+            appState.touchStartY = null;
+            this.showSearchBoxDelayed();
+        };
+
+        // 3. 滚轮事件
+        const handleWheel = () => {
+            setTimeout(() => {
+                const st = window.pageYOffset || document.documentElement.scrollTop;
+                if (st > appState.lastScrollTop && st > 50) {
+                    this.hideSearchBox();
+                } else {
+                    this.showSearchBoxImmediately();
+                }
+                appState.lastScrollTop = st <= 0 ? 0 : st;
+                this.showSearchBoxDelayed();
+            }, 10);
+        };
+
+        // 4. 绑定事件
+        window.addEventListener('scroll', handleScroll, passiveOptions);
+        window.addEventListener('wheel', handleWheel, passiveOptions);
+        window.addEventListener('touchstart', handleTouchStart, passiveOptions);
+        window.addEventListener('touchmove', handleTouchMove, passiveOptions);
+        window.addEventListener('touchend', handleTouchEnd, passiveOptions);
+
+        // 5. 点击事件：点击其他区域显示搜索框
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest(`#${CLASS_NAMES.MANAGEMENT_PANEL}`) && 
+                !e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
+                this.showSearchBoxImmediately();
+            }
+        });
+
+        // 6. 聚焦事件：输入框聚焦时显示搜索框
+        document.addEventListener('focusin', (e) => {
+            if (e.target.matches('input, textarea')) {
+                this.showSearchBoxImmediately();
+            }
+        });
+
+        // 7. 鼠标进入事件：进入引擎容器时显示搜索框
+        document.addEventListener('mouseenter', (e) => {
+            if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`) || 
+                e.target.closest(`.${CLASS_NAMES.ENGINE_BUTTON}`)) {
+                this.showSearchBoxImmediately();
+            }
+        }, true);
+
+        // 8. 阻止引擎容器内滚动事件冒泡
+        const stopPropagationHandler = (e) => {
+            if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
+                e.stopPropagation();
+            }
+        };
+
+        document.addEventListener('wheel', stopPropagationHandler, passiveOptions);
+        document.addEventListener('touchmove', stopPropagationHandler, passiveOptions);
+    },
+
+    /**
+     * 立即显示搜索框
+     */
+    showSearchBoxImmediately() {
+        utils.clearAllTimeouts();
+        if (!appState.punkJetBoxVisible) {
+            appState.punkJetBoxVisible = true;
+            this.updateSearchBoxPosition();
+        }
+    },
+
+    /**
+     * 延迟显示搜索框
+     */
+    showSearchBoxDelayed() {
+        utils.clearAllTimeouts();
+        appState.hideTimeout = setTimeout(() => {
+            this.showSearchBoxImmediately();
+        }, DEFAULT_CONFIG.SHOW_SEARCH_BOX_DELAY);
+    },
+
+    /**
+     * 隐藏搜索框
+     */
+    hideSearchBox() {
+        if (appState.punkJetBoxVisible) {
+            appState.punkJetBoxVisible = false;
+            this.updateSearchBoxPosition();
+        }
+    },
+
+    /**
+     * 隐藏汉堡菜单
+     */
+    hideHamburgerMenu() {
+        hamburgerMenu.hideHamburgerMenu();
+    },
+
+    /**
+     * 显示汉堡菜单
+     */
+    showHamburgerMenu() {
+        hamburgerMenu.showHamburgerMenu();
+    },
+
+    /**
+     * 切换汉堡菜单
+     */
+    toggleHamburgerMenu() {
+        hamburgerMenu.toggleHamburgerMenu();
+    }
+};
+
+// ===== 搜索遮罩层模块 =====
+/**
+ * 搜索遮罩层功能模块 - 封装遮罩层创建、显示、隐藏、搜索逻辑
+ */
+const searchOverlay = {
+    /**
+     * 创建搜索遮罩层（确保只创建一次）
+     * @returns {HTMLDivElement} 遮罩层DOM元素
+     */
+    createSearchOverlay() {
+        let overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
+        if (overlay) return overlay;
+
+        // 1. 创建遮罩层容器
+        overlay = document.createElement("div");
+        overlay.id = CLASS_NAMES.SEARCH_OVERLAY;
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 1);
+            z-index: 9998;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        `;
+
+        // 2. 创建搜索内容容器
+        const searchContainer = document.createElement("div");
+        searchContainer.style.cssText = `
+            width: 90%;
+            max-width: 500px;
+            background: linear-gradient(145deg, #f0f0f0, #ffffff);
+            border-radius: 25px;
+            padding: 30px;
+            box-shadow: 
+                20px 20px 60px rgba(0, 0, 0, 0.1),
+                -20px -20px 60px rgba(255, 255, 255, 0.8),
+                inset 1px 1px 2px rgba(255, 255, 255, 0.6),
+                inset -1px -1px 2px rgba(0, 0, 0, 0.05);
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        `;
+
+        // 3. 创建关闭按钮
+        const closeBtn = document.createElement("button");
+        closeBtn.innerHTML = utils.createInlineSVG('times');
+        closeBtn.style.cssText = `
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: linear-gradient(145deg, #e8e8e8, #ffffff);
+            border: none;
+            font-size: 20px;
+            color: #666;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 
+                5px 5px 10px rgba(0, 0, 0, 0.1),
+                -5px -5px 10px rgba(255, 255, 255, 0.8),
+                inset 1px 1px 2px rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        `;
+
+        // 关闭按钮hover效果
+        closeBtn.addEventListener('mouseenter', () => {
+            closeBtn.style.background = 'linear-gradient(145deg, #ff6b6b, #ff5252)';
+            closeBtn.style.color = 'white';
+            closeBtn.style.transform = 'translateY(-2px)';
+        });
+
+        closeBtn.addEventListener('mouseleave', () => {
+            closeBtn.style.background = 'linear-gradient(145deg, #e8e8e8, #ffffff)';
+            closeBtn.style.color = '#666';
+            closeBtn.style.transform = 'translateY(0)';
+        });
+
+        closeBtn.addEventListener('click', () => this.hideSearchOverlay());
+
+        // 4. 创建标题
+        const title = document.createElement("h2");
+        title.innerHTML = utils.createInlineSVG('search') + ' 快捷搜索 (Alt+S)';
+        title.style.cssText = `
+            margin: 0 0 20px 0;
+            color: #2c3e50;
+            text-align: center;
+            font-size: 24px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        `;
+
+        // 5. 创建搜索输入框
+        const searchInput = document.createElement("input");
+        searchInput.type = "text";
+        searchInput.placeholder = "输入关键词或网址...";
+        searchInput.id = "overlay-search-input";
+        searchInput.style.cssText = `
+            width: 100%;
+            padding: 12px 15px;
+            box-sizing: border-box;
+            background: linear-gradient(145deg, #f8f9fa, #ffffff);
+            border-radius: 16px;
+            font-size: 16px;
+            color: #2c3e50;
+            outline: none;
+            transition: all 0.3s ease;
+            box-shadow: 
+                inset 4px 4px 8px rgba(0, 0, 0, 0.05),
+                inset -4px -4px 8px rgba(255, 255, 255, 0.8),
+                5px 5px 15px rgba(0, 0, 0, 0.1);
+            height: 48px;
+        `;
+
+        // 输入框focus/blur效果
+        searchInput.addEventListener('focus', () => {
+            searchInput.style.boxShadow = 
+                'inset 4px 4px 8px rgba(0, 0, 0, 0.08), inset -4px -4px 8px rgba(255, 255, 255, 0.9), 8px 8px 20px rgba(0, 0, 0, 0.15)';
+        });
+
+        searchInput.addEventListener('blur', () => {
+            searchInput.style.boxShadow = 
+                'inset 4px 4px 8px rgba(0, 0, 0, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.8), 5px 5px 15px rgba(0, 0, 0, 0.1)';
+        });
+
+        // 6. 创建提示文本
+        const tipText = document.createElement("p");
+        tipText.innerHTML = utils.createInlineSVG('info-circle') + ' 提示：输入关键词后按回车使用默认搜索引擎搜索，或点击下方搜索引擎按钮选择特定引擎';
+        tipText.style.cssText = `
+            margin: 15px 0 0 0;
+            color: #7f8c8d;
+            font-size: 12px;
+            text-align: center;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        `;
+
+        // 7. 组装结构
+        searchContainer.appendChild(closeBtn);
+        searchContainer.appendChild(title);
+        searchContainer.appendChild(searchInput);
+        searchContainer.appendChild(tipText);
+        overlay.appendChild(searchContainer);
+
+        // 8. 绑定事件
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.performOverlaySearch();
+            }
+        });
+
+        // 点击遮罩层背景关闭
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                this.hideSearchOverlay();
+            }
+        });
+
+        document.body.appendChild(overlay);
+        return overlay;
+    },
+
+    /**
+     * 显示搜索遮罩层
+     */
+    showSearchOverlay() {
+        const overlay = this.createSearchOverlay();
+        const searchInput = document.getElementById("overlay-search-input");
+
+        overlay.style.display = 'flex';
+        appState.searchOverlayVisible = true;
+
+        // 应用焦点陷阱
+        accessibility.trapFocus(overlay);
+
+        // 延迟聚焦输入框（确保动画完成）
+        setTimeout(() => {
+            searchInput.focus();
+            searchInput.select();
+        }, 100);
+
+        // 隐藏汉堡菜单
+        domHandler.hideHamburgerMenu();
+    },
+
+    /**
+     * 隐藏搜索遮罩层
+     */
+    hideSearchOverlay() {
+        const overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
+        if (overlay) {
+            overlay.style.display = 'none';
+            appState.searchOverlayVisible = false;
+            
+            // 移除焦点陷阱
+            accessibility.removeFocusTrap(overlay);
+        }
+    },
+
+    /**
+     * 执行遮罩层搜索逻辑（URL直接跳转，关键词用默认引擎搜索）
+     */
+    performOverlaySearch() {
+        const searchInput = document.getElementById("overlay-search-input");
+        const query = searchInput.value.trim();
+
+        if (!query) {
+            searchInput.focus();
+            return;
+        }
+
+        // 1. 是有效URL则直接打开
+        if (utils.isValidUrl(query)) {
+            window.open(query, '_blank');
+            this.hideSearchOverlay();
+            return;
+        }
+
+        // 2. 是关键词则用默认引擎搜索
+        const showList = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-');
+        if (showList.length > 0) {
+            const firstEngine = appState.searchUrlMap.find(item => item.mark === showList[0]);
+            if (firstEngine) {
+                const searchUrl = firstEngine.searchUrl.replace('{keyword}', encodeURIComponent(query));
+                window.open(searchUrl, '_blank');
+                this.hideSearchOverlay();
+            }
+        }
+    }
+};
+
+// ===== 汉堡菜单模块 =====
+/**
+ * 汉堡菜单功能模块 - 封装菜单创建、显示、隐藏逻辑
+ */
+const hamburgerMenu = {
+    /**
+     * 创建汉堡菜单（确保只创建一次）
+     * @returns {HTMLDivElement} 汉堡菜单DOM元素
+     */
+    createHamburgerMenu() {
+        let menu = document.getElementById(CLASS_NAMES.HAMBURGER_MENU);
+        if (menu) return menu;
+
+        // 1. 创建菜单容器
+        menu = document.createElement("div");
+        menu.id = CLASS_NAMES.HAMBURGER_MENU;
+        menu.style.cssText = `
+            position: fixed;
+            bottom: 50px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(5px);
+            z-index: 10001;
+            display: none;
+            flex-direction: column;
+            padding: 10px;
+            gap: 5px;
+            min-width: 180px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        `;
+
+        // 2. 定义菜单项配置
+        const menuItems = [
+            {
+                icon: 'search',
+                text: '快捷搜索 (Alt+S)',
+                action: () => searchOverlay.showSearchOverlay()
+            },
+            {
+                icon: 'cog',
+                text: '引擎管理 (Alt+E)',
+                action: () => managementPanel.showManagementPanel()
+            },
+            {
+                icon: 'keyboard',
+                text: '快捷键说明',
+                action: () => this.showKeyboardShortcuts()
+            }
+        ];
+
+        // 3. 创建菜单项按钮
+        menuItems.forEach(item => {
+            const menuItem = document.createElement("button");
+            menuItem.innerHTML = utils.createInlineSVG(item.icon) + ` ${item.text}`;
+            menuItem.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 12px 15px;
+                border: none;
+                background: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 14px;
+                color: #2c3e50;
+                transition: all 0.3s ease;
+                text-align: left;
+            `;
+
+            // 菜单项hover效果
+            menuItem.addEventListener('mouseenter', () => {
+                menuItem.style.background = 'rgba(52, 152, 219, 0.1)';
+            });
+
+            menuItem.addEventListener('mouseleave', () => {
+                menuItem.style.background = 'none';
+            });
+
+            // 绑定菜单项点击事件
+            menuItem.addEventListener('click', item.action);
+            menu.appendChild(menuItem);
+        });
+
+        document.body.appendChild(menu);
+        return menu;
+    },
+
+    /**
+     * 显示汉堡菜单
+     */
+    showHamburgerMenu() {
+        const menu = this.createHamburgerMenu();
+        menu.style.display = 'flex';
+        appState.hamburgerMenuOpen = true;
+        
+        // 更新ARIA状态
+        accessibility.updateHamburgerAriaState();
+        
+        // 应用焦点陷阱
+        accessibility.trapFocus(menu);
+    },
+
+    /**
+     * 隐藏汉堡菜单
+     */
+    hideHamburgerMenu() {
+        const menu = document.getElementById(CLASS_NAMES.HAMBURGER_MENU);
+        if (menu) {
+            menu.style.display = 'none';
+            appState.hamburgerMenuOpen = false;
+            
+            // 更新ARIA状态
+            accessibility.updateHamburgerAriaState();
+            
+            // 移除焦点陷阱
+            accessibility.removeFocusTrap(menu);
+        }
+    },
+
+    /**
+     * 切换汉堡菜单显示/隐藏状态
+     */
+    toggleHamburgerMenu() {
+        appState.hamburgerMenuOpen 
+            ? this.hideHamburgerMenu() 
+            : this.showHamburgerMenu();
+    },
+
+    /**
+     * 显示键盘快捷键说明
+     */
+    showKeyboardShortcuts() {
+        const shortcuts = [
+            { key: 'Alt + S', action: '打开搜索框' },
+            { key: 'Alt + E', action: '打开引擎管理' },
+            { key: 'Alt + M', action: '打开/关闭菜单' },
+            { key: 'ESC', action: '关闭当前弹窗' }
+        ];
+        
+        let message = '键盘快捷键:\n\n';
+        shortcuts.forEach(shortcut => {
+            message += `${shortcut.key} - ${shortcut.action}\n`;
+        });
+        
+        alert(message);
+        this.hideHamburgerMenu();
+    }
+};
+
+// ===== 管理面板模块 =====
+/**
+ * 引擎管理面板模块 - 封装面板创建、引擎管理、配置保存等核心逻辑
+ */
+const managementPanel = {
+    /**
+     * 创建操作按钮（通用按钮组件）
+     * @param {string} html - 按钮内部HTML
+     * @param {string} color - 按钮背景色
+     * @param {string} title - 按钮提示文本
+     * @returns {HTMLButtonElement} 操作按钮DOM元素
+     */
+    createActionButton(html, color, title) {
+        const button = document.createElement("button");
+        button.innerHTML = html;
+        button.title = title;
+        button.style.cssText = `
+            padding: 10px 15px;
+            background-color: ${color};
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 120px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            justify-content: center;
+        `;
+
+        // 按钮hover效果
+        button.addEventListener("mouseenter", () => {
+            button.style.transform = "translateY(-2px)";
+            button.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
+        });
+
+        button.addEventListener("mouseleave", () => {
+            button.style.transform = "translateY(0)";
+            button.style.boxShadow = "none";
+        });
+
+        return button;
+    },
+
+    /**
+     * 从当前页面提取搜索引擎信息（自动识别）
+     */
+    extractSearchEngineFromPage() {       
+        const searchForms = document.querySelectorAll('form[action*="search"], form[action*="query"], form[action*="find"]');
+        const searchInputs = document.querySelectorAll('input[type="search"], input[name*="search"], input[name*="query"], input[name*="q"]');
+        
+        // 初始化返回结果
+        const searchInfo = {
+            name: "",
+            searchUrl: "",
+            searchkeyName: [],
+            matchUrl: "",
+            mark: "",
+            found: false
+        };
+
+        // 1. 从搜索表单提取信息
+        if (searchForms.length > 0) {
+            const form = searchForms[0];
+            const action = form.getAttribute('action') || '';
+            const method = (form.getAttribute('method') || 'get').toLowerCase();
+
+            if (action) {
+                // 处理相对路径URL
+                const baseUrl = action.startsWith('http') 
+                    ? action 
+                    : new URL(action, window.location.origin).href;
+                
+                // 提取关键词参数名
+                const inputs = form.querySelectorAll('input[name]');
+                let keyParam = '';
+                for (const input of inputs) {
+                    const name = input.getAttribute('name');
+                    if (name && (name.includes('q') || name.includes('search') || name.includes('query') || name.includes('keyword'))) {
+                        keyParam = name;
+                        break;
+                    }
+                }
+
+                // 表单未提取到参数时，从页面搜索输入框提取
+                if (!keyParam && searchInputs.length > 0) {
+                    keyParam = searchInputs[0].getAttribute('name') || 'q';
+                }
+
+                // 组装搜索引擎配置
+                if (keyParam) {
+                    // 处理GET/POST方法的URL拼接
+                    searchInfo.searchUrl = method === 'post' 
+                        ? `${baseUrl}?${keyParam}={keyword}` 
+                        : `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}${keyParam}={keyword}`;
+                    
+                    searchInfo.searchkeyName = [keyParam];
+                    searchInfo.found = true;
+
+                    // 提取域名作为名称和标识
+                    const domain = new URL(baseUrl).hostname.replace('www.', '');
+                    searchInfo.name = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
+                    searchInfo.mark = domain.replace(/\./g, '_');
+                    searchInfo.matchUrl = `.*${domain}.*`;
                 }
             }
         }
 
-        ulList.appendChild(fragment);
-        punkJetBox.appendChild(ulList);
-        document.body.appendChild(punkJetBox);
-        containerAdded = true;
+        // 2. 表单未提取到信息时，从搜索输入框提取
+        if (!searchInfo.found && searchInputs.length > 0) {
+            const input = searchInputs[0];
+            const name = input.getAttribute('name') || 'q';
+            const domain = window.location.hostname.replace('www.', '');
 
-        initScrollListener();
-        
-        window.addEventListener('resize', updateSearchBoxPosition);
+            searchInfo.searchUrl = `${window.location.origin}/search?${name}={keyword}`;
+            searchInfo.searchkeyName = [name];
+            searchInfo.name = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
+            searchInfo.mark = domain.replace(/\./g, '_');
+            searchInfo.matchUrl = `.*${domain}.*`;
+            searchInfo.found = true;
+        }
 
-        // 点击页面其他区域关闭汉堡菜单
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#punkjet-hamburger-menu') && !e.target.closest('.engine-hamburger-button')) {
-                hideHamburgerMenu();
+        return searchInfo;
+    },
+
+    /**
+     * 从当前页面提取引擎并填充到添加表单
+     */
+    extractFromCurrentPage() {
+        const searchInfo = this.extractSearchEngineFromPage();
+        if (!searchInfo.found) {
+            alert("无法自动识别当前页面的搜索引擎，请手动添加。");
+            return;
+        }
+
+        // 显示添加表单并填充数据
+        this.showAddForm(true);
+        document.getElementById("engine-name").value = searchInfo.name;
+        document.getElementById("engine-mark").value = searchInfo.mark;
+        document.getElementById("engine-url").value = searchInfo.searchUrl;
+        document.getElementById("engine-keys").value = searchInfo.searchkeyName.join(",");
+
+        // 自动填充图标（从页面favicon提取）
+        const favicon = document.querySelector('link[rel*="icon"]');
+        if (favicon) {
+            const iconUrl = favicon.href;
+            if (!iconUrl.startsWith('data:')) {
+                document.getElementById("icon-type").value = "image";
+                document.getElementById("icon-input").value = iconUrl;
+                this.previewIcon();
+            }
+        }
+
+        alert(`✅ 已自动识别 ${searchInfo.name} 搜索引擎！请检查并保存。`);
+    },
+
+    /**
+     * 显示/隐藏添加引擎表单
+     */
+    showAddForm(show) {
+        const formSection = document.getElementById("add-engine-form");
+        const engineList = document.getElementById("engine-management-list");
+        const listTitle = formSection?.previousElementSibling;
+
+        if (!formSection || !engineList || !listTitle) return;
+
+        if (show) {
+            formSection.style.display = "block";
+            engineList.style.display = "none";
+            listTitle.style.display = "none";
+            // 清空表单
+            document.getElementById("engine-name").value = "";
+            document.getElementById("engine-mark").value = "";
+            document.getElementById("engine-url").value = "";
+            document.getElementById("engine-keys").value = "";
+            document.getElementById("icon-input").value = "";
+            document.getElementById("icon-preview").innerHTML = "";
+        } else {
+            formSection.style.display = "none";
+            engineList.style.display = "grid";
+            listTitle.style.display = "block";
+        }
+    },
+
+    /**
+     * 预览图标（根据图标类型渲染预览效果）
+     */
+    previewIcon() {
+        const type = document.getElementById("icon-type").value;
+        const value = document.getElementById("icon-input").value.trim();
+        const preview = document.getElementById("icon-preview");
+
+        // 重置预览容器
+        preview.innerHTML = "";
+        preview.style.backgroundImage = "none";
+        preview.style.backgroundColor = "#ecf0f1";
+
+        if (!value) return;
+
+        try {
+            switch (type) {
+                case "svg":
+                    // 验证SVG有效性
+                    const parser = new DOMParser();
+                    const svgDoc = parser.parseFromString(value, "image/svg+xml");
+                    if (svgDoc.querySelector("parsererror")) {
+                        throw new Error("无效的SVG代码");
+                    }
+                    preview.innerHTML = value;
+                    break;
+                case "image":
+                    preview.style.backgroundImage = `url(${value})`;
+                    preview.style.backgroundSize = "contain";
+                    preview.style.backgroundRepeat = "no-repeat";
+                    preview.style.backgroundPosition = "center";
+                    break;
+                case "text":
+                    const displayText = value.length > 4 ? value.substring(0, 4) : value;
+                    preview.textContent = displayText;
+                    preview.style.fontSize = value.length > 4 ? "14px" : "18px";
+                    preview.style.color = "#2c3e50";
+                    preview.style.fontWeight = "bold";
+                    break;
+                case "emoji":
+                    preview.textContent = value;
+                    preview.style.fontSize = "24px";
+                    break;
+            }
+        } catch (e) {
+            alert(`图标预览失败: ${e.message}`);
+        }
+    },
+
+    /**
+     * 保存新添加的搜索引擎
+     */
+    saveNewEngine() {
+        // 1. 获取表单数据
+        const name = document.getElementById("engine-name").value.trim();
+        const mark = document.getElementById("engine-mark").value.trim();
+        const url = document.getElementById("engine-url").value.trim();
+        const keys = document.getElementById("engine-keys").value.split(',').map(k => k.trim());
+        const iconType = document.getElementById("icon-type").value;
+        const iconValue = document.getElementById("icon-input").value.trim();
+
+        // 2. 表单验证
+        if (!name || !mark || !url || keys.length === 0) {
+            alert("请填写所有必填字段");
+            return;
+        }
+        if (appState.searchUrlMap.some(engine => engine.mark === mark)) {
+            alert("标识已存在，请使用其他标识");
+            return;
+        }
+
+        // 3. 组装引擎配置（处理图标）
+        const newEngine = {
+            name,
+            searchUrl: url,
+            searchkeyName: keys,
+            matchUrl: new RegExp(`.*${new URL(url).hostname}.*`),
+            mark,
+            svgCode: "",
+            custom: true // 标记为自定义引擎
+        };
+
+        // 根据图标类型生成SVG代码
+        if (iconValue) {
+            switch (iconType) {
+                case "svg":
+                    newEngine.svgCode = iconValue;
+                    break;
+                case "image":
+                    newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                        <style>.bg-img {background-image: url(${iconValue}); background-size: contain; background-repeat: no-repeat; background-position: center; width: 100%; height: 100%;}</style>
+                        <foreignObject width="100%" height="100%"><div class="bg-img" xmlns="http://www.w3.org/1999/xhtml"></div></foreignObject>
+                    </svg>`;
+                    break;
+                case "text":
+                    newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                        <style>.text {font-size: 12px; fill: #333; text-anchor: middle; dominant-baseline: middle; font-weight: bold;}</style>
+                        <text x="50%" y="50%" class="text">${iconValue}</text>
+                    </svg>`;
+                    break;
+                case "emoji":
+                    newEngine.svgCode = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                        <style>.emoji {font-size: 20px; text-anchor: middle; dominant-baseline: middle;}</style>
+                        <text x="50%" y="50%" class="emoji">${iconValue}</text>
+                    </svg>`;
+                    break;
+            }
+        }
+
+        // 4. 保存到存储并更新状态
+        appState.userSearchEngines.push(newEngine);
+        GM_setValue(STORAGE_KEYS.USER_SEARCH_ENGINES, appState.userSearchEngines);
+        // 更新引擎映射表
+        appState.searchUrlMap = [...defaultSearchEngines, ...appState.userSearchEngines];
+        // 更新激活引擎列表
+        const currentSetup = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK);
+        GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, `${currentSetup}-${mark}`);
+
+        // 5. 反馈结果并刷新界面
+        utils.markUnsavedChanges();
+        alert("✅ 搜索引擎添加成功!");
+        this.showAddForm(false);
+        this.refreshEngineList();
+    },
+
+    /**
+     * 恢复默认搜索引擎配置（清除自定义引擎）
+     */
+    resetToDefault() {
+        if (confirm("⚠️ 确定要恢复默认设置吗？这将删除所有自定义搜索引擎。")) {
+            // 清空自定义引擎存储
+            appState.userSearchEngines = [];
+            GM_setValue(STORAGE_KEYS.USER_SEARCH_ENGINES, []);
+            // 恢复默认激活引擎列表
+            GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK);
+            // 更新引擎映射表
+            appState.searchUrlMap = [...defaultSearchEngines];
+
+            // 反馈结果并刷新界面
+            utils.markUnsavedChanges();
+            alert("✅ 已恢复默认设置");
+            this.refreshEngineList();
+        }
+    },
+
+    /**
+     * 刷新引擎列表（重新渲染管理面板中的引擎卡片）
+     */
+    refreshEngineList() {
+        const engineList = document.getElementById("engine-management-list");
+        const activeMarks = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split("-");
+
+        if (!engineList) return;
+        engineList.innerHTML = ""; // 清空列表
+
+        // 遍历引擎配置，创建卡片
+        appState.searchUrlMap.forEach((engine) => {
+            const engineCard = document.createElement("div");
+            engineCard.className = CLASS_NAMES.ENGINE_CARD;
+            engineCard.style.cssText = `
+                display: flex;
+                align-items: center;
+                padding: 15px;
+                background: white;
+                border: 2px solid ${activeMarks.includes(engine.mark) ? '#27ae60' : '#ecf0f1'};
+                border-radius: 10px;
+                transition: all 0.3s ease;
+                cursor: grab;
+                min-height: 60px;
+                box-sizing: border-box;
+            `;
+
+            // 卡片hover效果
+            engineCard.addEventListener("mouseenter", () => {
+                engineCard.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+                engineCard.style.transform = "translateY(-2px)";
+            });
+
+            engineCard.addEventListener("mouseleave", () => {
+                engineCard.style.boxShadow = "none";
+                engineCard.style.transform = "translateY(0)";
+            });
+
+            // 1. 选择复选框
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.dataset.mark = engine.mark;
+            checkbox.checked = activeMarks.includes(engine.mark);
+            checkbox.style.cssText = `
+                margin-right: 15px;
+                transform: scale(1.2);
+            `;
+            // 复选框变更事件
+            checkbox.addEventListener("change", () => {
+                utils.updateSelectedCount();
+                utils.markUnsavedChanges();
+            });
+
+            // 2. 图标预览
+            const iconPreview = document.createElement("div");
+            iconPreview.style.cssText = `
+                width: 40px;
+                height: 25px;
+                background-image: url('data:image/svg+xml;utf8,${encodeURIComponent(engine.svgCode)}');
+                background-size: contain;
+                background-repeat: no-repeat;
+                background-position: center;
+                margin-right: 15px;
+                border: 1px solid #eee;
+                border-radius: 5px;
+                flex-shrink: 0;
+            `;
+
+            // 3. 引擎信息容器
+            const infoContainer = document.createElement("div");
+            infoContainer.style.cssText = `
+                flex-grow: 1;
+                min-width: 0;
+            `;
+            // 引擎名称
+            const name = document.createElement("div");
+            name.textContent = engine.name;
+            name.style.cssText = `
+                font-weight: bold;
+                color: #2c3e50;
+                margin-bottom: 5px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            `;
+            // 引擎URL
+            const url = document.createElement("div");
+            url.textContent = engine.searchUrl;
+            url.style.cssText = `
+                font-size: 0.8em;
+                color: #7f8c8d;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            `;
+            infoContainer.appendChild(name);
+            infoContainer.appendChild(url);
+
+            // 4. 操作按钮（仅自定义引擎显示删除按钮）
+            const actions = document.createElement("div");
+            actions.style.cssText = `
+                display: flex;
+                gap: 5px;
+                flex-shrink: 0;
+            `;
+
+            if (engine.custom) {
+                const deleteBtn = document.createElement("button");
+                deleteBtn.innerHTML = utils.createInlineSVG('trash', 'white');
+                deleteBtn.title = "删除";
+                deleteBtn.style.cssText = `
+                    padding: 8px 12px;
+                    border: none;
+                    background: #e74c3c;
+                    color: white;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    flex-shrink: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                actions.appendChild(deleteBtn);
+
+                // 删除按钮点击事件
+                deleteBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (confirm(`确定要删除 ${engine.name} 吗?`)) {
+                        // 从自定义引擎列表中移除
+                        appState.userSearchEngines = appState.userSearchEngines.filter(e => e.mark !== engine.mark);
+                        GM_setValue(STORAGE_KEYS.USER_SEARCH_ENGINES, appState.userSearchEngines);
+                        // 从激活列表中移除
+                        const currentSetup = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK);
+                        const newSetup = currentSetup.split("-").filter(m => m !== engine.mark).join("-");
+                        GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, newSetup);
+                        // 更新引擎映射表
+                        appState.searchUrlMap = [...defaultSearchEngines, ...appState.userSearchEngines];
+
+                        // 反馈结果并刷新界面
+                        utils.markUnsavedChanges();
+                        this.refreshEngineList();
+                    }
+                });
+            }
+
+            // 组装卡片结构
+            engineCard.appendChild(checkbox);
+            engineCard.appendChild(iconPreview);
+            engineCard.appendChild(infoContainer);
+            engineCard.appendChild(actions);
+            engineList.appendChild(engineCard);
+        });
+
+        // 更新已选数量显示
+        utils.updateSelectedCount();
+    },
+
+    /**
+     * 保存引擎配置（激活状态、排序等）
+     */
+    saveEngineSettings() {
+        const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]');
+        const activeMarks = [];
+
+        // 收集激活的引擎标识
+        checkboxes.forEach(checkbox => {
+            if (checkbox.checked) {
+                activeMarks.push(checkbox.dataset.mark);
             }
         });
 
-        setTimeout(enableDragAndSort, 500);
-    } catch (error) {
-        console.error("添加搜索框时出错:", error.message);
-    }
-}
-
-function showContextMenu(e, item) {
-    e.preventDefault();
-    alert(`已触发 ${item.name} 搜索引擎的长按菜单`);
-}
-
-function injectStyle() {
-    try {
-        if (document.querySelector('style#engine-container-style')) {
+        // 验证至少选择一个引擎
+        if (activeMarks.length === 0) {
+            alert("⚠️ 请至少选择一个搜索引擎");
             return;
         }
 
-        const cssNode = document.createElement("style");
-cssNode.id = "engine-container-style";
-cssNode.textContent = `
-    .engine-container {
-        display: flex;
-        position: fixed;
-        bottom: 0px;
-        left: 2%;
-        width: 96%;
-        height: 36px;
-        overflow: hidden;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-        background-color: rgba(255, 255, 255, 0);
-        margin-top: 1px;
-        transition: all 0.3s ease;
-        transform: translateY(0);
-        opacity: 1;
-        overflow-y: hidden;
-        overflow-x: visible;
-    }
+        // 保存到存储
+        GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, activeMarks.join("-"));
+        utils.clearUnsavedChanges();
 
-    .engine-container.hidden {
-        transform: translateY(100%);
-        opacity: 0;
-    }
+        // 延迟关闭面板并重新加载脚本
+        setTimeout(() => {
+            this.closeManagementPanel();
+            appInitializer.reloadScript();
+        }, 1000);
+    },
 
-    .engine-display {
-        display: flex;
-        overflow-x: auto;
-        overflow-y: hidden;
-        white-space: nowrap;
-        height: 100%;
-        gap: 0px;
-        flex-grow: 1;
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-    }
+    /**
+     * 关闭管理面板（带未保存提示）
+     */
+    closeManagementPanel() {
+        const panel = document.getElementById(CLASS_NAMES.MANAGEMENT_PANEL);
+        if (!panel) return;
 
-    .engine-display::-webkit-scrollbar {
-        display: none;
-    }
-
-    .engine-button {
-        width: 55.5px;
-        height: 32px;
-        padding: 0;
-        border: 1px solid #f0f0f0;
-        border-radius: 8px;
-        background-color: rgba(255, 255, 255, 1);
-        color: transparent;
-        font-size: 14px;
-        cursor: pointer;
-        margin: 2px;
-        background-size: contain;
-        background-repeat: no-repeat;
-        background-position: center;
-        backdrop-filter: blur(5px);
-        box-shadow: 
-            1px 1px 1px rgba(0, 0, 0, 0.1),
-            0px 0px 0px rgba(255, 255, 255, 0.5),
-            6px 6px 10px rgba(0, 0, 0, 0.1) inset,
-            -6px -6px 10px rgba(255, 255, 255, 0) inset;
-        transition: all 0.3s ease;
-        flex-shrink: 0;
-        overflow: hidden;
-    }
-
-    .engine-button:focus {
-        border: 2px dashed #2196F3;
-        background-color: #f0f8ff;
-    }
-
-    .engine-button.selected {
-        border: 2px dashed #2196F3;
-        background-color: #f0f8ff;
-    }
-
-    .engine-button.dragging {
-        opacity: 0.5;
-        transform: rotate(5deg);
-    }
-
-    .engine-button.drag-over {
-        border: 2px dashed #2196F3;
-        background-color: #f0f8ff;
-    }
-
-    .engine-card {
-        transition: all 0.3s ease;
-    }
-
-    #engine-management-panel {
-        animation: slideIn 0.3s ease;
-    }
-
-    #punkjet-hamburger-menu {
-        animation: slideInLeft 0.3s ease;
-    }
-
-    #punkjet-search-overlay {
-        animation: fadeIn 0.3s ease;
-    }
-
-    @keyframes slideIn {
-        from {
-            opacity: 0;
-            transform: translate(-50%, -48%);
-        }
-        to {
-            opacity: 1;
-            transform: translate(-50%, -50%);
-        }
-    }
-
-    @keyframes slideInLeft {
-        from {
-            opacity: 0;
-            transform: translateX(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-        }
-        to {
-            opacity: 1;
-        }
-    }
-`;
-
-        document.head.appendChild(cssNode);
-    } catch (error) {
-        console.error("注入样式时出错:", error.message);
-    }
-}
-
-function reloadScript() {
-    const punkJetBox = document.getElementById("punkjet-search-box");
-    if (punkJetBox) {
-        punkJetBox.remove();
-        containerAdded = false;
-    }
-    
-    // 移除汉堡菜单
-    const hamburgerMenu = document.getElementById("punkjet-hamburger-menu");
-    if (hamburgerMenu) {
-        hamburgerMenu.remove();
-    }
-    
-    // 移除搜索遮罩层
-    const searchOverlay = document.getElementById("punkjet-search-overlay");
-    if (searchOverlay) {
-        searchOverlay.remove();
-    }
-    
-    if (scrollTimeout) {
-        clearTimeout(scrollTimeout);
-        scrollTimeout = null;
-    }
-    if (hideTimeout) {
-        clearTimeout(hideTimeout);
-        hideTimeout = null;
-    }
-    
-    window.removeEventListener('scroll', handleScroll);
-    window.removeEventListener('wheel', handleWheel);
-    window.removeEventListener('touchstart', handleTouchStart);
-    window.removeEventListener('touchmove', handleTouchMove);
-    window.removeEventListener('touchend', handleTouchEnd);
-    
-    scriptLoaded = false;
-    hamburgerMenuOpen = false;
-    searchOverlayVisible = false;
-    init();
-}
-
-setInterval(() => {
-    if (isValidScope() && !containerAdded) {
-        init();
-    }
-    else if (!isValidScope() && containerAdded) {
-        reloadScript();
-    }
-}, 1000);
-
-function init() {
-    try {
-        if (containerAdded || scriptLoaded) {
+        // 有未保存更改时提示
+        if (appState.hasUnsavedChanges && !confirm("⚠️ 您有未保存的更改，确定要关闭吗？")) {
             return;
         }
 
-        if (!GM_getValue("punk_setup_search")) {
-            GM_setValue("punk_setup_search", punkDeafultMark);
-        }
-        currentInput = sessionStorage.getItem("currentInput") || "";
-        monitorInputFields();
-        addSearchBox();
-        injectStyle();
-        scriptLoaded = true;
+        panel.style.display = "none";
+        appState.hasUnsavedChanges = false;
         
+        // 移除焦点陷阱
+        accessibility.removeFocusTrap(panel);
+    },
+
+    /**
+     * 创建管理面板DOM结构（核心配置界面）
+     */
+    createManagementPanel() {
+        let panel = document.getElementById(CLASS_NAMES.MANAGEMENT_PANEL);
+        if (panel) return panel;
+
+        // 1. 面板主容器
+        panel = document.createElement("div");
+        panel.id = CLASS_NAMES.MANAGEMENT_PANEL;
+        panel.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            max-height: 90vh;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 0;
+            z-index: 10000;
+            display: none;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        `;
+
+        // 2. 面板头部
+        const header = document.createElement("div");
+        header.style.cssText = `
+            height: 15vh;
+            min-height: 80px;
+            max-height: 120px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 15px 15px 0 0;
+            position: relative;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        `;
+        const title = document.createElement("h2");
+        title.innerHTML = utils.createInlineSVG('cog', 'white') + ' 搜索引擎管理中心';
+        title.style.cssText = `
+            margin: 0;
+            font-size: 1.5em;
+            font-weight: 300;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        const subtitle = document.createElement("p");
+        subtitle.textContent = "管理您的搜索快捷方式";
+        subtitle.style.cssText = `
+            margin: 5px 0 0 0;
+            opacity: 0.8;
+            font-size: 0.9em;
+        `;
+        // 未保存更改指示器
+        const unsavedIndicator = document.createElement("div");
+        unsavedIndicator.id = "unsaved-indicator";
+        unsavedIndicator.innerHTML = utils.createInlineSVG('circle', '#e74c3c') + ' 有未保存的更改';
+        unsavedIndicator.style.cssText = `
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            color: #e74c3c;
+            font-size: 0.8em;
+            display: none;
+            align-items: center;
+            gap: 5px;
+        `;
+        header.appendChild(title);
+        header.appendChild(subtitle);
+        header.appendChild(unsavedIndicator);
+        panel.appendChild(header);
+
+        // 3. 面板内容区
+        const content = document.createElement("div");
+        content.style.cssText = `
+            height: 65vh;
+            min-height: 300px;
+            position: relative;
+            overflow: hidden;
+            padding: 0;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        `;
+
+        // 3.1 快捷操作栏
+        const quickActions = document.createElement("div");
+        quickActions.style.cssText = `
+            padding: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            background-color: #ffffff;
+            border-bottom: 1px solid #ecf0f1;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        `;
+        // 左侧操作组
+        const leftActionGroup = document.createElement("div");
+        leftActionGroup.style.cssText = `
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        `;
+        const extractBtn = this.createActionButton(utils.createInlineSVG('globe') + ' 自动添加', "#3498db", "自动识别当前页面的搜索引擎");
+        const addBtn = this.createActionButton(utils.createInlineSVG('plus') + ' 手动添加', "#27ae60", "手动添加新的搜索引擎");
+        leftActionGroup.appendChild(extractBtn);
+        leftActionGroup.appendChild(addBtn);
+        // 右侧操作组
+        const rightActionGroup = document.createElement("div");
+        rightActionGroup.style.cssText = `
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        `;
+        const saveBtn = document.createElement("button");
+        saveBtn.id = "panel-save-btn";
+        saveBtn.innerHTML = utils.createInlineSVG('save') + ' 保存设置';
+        saveBtn.title = "保存当前设置";
+        saveBtn.style.cssText = `
+            padding: 10px 20px;
+            background: #95a5a6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+            opacity: 0.7;
+            pointer-events: none;
+            min-width: 120px;
+            justify-content: center;
+        `;
+        const resetBtn = this.createActionButton(utils.createInlineSVG('undo') + ' 恢复默认', "#e74c3c", "恢复默认搜索引擎设置");
+        rightActionGroup.appendChild(saveBtn);
+        rightActionGroup.appendChild(resetBtn);
+        quickActions.appendChild(leftActionGroup);
+        quickActions.appendChild(rightActionGroup);
+        content.appendChild(quickActions);
+
+        // 3.2 引擎列表区
+        const listSection = document.createElement("div");
+        listSection.style.cssText = `
+            flex: 1;
+            overflow: hidden;
+            padding: 0 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            overflow: auto;
+        `;
+        const listTitle = document.createElement("h3");
+        listTitle.innerHTML = utils.createInlineSVG('list') + ' 已配置的搜索引擎';
+        listTitle.style.cssText = `
+            color: #2c3e50;
+            margin: 15px 0;
+            font-weight: 500;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        const engineList = document.createElement("div");
+        engineList.id = "engine-management-list";
+        engineList.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            padding-bottom: 10px;
+            box-sizing: border-box;
+        `;
+        listSection.appendChild(listTitle);
+        listSection.appendChild(engineList);
+
+        // 3.3 添加引擎表单
+        const formSection = document.createElement("div");
+        formSection.id = "add-engine-form";
+        formSection.style.cssText = `
+            display: none;
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        `;
+        const formTitle = document.createElement("h3");
+        formTitle.innerHTML = utils.createInlineSVG('magic') + ' 添加新搜索引擎';
+        formTitle.style.cssText = `
+            color: #2c3e50;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        formSection.appendChild(formTitle);
+
+        // 表单字段容器
+        const form = document.createElement("div");
+        form.style.cssText = `
+            display: grid;
+            gap: 15px;
+            grid-template-columns: 1fr 1fr;
+        `;
+        // 表单字段配置
+        const fields = [
+            { label: "引擎名称", placeholder: "例如: Google", type: "text", id: "engine-name", required: true },
+            { label: "唯一标识", placeholder: "例如: google", type: "text", id: "engine-mark", required: true },
+            { label: "搜索URL", placeholder: "使用 {keyword} 作为占位符", type: "text", id: "engine-url", required: true, fullWidth: true },
+            { label: "关键词参数", placeholder: "例如: q,query,search", type: "text", id: "engine-keys", required: true, fullWidth: true }
+        ];
+        // 创建表单字段
+        fields.forEach(field => {
+            const container = document.createElement("div");
+            if (field.fullWidth) {
+                container.style.gridColumn = "1 / -1";
+            }
+            const label = document.createElement("label");
+            label.textContent = field.label;
+            label.style.cssText = `
+                display: block;
+                margin-bottom: 5px;
+                font-weight: 500;
+                color: #34495e;
+            `;
+            const input = document.createElement("input");
+            input.type = field.type;
+            input.placeholder = field.placeholder;
+            input.id = field.id;
+            input.required = field.required;
+            input.style.cssText = `
+                width: 100%;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                font-size: 14px;
+            `;
+            container.appendChild(label);
+            container.appendChild(input);
+            form.appendChild(container);
+        });
+
+        // 图标设置区域
+        const iconContainer = document.createElement("div");
+        iconContainer.style.gridColumn = "1 / -1";
+        const iconTitle = document.createElement("h4");
+        iconTitle.innerHTML = utils.createInlineSVG('palette') + ' 图标设置';
+        iconTitle.style.cssText = `
+            margin-bottom: 10px;
+            color: #34495e;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+        iconContainer.appendChild(iconTitle);
+        // 图标设置网格
+        const iconGrid = document.createElement("div");
+        iconGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 10px;
+            align-items: end;
+        `;
+        // 图标类型选择
+        const typeGroup = document.createElement("div");
+        const typeLabel = document.createElement("label");
+        typeLabel.textContent = "图标类型";
+        typeLabel.style.cssText = `
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        `;
+        typeGroup.appendChild(typeLabel);
+        const iconTypeSelect = document.createElement("select");
+        iconTypeSelect.id = "icon-type";
+        iconTypeSelect.style.cssText = `
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        `;
+        ["svg", "image", "text", "emoji"].forEach(type => {
+            const option = document.createElement("option");
+            option.value = type;
+            option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+            iconTypeSelect.appendChild(option);
+        });
+        typeGroup.appendChild(iconTypeSelect);
+        // 图标内容输入
+        const inputGroup = document.createElement("div");
+        const inputLabel = document.createElement("label");
+        inputLabel.textContent = "图标内容";
+        inputLabel.style.cssText = `
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        `;
+        inputGroup.appendChild(inputLabel);
+        const iconInput = document.createElement("input");
+        iconInput.type = "text";
+        iconInput.id = "icon-input";
+        iconInput.placeholder = "SVG代码、图片URL、文字或表情符号";
+        iconInput.style.cssText = `
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        `;
+        inputGroup.appendChild(iconInput);
+        // 预览按钮
+        const previewGroup = document.createElement("div");
+        const previewButton = document.createElement("button");
+        previewButton.innerHTML = utils.createInlineSVG('eye') + ' 预览图标';
+        previewButton.style.cssText = `
+            width: 100%;
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        `;
+        previewButton.id = "preview-icon";
+        previewGroup.appendChild(previewButton);
+        // 组装图标设置网格
+        iconGrid.appendChild(typeGroup);
+        iconGrid.appendChild(inputGroup);
+        iconGrid.appendChild(previewGroup);
+        iconContainer.appendChild(iconGrid);
+        // 图标预览区域
+        const previewContainer = document.createElement("div");
+        previewContainer.style.gridColumn = "1 / -1";
+        previewContainer.style.cssText = `
+            margin-top: 15px;
+            text-align: center;
+        `;
+        const previewLabel = document.createElement("label");
+        previewLabel.textContent = "图标预览 (推荐比例 8:5)";
+        previewLabel.style.cssText = `
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+        `;
+        const iconPreview = document.createElement("div");
+        iconPreview.id = "icon-preview";
+        iconPreview.style.cssText = `
+            width: 88px;
+            height: 55px;
+            border: 2px dashed #bdc3c7;
+            border-radius: 8px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background: #ecf0f1;
+        `;
+        previewContainer.appendChild(previewLabel);
+        previewContainer.appendChild(iconPreview);
+        iconContainer.appendChild(previewContainer);
+        form.appendChild(iconContainer);
+        // 表单操作按钮
+        const formActions = document.createElement("div");
+        formActions.style.cssText = `
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        `;
+        const saveFormBtn = this.createActionButton(utils.createInlineSVG('save') + ' 保存引擎', "#27ae60", "");
+        const cancelFormBtn = this.createActionButton(utils.createInlineSVG('times') + ' 取消', "#95a5a6", "");
+        formActions.appendChild(saveFormBtn);
+        formActions.appendChild(cancelFormBtn);
+        formSection.appendChild(form);
+        formSection.appendChild(formActions);
+        listSection.appendChild(formSection);
+        content.appendChild(listSection);
+        panel.appendChild(content);
+
+        // 4. 面板底部
+        const footer = document.createElement("div");
+        footer.style.cssText = `
+            height: 20vh;
+            min-height: 60px;
+            max-height: 90px;
+            background-color: #ecf0f1;
+            padding: 15px 20px;
+            border-top: 1px solid #bdc3c7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            flex-shrink: 0;
+            border-radius: 0 0 15px 15px;
+        `;
+        const selectedCount = document.createElement("span");
+        selectedCount.id = "selected-count";
+        selectedCount.innerHTML = utils.createInlineSVG('check-circle') + ' 已选择 0 个引擎';
+        selectedCount.style.cssText = `
+            color: #7f8c8d;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        `;
+        const footerActions = document.createElement("div");
+        footerActions.style.cssText = `
+            display: flex;
+            gap: 10px;
+        `;
+        const closeBtn = this.createActionButton(utils.createInlineSVG('times') + ' 关闭', "#95a5a6", "");
+        footerActions.appendChild(closeBtn);
+        footer.appendChild(selectedCount);
+        footer.appendChild(footerActions);
+        panel.appendChild(footer);
+
+        // 5. 绑定事件
+        extractBtn.addEventListener("click", () => this.extractFromCurrentPage());
+        addBtn.addEventListener("click", () => this.showAddForm(true));
+        resetBtn.addEventListener("click", () => this.resetToDefault());
+        previewButton.addEventListener("click", () => this.previewIcon());
+        saveFormBtn.addEventListener("click", () => this.saveNewEngine());
+        cancelFormBtn.addEventListener("click", () => this.showAddForm(false));
+        saveBtn.addEventListener("click", () => this.saveEngineSettings());
+        closeBtn.addEventListener("click", () => this.closeManagementPanel());
+        // 点击面板背景关闭
+        panel.addEventListener("click", (e) => {
+            if (e.target === panel) {
+                this.closeManagementPanel();
+            }
+        });
+
+        document.body.appendChild(panel);
+        return panel;
+    },
+
+    /**
+     * 显示管理面板
+     */
+    showManagementPanel() {
+        const panel = this.createManagementPanel();
+        // 重置未保存状态
+        appState.hasUnsavedChanges = false;
+        utils.clearUnsavedChanges();
+        // 刷新引擎列表
+        this.refreshEngineList();
+        // 显示面板
+        panel.style.display = "block";
+        
+        // 应用焦点陷阱
+        accessibility.trapFocus(panel);
+        
+        // 隐藏汉堡菜单
+        hamburgerMenu.hideHamburgerMenu();
+    }
+};
+
+// ===== 应用初始化模块 =====
+/**
+ * 应用初始化模块 - 封装初始化、脚本重载、页面事件监听等入口逻辑
+ */
+const appInitializer = {
+    /**
+     * 重新加载脚本（清理DOM、重置状态、重新初始化）
+     */
+    reloadScript() {
+        // 1. 清理所有创建的DOM元素
+        [
+            "#punkjet-search-box",
+            `#${CLASS_NAMES.HAMBURGER_MENU}`,
+            `#${CLASS_NAMES.SEARCH_OVERLAY}`,
+            `#${CLASS_NAMES.MANAGEMENT_PANEL}`
+        ].forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                // 移除焦点陷阱
+                accessibility.removeFocusTrap(element);
+                element.remove();
+            }
+        });
+
+        // 2. 清除所有定时器和防抖器
+        utils.clearAllTimeouts();
+        debounceUtils.clearAll();
+
+        // 3. 移除全局事件监听器
+        const events = ['scroll', 'wheel', 'touchstart', 'touchmove', 'touchend'];
+        events.forEach(event => {
+            window.removeEventListener(event, () => {});
+        });
+
+        // 4. 重置应用状态
+        appState.scriptLoaded = false;
+        appState.containerAdded = false;
+        appState.hamburgerMenuOpen = false;
+        appState.searchOverlayVisible = false;
+
+        // 5. 重新初始化
+        this.init();
+    },
+
+    /**
+     * 百度搜索特殊处理（延迟同步输入框内容）
+     */
+    handleBaiduSpecialCase() {
         if (window.location.hostname.includes('baidu')) {
             setTimeout(() => {
                 const baiduInput = document.querySelector('input#kw');
                 if (baiduInput && baiduInput.value) {
-                    currentInput = baiduInput.value.trim();
-                    sessionStorage.setItem("currentInput", currentInput);
+                    appState.currentInput = baiduInput.value.trim();
+                    sessionStorage.setItem(STORAGE_KEYS.CURRENT_INPUT, appState.currentInput);
                 }
-            }, 500);
+            }, DEFAULT_CONFIG.BAIDU_INPUT_DELAY);
         }
-    } catch (error) {
-        console.error("初始化时出错:", error.message);
-    }
-}
+    },
 
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === 'visible') {
-        if (!containerAdded) {
-            init();
+    /**
+     * 初始化应用（核心入口函数）
+     */
+    init() {
+        try {
+            // 前置校验：避免重复初始化或无效作用域初始化
+            if (appState.containerAdded || appState.scriptLoaded || !utils.isValidScope()) {
+                return;
+            }
+
+            // 1. 初始化默认存储配置（若未设置过）
+            if (!GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH)) {
+                GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK);
+            }
+
+            // 2. 从sessionStorage恢复当前输入内容
+            appState.currentInput = sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '';
+
+            // 3. 执行初始化流程
+            domHandler.monitorInputFields(); // 监控输入框
+            domHandler.addSearchBox();       // 添加搜索框
+            domHandler.injectStyle();        // 注入样式
+            accessibility.init();            // 初始化可访问性功能
+            this.handleBaiduSpecialCase();   // 百度特殊处理
+
+            // 4. 更新初始化状态
+            appState.scriptLoaded = true;
+        } catch (error) {
+            console.error("应用初始化失败:", error.message);
         }
-    }
-});
+    },
 
-document.addEventListener("pageshow", (event) => {
-    if (event.persisted) {
-        if (!containerAdded) {
-            init();
-        }
-    }
-});
+    /**
+     * 初始化页面事件监听（ visibilitychange、pageshow 等）
+     */
+    initPageEventListeners() {
+        // 1. 页面可见性变化时重新检查初始化
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === 'visible' && !appState.containerAdded) {
+                this.init();
+            }
+        });
 
-document.addEventListener("DOMContentLoaded", () => {
-    if (isValidScope()) {
-        init();
+        // 2. 页面从缓存恢复时重新检查初始化
+        document.addEventListener("pageshow", (event) => {
+            if (event.persisted && !appState.containerAdded) {
+                this.init();
+            }
+        });
+
+        // 3. DOM加载完成后初始化
+        document.addEventListener("DOMContentLoaded", () => {
+            if (utils.isValidScope()) {
+                this.init();
+            }
+        });
+
+        // 4. 定期检查作用域（确保页面动态变化后仍能正常初始化）
+        setInterval(() => {
+            if (utils.isValidScope() && !appState.containerAdded) {
+                this.init();
+            } else if (!utils.isValidScope() && appState.containerAdded) {
+                this.reloadScript();
+            }
+        }, DEFAULT_CONFIG.CHECK_SCOPE_INTERVAL);
     }
-});
+};
+
+// ===== 应用启动入口 =====
+// 初始化页面事件监听并启动应用
+appInitializer.initPageEventListeners();
