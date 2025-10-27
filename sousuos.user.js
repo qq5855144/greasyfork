@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.27
+// @version      v1.28
 // @author       晚风知我意
 // @match        *://*/*searchstring=*
 // @match        *://*/*searchquery=*
@@ -2301,9 +2301,8 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
     `
                 },
             ];
-
-
-            // ===== 常量定义区 =====
+                                 
+             // ===== 常量定义区 =====
             // 样式类名常量（统一管理，避免硬编码）
             const CLASS_NAMES = Object.freeze({
                 ENGINE_CONTAINER: 'engine-container',
@@ -2327,7 +2326,7 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
 
             // 默认配置（抽离默认值，便于维护）
             const DEFAULT_CONFIG = {
-                PUNK_DEFAULT_MARK: 'baidu-google-bing', // 需与原代码punkDeafultMark保持一致
+                PUNK_DEFAULT_MARK: 'Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu', 
                 SEARCH_PARAMS: ['q', 'query', 'search', 'keyword', 'keywords', 'wd', 'key'],
                 MONITORED_INPUT_SELECTOR: 'input[type="text"], input[type="search"], textarea, input#kw',
                 CHECK_SCOPE_INTERVAL: 1000,
@@ -2336,6 +2335,9 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                 BAIDU_INPUT_DELAY: 500,
                 DRAG_SORT_DELAY: 500
             };
+
+
+
 
             // ===== 全局状态管理 =====
             // 用对象封装全局状态，避免零散变量污染作用域
