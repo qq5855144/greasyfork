@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         聚合搜索引擎切换(自用)
+// @name         聚合搜索引擎切换导航(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.28
+// @version      v1.30
 // @author       晚风知我意
 // @match        *://*/*searchstring=*
 // @match        *://*/*searchquery=*
@@ -49,7 +49,7 @@
 // @icon         https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/shousuo.svg
 // @run-at       document-body
 // @license     MIT
-// @description * 搜索引擎快捷工具 * 核心功能：页面底部搜索引擎快捷栏、拖拽排序、自定义引擎管理、快捷搜索 
+// @description * 搜索引擎快捷工具 * 核心功能：页面底部搜索引擎快捷栏、拖拽排序、自定义引擎管理、快捷搜索 、增加底部搜索引擎栏偏移设置(确保任何浏览器内搜索引擎导航栏都能够聚焦在输入法键盘上方)
 // ==/UserScript==
 
             const punkDeafultMark = "Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
@@ -2302,617 +2302,633 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                 },
             ];
                                  
-             // ===== 常量定义区 =====
-            // 样式类名常量（统一管理，避免硬编码）
-            const CLASS_NAMES = Object.freeze({
-                ENGINE_CONTAINER: 'engine-container',
-                ENGINE_DISPLAY: 'engine-display',
-                ENGINE_BUTTON: 'engine-button',
-                HAMBURGER_MENU: 'punkjet-hamburger-menu',
-                SEARCH_OVERLAY: 'punkjet-search-overlay',
-                MANAGEMENT_PANEL: 'engine-management-panel',
-                ENGINE_CARD: 'engine-card',
-                DRAGGING: 'dragging',
-                DRAG_OVER: 'drag-over'
-            });
+         // ===== 常量定义区 =====
+// 样式类名常量（统一管理，避免硬编码）
+const CLASS_NAMES = Object.freeze({
+    ENGINE_CONTAINER: 'engine-container',
+    ENGINE_DISPLAY: 'engine-display',
+    ENGINE_BUTTON: 'engine-button',
+    HAMBURGER_MENU: 'punkjet-hamburger-menu',
+    SEARCH_OVERLAY: 'punkjet-search-overlay',
+    MANAGEMENT_PANEL: 'engine-management-panel',
+    ENGINE_CARD: 'engine-card',
+    DRAGGING: 'dragging',
+    DRAG_OVER: 'drag-over'
+});
 
-            // 存储键名常量（统一管理GM存储键）
-            const STORAGE_KEYS = Object.freeze({
-                USER_SEARCH_ENGINES: 'userSearchEngines',
-                PUNK_SETUP_SEARCH: 'punk_setup_search',
-                LAST_SUCCESSFUL_KEYWORDS: 'last_successful_keywords',
-                CURRENT_INPUT: 'currentInput'
-            });
+// 存储键名常量（统一管理GM存储键）
+const STORAGE_KEYS = Object.freeze({
+    USER_SEARCH_ENGINES: 'userSearchEngines',
+    PUNK_SETUP_SEARCH: 'punk_setup_search',
+    LAST_SUCCESSFUL_KEYWORDS: 'last_successful_keywords',
+    CURRENT_INPUT: 'currentInput',
+    ENGINE_BAR_OFFSET: 'engineBarOffset'  // 新增，用于保存用户设置的偏移值
+});
 
-            // 默认配置（抽离默认值，便于维护）
-            const DEFAULT_CONFIG = {
-                PUNK_DEFAULT_MARK: 'Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu', 
-                SEARCH_PARAMS: ['q', 'query', 'search', 'keyword', 'keywords', 'wd', 'key'],
-                MONITORED_INPUT_SELECTOR: 'input[type="text"], input[type="search"], textarea, input#kw',
-                CHECK_SCOPE_INTERVAL: 1000,
-                SHOW_SEARCH_BOX_DELAY: 10000,
-                SCROLL_TIMEOUT_DURATION: 150,
-                BAIDU_INPUT_DELAY: 500,
-                DRAG_SORT_DELAY: 500
-            };
+// 默认配置（抽离默认值，便于维护）
+const DEFAULT_CONFIG = {
+    PUNK_DEFAULT_MARK: 'Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu',
+    SEARCH_PARAMS: ['q', 'query', 'search', 'keyword', 'keywords', 'wd', 'key'],
+    MONITORED_INPUT_SELECTOR: 'input[type="text"], input[type="search"], textarea, input#kw',
+    CHECK_SCOPE_INTERVAL: 1000,
+    SHOW_SEARCH_BOX_DELAY: 10000,
+    SCROLL_TIMEOUT_DURATION: 150,
+    BAIDU_INPUT_DELAY: 500,
+    DRAG_SORT_DELAY: 500,
+    ENGINE_BAR_OFFSET_DEFAULT: 0  // 默认偏移为0
+};
 
+// ===== 全局状态管理 =====
+// 用对象封装全局状态，避免零散变量污染作用域
+const appState = {
+    userSearchEngines: GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, []),
+    searchUrlMap: [...defaultSearchEngines, ...GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, [])], // defaultSearchEngines为原代码默认引擎数组
+    lastScrollTop: 0,
+    punkJetBoxVisible: true,
+    currentInput: sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '',
+    scriptLoaded: false,
+    containerAdded: false,
+    hasUnsavedChanges: false,
+    scrollTimeout: null,
+    isScrolling: false,
+    hideTimeout: null,
+    touchStartY: null,
+    hamburgerMenuOpen: false,
+    searchOverlayVisible: false
+};
 
+// ===== 可访问性模块 =====
+/**
+ * 可访问性功能模块 - 键盘导航、ARIA标签、焦点管理
+ */
+const accessibility = {
+    /**
+     * 初始化键盘导航支持
+     */
+    initKeyboardNavigation() {
+        document.addEventListener('keydown', (e) => {
+            // Alt+S 打开搜索框
+            if (e.altKey && e.key === 's') {
+                e.preventDefault();
+                searchOverlay.showSearchOverlay();
+            }
 
-
-            // ===== 全局状态管理 =====
-            // 用对象封装全局状态，避免零散变量污染作用域
-            const appState = {
-                userSearchEngines: GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, []),
-                searchUrlMap: [...defaultSearchEngines, ...GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, [])], // defaultSearchEngines为原代码默认引擎数组
-                lastScrollTop: 0,
-                punkJetBoxVisible: true,
-                currentInput: sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '',
-                scriptLoaded: false,
-                containerAdded: false,
-                hasUnsavedChanges: false,
-                scrollTimeout: null,
-                isScrolling: false,
-                hideTimeout: null,
-                touchStartY: null,
-                hamburgerMenuOpen: false,
-                searchOverlayVisible: false
-            };
-
-            // ===== 可访问性模块 =====
-            /**
-             * 可访问性功能模块 - 键盘导航、ARIA标签、焦点管理
-             */
-            const accessibility = {
-                /**
-                 * 初始化键盘导航支持
-                 */
-                initKeyboardNavigation() {
-                    document.addEventListener('keydown', (e) => {
-                        // Alt+S 打开搜索框
-                        if (e.altKey && e.key === 's') {
-                            e.preventDefault();
-                            searchOverlay.showSearchOverlay();
-                        }
-
-                        // ESC 关闭各种弹窗
-                        if (e.key === 'Escape') {
-                            if (appState.searchOverlayVisible) {
-                                searchOverlay.hideSearchOverlay();
-                            }
-                            if (appState.hamburgerMenuOpen) {
-                                hamburgerMenu.hideHamburgerMenu();
-                            }
-                            const panel = document.getElementById(CLASS_NAMES.MANAGEMENT_PANEL);
-                            if (panel && panel.style.display === 'block') {
-                                managementPanel.closeManagementPanel();
-                            }
-                        }
-
-                        // Alt+M 打开菜单
-                        if (e.altKey && e.key === 'm') {
-                            e.preventDefault();
-                            hamburgerMenu.toggleHamburgerMenu();
-                        }
-
-                        // Alt+E 打开引擎管理
-                        if (e.altKey && e.key === 'e') {
-                            e.preventDefault();
-                            managementPanel.showManagementPanel();
-                        }
-                    });
-                },
-
-                /**
-                 * 改进ARIA标签
-                 */
-                enhanceAriaLabels() {
-                    const buttons = document.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
-                    buttons.forEach(button => {
-                        const engineName = button.getAttribute('title');
-                        button.setAttribute('aria-label', `使用${engineName}搜索`);
-                        button.setAttribute('role', 'button');
-                        button.setAttribute('tabindex', '0');
-                    });
-
-                    // 为汉堡菜单按钮添加ARIA
-                    const hamburgerButton = document.querySelector('.engine-hamburger-button');
-                    if (hamburgerButton) {
-                        hamburgerButton.setAttribute('aria-label', '打开菜单');
-                        hamburgerButton.setAttribute('aria-expanded', 'false');
-                        hamburgerButton.setAttribute('aria-haspopup', 'true');
-                    }
-
-                    // 为搜索遮罩添加ARIA
-                    const overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
-                    if (overlay) {
-                        const searchInput = overlay.querySelector('input');
-                        if (searchInput) {
-                            searchInput.setAttribute('aria-label', '搜索关键词或网址');
-                        }
-                    }
-                },
-
-                /**
-                 * 更新汉堡菜单ARIA状态
-                 */
-                updateHamburgerAriaState() {
-                    const hamburgerButton = document.querySelector('.engine-hamburger-button');
-                    if (hamburgerButton) {
-                        hamburgerButton.setAttribute('aria-expanded', appState.hamburgerMenuOpen.toString());
-                    }
-                },
-
-                /**
-                 * 焦点管理 - 陷阱焦点在模态框内
-                 * @param {HTMLElement} element - 模态框元素
-                 */
-                trapFocus(element) {
-                    const focusableElements = element.querySelectorAll(
-                        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-                    );
-
-                    if (focusableElements.length === 0) return;
-
-                    const firstElement = focusableElements[0];
-                    const lastElement = focusableElements[focusableElements.length - 1];
-
-                    const handleKeyDown = (e) => {
-                        if (e.key !== 'Tab') return;
-
-                        if (e.shiftKey) {
-                            // Shift + Tab
-                            if (document.activeElement === firstElement) {
-                                lastElement.focus();
-                                e.preventDefault();
-                            }
-                        } else {
-                            // Tab
-                            if (document.activeElement === lastElement) {
-                                firstElement.focus();
-                                e.preventDefault();
-                            }
-                        }
-                    };
-
-                    element.addEventListener('keydown', handleKeyDown);
-
-                    // 存储事件处理器以便清理
-                    if (!element._focusTrapHandler) {
-                        element._focusTrapHandler = handleKeyDown;
-                    }
-
-                    // 初始聚焦到第一个元素
-                    setTimeout(() => firstElement.focus(), 100);
-                },
-
-                /**
-                 * 移除焦点陷阱
-                 * @param {HTMLElement} element - 模态框元素
-                 */
-                removeFocusTrap(element) {
-                    if (element._focusTrapHandler) {
-                        element.removeEventListener('keydown', element._focusTrapHandler);
-                        delete element._focusTrapHandler;
-                    }
-                },
-
-                /**
-                 * 初始化可访问性功能
-                 */
-                init() {
-                    this.initKeyboardNavigation();
-
-                    // 延迟执行ARIA标签增强，等待DOM加载
-                    setTimeout(() => {
-                        this.enhanceAriaLabels();
-                    }, 1000);
-
-                    // 监听DOM变化，动态增强ARIA标签
-                    const observer = new MutationObserver(() => {
-                        this.enhanceAriaLabels();
-                    });
-
-                    observer.observe(document.body, {
-                        childList: true,
-                        subtree: true
-                    });
+            // ESC 关闭各种弹窗
+            if (e.key === 'Escape') {
+                if (appState.searchOverlayVisible) {
+                    searchOverlay.hideSearchOverlay();
                 }
-            };
-
-            // ===== 防抖工具模块 =====
-            /**
-             * 防抖工具模块 - 更精细的防抖控制
-             */
-            const debounceUtils = {
-                timers: new Map(),
-
-                /**
-                 * 防抖函数
-                 * @param {string} key - 防抖标识键
-                 * @param {Function} fn - 要执行的函数
-                 * @param {number} delay - 延迟时间(ms)
-                 * @param {boolean} immediate - 是否立即执行
-                 */
-                debounce(key, fn, delay = 300, immediate = false) {
-                    // 清除现有定时器
-                    if (this.timers.has(key)) {
-                        clearTimeout(this.timers.get(key));
-                    }
-
-                    // 立即执行模式
-                    if (immediate && !this.timers.has(key)) {
-                        fn();
-                        this.timers.set(key, setTimeout(() => {
-                            this.timers.delete(key);
-                        }, delay));
-                    } else {
-                        // 延迟执行模式
-                        const timer = setTimeout(() => {
-                            fn();
-                            this.timers.delete(key);
-                        }, delay);
-                        this.timers.set(key, timer);
-                    }
-                },
-
-                /**
-                 * 节流函数
-                 * @param {string} key - 节流标识键
-                 * @param {Function} fn - 要执行的函数
-                 * @param {number} limit - 时间限制(ms)
-                 */
-                throttle(key, fn, limit = 300) {
-                    if (!this.timers.has(key)) {
-                        fn();
-                        this.timers.set(key, setTimeout(() => {
-                            this.timers.delete(key);
-                        }, limit));
-                    }
-                },
-
-                /**
-                 * 清除指定防抖定时器
-                 * @param {string} key - 防抖标识键
-                 */
-                cancel(key) {
-                    if (this.timers.has(key)) {
-                        clearTimeout(this.timers.get(key));
-                        this.timers.delete(key);
-                    }
-                },
-
-                /**
-                 * 清除所有防抖定时器
-                 */
-                clearAll() {
-                    this.timers.forEach((timer, key) => {
-                        clearTimeout(timer);
-                        this.timers.delete(key);
-                    });
+                if (appState.hamburgerMenuOpen) {
+                    hamburgerMenu.hideHamburgerMenu();
                 }
-            };
+                const panel = document.getElementById(CLASS_NAMES.MANAGEMENT_PANEL);
+                if (panel && panel.style.display === 'block') {
+                    managementPanel.closeManagementPanel();
+                }
+            }
 
-            // ===== 工具函数库 =====
-            /**
-             * 工具函数集合 - 封装通用逻辑，提升复用性
-             */
-            const utils = {
-                /**
-                 * 清除所有定时器
-                 */
-                clearAllTimeouts() {
-                    if (appState.scrollTimeout) {
-                        clearTimeout(appState.scrollTimeout);
-                        appState.scrollTimeout = null;
-                    }
-                    if (appState.hideTimeout) {
-                        clearTimeout(appState.hideTimeout);
-                        appState.hideTimeout = null;
-                    }
-                    // 同时清除防抖定时器
-                    debounceUtils.clearAll();
-                },
+            // Alt+M 打开菜单
+            if (e.altKey && e.key === 'm') {
+                e.preventDefault();
+                hamburgerMenu.toggleHamburgerMenu();
+            }
 
-                /**
-                 * 检查引擎容器是否已存在
-                 * @returns {boolean} 存在返回true，否则false
-                 */
-                isEngineContainerExists() {
-                    return document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}`) !== null;
-                },
+            // Alt+E 打开引擎管理
+            if (e.altKey && e.key === 'e') {
+                e.preventDefault();
+                managementPanel.showManagementPanel();
+            }
+        });
+    },
 
-                /**
-                 * 检查当前页面是否在有效作用域内（匹配搜索引擎页面）
-                 * @returns {boolean} 有效返回true，否则false
-                 */
-                isValidScope() {
-                    return appState.searchUrlMap.some(item =>
-                        window.location.href.match(item.matchUrl) !== null
-                    );
-                },
+    /**
+     * 改进ARIA标签
+     */
+    enhanceAriaLabels() {
+        const buttons = document.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
+        buttons.forEach(button => {
+            const engineName = button.getAttribute('title');
+            button.setAttribute('aria-label', `使用${engineName}搜索`);
+            button.setAttribute('role', 'button');
+            button.setAttribute('tabindex', '0');
+        });
 
-                /**
-                 * 验证URL是否有效（http/https协议）
-                 * @param {string} string - 待验证的URL字符串
-                 * @returns {boolean} 有效返回true，否则false
-                 */
-                isValidUrl(string) {
-                    try {
-                        const url = new URL(string);
-                        return url.protocol === 'http:' || url.protocol === 'https:';
-                    } catch (_) {
-                        return false;
-                    }
-                },
+        // 为汉堡菜单按钮添加ARIA
+        const hamburgerButton = document.querySelector('.engine-hamburger-button');
+        if (hamburgerButton) {
+            hamburgerButton.setAttribute('aria-label', '打开菜单');
+            hamburgerButton.setAttribute('aria-expanded', 'false');
+            hamburgerButton.setAttribute('aria-haspopup', 'true');
+        }
 
-                /**
-                 * 获取当前页面的搜索关键词（从URL参数、输入框、存储中优先级获取）
-                 * @returns {string} 搜索关键词
-                 */
-                getKeywords() {
-                    try {
-                        // 1. 从URL参数中提取关键词
-                        const url = new URL(window.location.href);
-                        const searchParams = url.searchParams;
-                        let keywords = '';
+        // 为搜索遮罩添加ARIA
+        const overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
+        if (overlay) {
+            const searchInput = overlay.querySelector('input');
+            if (searchInput) {
+                searchInput.setAttribute('aria-label', '搜索关键词或网址');
+            }
+        }
+    },
 
-                        // 优先从通用参数中提取
-                        for (const param of DEFAULT_CONFIG.SEARCH_PARAMS) {
-                            if (searchParams.has(param)) {
-                                keywords = searchParams.get(param).trim();
+    /**
+     * 更新汉堡菜单ARIA状态
+     */
+    updateHamburgerAriaState() {
+        const hamburgerButton = document.querySelector('.engine-hamburger-button');
+        if (hamburgerButton) {
+            hamburgerButton.setAttribute('aria-expanded', appState.hamburgerMenuOpen.toString());
+        }
+    },
+
+    /**
+     * 焦点管理 - 陷阱焦点在模态框内
+     * @param {HTMLElement} element - 模态框元素
+     */
+    trapFocus(element) {
+        const focusableElements = element.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        const handleKeyDown = (e) => {
+            if (e.key !== 'Tab') return;
+
+            if (e.shiftKey) {
+                // Shift + Tab
+                if (document.activeElement === firstElement) {
+                    lastElement.focus();
+                    e.preventDefault();
+                }
+            } else {
+                // Tab
+                if (document.activeElement === lastElement) {
+                    firstElement.focus();
+                    e.preventDefault();
+                }
+            }
+        };
+
+        element.addEventListener('keydown', handleKeyDown);
+
+        // 存储事件处理器以便清理
+        if (!element._focusTrapHandler) {
+            element._focusTrapHandler = handleKeyDown;
+        }
+
+        // 初始聚焦到第一个元素
+        setTimeout(() => firstElement.focus(), 100);
+    },
+
+    /**
+     * 移除焦点陷阱
+     * @param {HTMLElement} element - 模态框元素
+     */
+    removeFocusTrap(element) {
+        if (element._focusTrapHandler) {
+            element.removeEventListener('keydown', element._focusTrapHandler);
+            delete element._focusTrapHandler;
+        }
+    },
+
+    /**
+     * 初始化可访问性功能
+     */
+    init() {
+        this.initKeyboardNavigation();
+
+        // 延迟执行ARIA标签增强，等待DOM加载
+        setTimeout(() => {
+            this.enhanceAriaLabels();
+        }, 1000);
+
+        // 监听DOM变化，动态增强ARIA标签
+        const observer = new MutationObserver(() => {
+            this.enhanceAriaLabels();
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+};
+
+// ===== 防抖工具模块 =====
+/**
+ * 防抖工具模块 - 更精细的防抖控制
+ */
+const debounceUtils = {
+    timers: new Map(),
+
+    /**
+     * 防抖函数
+     * @param {string} key - 防抖标识键
+     * @param {Function} fn - 要执行的函数
+     * @param {number} delay - 延迟时间(ms)
+     * @param {boolean} immediate - 是否立即执行
+     */
+    debounce(key, fn, delay = 300, immediate = false) {
+        // 清除现有定时器
+        if (this.timers.has(key)) {
+            clearTimeout(this.timers.get(key));
+        }
+
+        // 立即执行模式
+        if (immediate && !this.timers.has(key)) {
+            fn();
+            this.timers.set(key, setTimeout(() => {
+                this.timers.delete(key);
+            }, delay));
+        } else {
+            // 延迟执行模式
+            const timer = setTimeout(() => {
+                fn();
+                this.timers.delete(key);
+            }, delay);
+            this.timers.set(key, timer);
+        }
+    },
+
+    /**
+     * 节流函数
+     * @param {string} key - 节流标识键
+     * @param {Function} fn - 要执行的函数
+     * @param {number} limit - 时间限制(ms)
+     */
+    throttle(key, fn, limit = 300) {
+        if (!this.timers.has(key)) {
+            fn();
+            this.timers.set(key, setTimeout(() => {
+                this.timers.delete(key);
+            }, limit));
+        }
+    },
+
+    /**
+     * 清除指定防抖定时器
+     * @param {string} key - 防抖标识键
+     */
+    cancel(key) {
+        if (this.timers.has(key)) {
+            clearTimeout(this.timers.get(key));
+            this.timers.delete(key);
+        }
+    },
+
+    /**
+     * 清除所有防抖定时器
+     */
+    clearAll() {
+        this.timers.forEach((timer, key) => {
+            clearTimeout(timer);
+            this.timers.delete(key);
+        });
+    }
+};
+
+// ===== 工具函数库 =====
+/**
+ * 工具函数集合 - 封装通用逻辑，提升复用性
+ */
+const utils = {
+    /**
+     * 清除所有定时器
+     */
+    clearAllTimeouts() {
+        if (appState.scrollTimeout) {
+            clearTimeout(appState.scrollTimeout);
+            appState.scrollTimeout = null;
+        }
+        if (appState.hideTimeout) {
+            clearTimeout(appState.hideTimeout);
+            appState.hideTimeout = null;
+        }
+        // 同时清除防抖定时器
+        debounceUtils.clearAll();
+    },
+
+    /**
+     * 检查引擎容器是否已存在
+     * @returns {boolean} 存在返回true，否则false
+     */
+    isEngineContainerExists() {
+        return document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}`) !== null;
+    },
+
+    /**
+     * 检查当前页面是否在有效作用域内（匹配搜索引擎页面）
+     * @returns {boolean} 有效返回true，否则false
+     */
+    isValidScope() {
+        return appState.searchUrlMap.some(item =>
+            window.location.href.match(item.matchUrl) !== null
+        );
+    },
+
+    /**
+     * 验证URL是否有效（http/https协议）
+     * @param {string} string - 待验证的URL字符串
+     * @returns {boolean} 有效返回true，否则false
+     */
+    isValidUrl(string) {
+        try {
+            const url = new URL(string);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch (_) {
+            return false;
+        }
+    },
+
+    /**
+     * 获取当前页面的搜索关键词（从URL参数、输入框、存储中优先级获取）
+     * @returns {string} 搜索关键词
+     */
+    getKeywords() {
+        try {
+            // 1. 从URL参数中提取关键词
+            const url = new URL(window.location.href);
+            const searchParams = url.searchParams;
+            let keywords = '';
+
+            // 优先从通用参数中提取
+            for (const param of DEFAULT_CONFIG.SEARCH_PARAMS) {
+                if (searchParams.has(param)) {
+                    keywords = searchParams.get(param).trim();
+                    if (keywords) break;
+                }
+            }
+
+            // 通用参数未提取到，从引擎配置的参数中提取
+            if (!keywords) {
+                for (const urlItem of appState.searchUrlMap) {
+                    if (window.location.href.match(urlItem.matchUrl) !== null) {
+                        for (const keyItem of urlItem.searchkeyName) {
+                            if (searchParams.has(keyItem)) {
+                                keywords = searchParams.get(keyItem).trim();
                                 if (keywords) break;
                             }
                         }
+                        if (keywords) break;
+                    }
+                }
+            }
 
-                        // 通用参数未提取到，从引擎配置的参数中提取
-                        if (!keywords) {
-                            for (const urlItem of appState.searchUrlMap) {
-                                if (window.location.href.match(urlItem.matchUrl) !== null) {
-                                    for (const keyItem of urlItem.searchkeyName) {
-                                        if (searchParams.has(keyItem)) {
-                                            keywords = searchParams.get(keyItem).trim();
-                                            if (keywords) break;
-                                        }
-                                    }
-                                    if (keywords) break;
-                                }
-                            }
+            // 2. 关键词存在时更新存储，不存在时从存储中读取
+            if (keywords) {
+                localStorage.setItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS, keywords);
+                sessionStorage.setItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS, keywords);
+            } else {
+                keywords = sessionStorage.getItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS) ||
+                    localStorage.getItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS) || '';
+            }
+
+            return keywords;
+        } catch (error) {
+            console.error("获取关键词失败:", error.message, "当前URL:", window.location.href);
+            return "";
+        }
+    },
+
+    /**
+     * 获取搜索关键词（整合遮罩层、输入框、存储多渠道）
+     * @returns {string} 最终搜索关键词
+     */
+    getSearchKeywords() {
+        let keywords = "";
+
+        // 1. 优先从搜索遮罩层输入框获取
+        if (appState.searchOverlayVisible) {
+            const searchInput = document.getElementById("overlay-search-input");
+            if (searchInput && searchInput.value.trim()) {
+                return searchInput.value.trim();
+            }
+        }
+
+        // 2. 从百度特定输入框获取
+        const baiduInput = document.querySelector('input#kw, input[name="wd"], input[name="word"]');
+        if (baiduInput && baiduInput.value.trim()) {
+            keywords = baiduInput.value.trim();
+            return keywords;
+        }
+
+        // 3. 从页面所有输入框中获取
+        const allInputs = document.querySelectorAll(DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR);
+        for (const input of allInputs) {
+            const inputVal = input.value.trim();
+            if (inputVal) {
+                keywords = inputVal;
+                break;
+            }
+        }
+
+        // 4. 从工具函数提取的关键词中获取
+        if (!keywords) {
+            keywords = this.getKeywords().trim();
+        }
+
+        // 5. 最后从sessionStorage获取
+        if (!keywords) {
+            keywords = sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || "";
+        }
+
+        return keywords;
+    },
+
+    /**
+     * 更新未保存更改状态（显示指示器、激活保存按钮）
+     */
+    markUnsavedChanges() {
+        appState.hasUnsavedChanges = true;
+        const indicator = document.getElementById("unsaved-indicator");
+        const saveBtn = document.getElementById("panel-save-btn");
+
+        if (indicator) indicator.style.display = "block";
+        if (saveBtn) {
+            saveBtn.style.opacity = "1";
+            saveBtn.style.pointerEvents = "auto";
+            saveBtn.style.background = "#e67e22";
+            saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存更改';
+
+            // 统一hover事件处理
+            const handleHover = function(isEnter) {
+                this.style.transform = isEnter ? "translateY(-2px)" : "translateY(0)";
+                this.style.boxShadow = isEnter ? "0 4px 8px rgba(0,0,0,0.2)" : "none";
+            };
+
+            // 移除旧事件，避免重复绑定
+            saveBtn.removeEventListener("mouseenter", () => {});
+            saveBtn.removeEventListener("mouseleave", () => {});
+            saveBtn.addEventListener("mouseenter", () => handleHover.call(saveBtn, true));
+            saveBtn.addEventListener("mouseleave", () => handleHover.call(saveBtn, false));
+        }
+    },
+
+    /**
+     * 清除未保存更改状态（隐藏指示器、禁用保存按钮）
+     */
+    clearUnsavedChanges() {
+        appState.hasUnsavedChanges = false;
+        const indicator = document.getElementById("unsaved-indicator");
+        const saveBtn = document.getElementById("panel-save-btn");
+
+        if (indicator) indicator.style.display = "none";
+        if (saveBtn) {
+            saveBtn.style.opacity = "0.7";
+            saveBtn.style.pointerEvents = "none";
+            saveBtn.style.background = "#95a5a6";
+            saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存设置';
+
+            // 显示保存成功反馈
+            setTimeout(() => {
+                if (!appState.hasUnsavedChanges) {
+                    saveBtn.innerHTML = this.createInlineSVG('check') + ' 已保存';
+                    saveBtn.style.background = "#27ae60";
+                    setTimeout(() => {
+                        if (!appState.hasUnsavedChanges) {
+                            saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存设置';
+                            saveBtn.style.background = "#95a5a6";
                         }
+                    }, 2000);
+                }
+            }, 100);
+        }
+    },
 
-                        // 2. 关键词存在时更新存储，不存在时从存储中读取
-                        if (keywords) {
-                            localStorage.setItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS, keywords);
-                            sessionStorage.setItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS, keywords);
-                        } else {
-                            keywords = sessionStorage.getItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS) ||
-                                localStorage.getItem(STORAGE_KEYS.LAST_SUCCESSFUL_KEYWORDS) || '';
-                        }
+    /**
+     * 更新已选引擎数量显示
+     */
+    updateSelectedCount() {
+        const checkboxes = document.querySelectorAll(`#engine-management-list input[type="checkbox"]:checked`);
+        const countElement = document.getElementById("selected-count");
+        if (countElement) {
+            countElement.innerHTML = this.createInlineSVG('check-circle') + ` 已选择 ${checkboxes.length} 个引擎`;
+        }
+    },
 
-                        return keywords;
-                    } catch (error) {
-                        console.error("获取关键词失败:", error.message, "当前URL:", window.location.href);
-                        return "";
-                    }
-                },
+    /**
+     * 保存引擎按钮排序（更新到GM存储）
+     */
+    saveButtonOrder() {
+        const container = document.querySelector(`.${CLASS_NAMES.ENGINE_DISPLAY}`);
+        if (!container) return;
 
-                /**
-                 * 获取搜索关键词（整合遮罩层、输入框、存储多渠道）
-                 * @returns {string} 最终搜索关键词
-                 */
-                getSearchKeywords() {
-                    let keywords = "";
+        const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
+        const newOrder = Array.from(buttons)
+            .map(btn => btn.getAttribute('data-mark'))
+            .filter(mark => mark !== null)
+            .join('-');
 
-                    // 1. 优先从搜索遮罩层输入框获取
-                    if (appState.searchOverlayVisible) {
-                        const searchInput = document.getElementById("overlay-search-input");
-                        if (searchInput && searchInput.value.trim()) {
-                            return searchInput.value.trim();
-                        }
-                    }
+        GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, newOrder);
+    },
 
-                    // 2. 从百度特定输入框获取
-                    const baiduInput = document.querySelector('input#kw, input[name="wd"], input[name="word"]');
-                    if (baiduInput && baiduInput.value.trim()) {
-                        keywords = baiduInput.value.trim();
-                        return keywords;
-                    }
-
-                    // 3. 从页面所有输入框中获取
-                    const allInputs = document.querySelectorAll(DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR);
-                    for (const input of allInputs) {
-                        const inputVal = input.value.trim();
-                        if (inputVal) {
-                            keywords = inputVal;
-                            break;
-                        }
-                    }
-
-                    // 4. 从工具函数提取的关键词中获取
-                    if (!keywords) {
-                        keywords = this.getKeywords().trim();
-                    }
-
-                    // 5. 最后从sessionStorage获取
-                    if (!keywords) {
-                        keywords = sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || "";
-                    }
-
-                    return keywords;
-                },
-
-                /**
-                 * 更新未保存更改状态（显示指示器、激活保存按钮）
-                 */
-                markUnsavedChanges() {
-                    appState.hasUnsavedChanges = true;
-                    const indicator = document.getElementById("unsaved-indicator");
-                    const saveBtn = document.getElementById("panel-save-btn");
-
-                    if (indicator) indicator.style.display = "block";
-                    if (saveBtn) {
-                        saveBtn.style.opacity = "1";
-                        saveBtn.style.pointerEvents = "auto";
-                        saveBtn.style.background = "#e67e22";
-                        saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存更改';
-
-                        // 统一hover事件处理
-                        const handleHover = function(isEnter) {
-                            this.style.transform = isEnter ? "translateY(-2px)" : "translateY(0)";
-                            this.style.boxShadow = isEnter ? "0 4px 8px rgba(0,0,0,0.2)" : "none";
-                        };
-
-                        // 移除旧事件，避免重复绑定
-                        saveBtn.removeEventListener("mouseenter", () => {});
-                        saveBtn.removeEventListener("mouseleave", () => {});
-                        saveBtn.addEventListener("mouseenter", () => handleHover.call(saveBtn, true));
-                        saveBtn.addEventListener("mouseleave", () => handleHover.call(saveBtn, false));
-                    }
-                },
-
-                /**
-                 * 清除未保存更改状态（隐藏指示器、禁用保存按钮）
-                 */
-                clearUnsavedChanges() {
-                    appState.hasUnsavedChanges = false;
-                    const indicator = document.getElementById("unsaved-indicator");
-                    const saveBtn = document.getElementById("panel-save-btn");
-
-                    if (indicator) indicator.style.display = "none";
-                    if (saveBtn) {
-                        saveBtn.style.opacity = "0.7";
-                        saveBtn.style.pointerEvents = "none";
-                        saveBtn.style.background = "#95a5a6";
-                        saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存设置';
-
-                        // 显示保存成功反馈
-                        setTimeout(() => {
-                            if (!appState.hasUnsavedChanges) {
-                                saveBtn.innerHTML = this.createInlineSVG('check') + ' 已保存';
-                                saveBtn.style.background = "#27ae60";
-                                setTimeout(() => {
-                                    if (!appState.hasUnsavedChanges) {
-                                        saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存设置';
-                                        saveBtn.style.background = "#95a5a6";
-                                    }
-                                }, 2000);
-                            }
-                        }, 100);
-                    }
-                },
-
-                /**
-                 * 更新已选引擎数量显示
-                 */
-                updateSelectedCount() {
-                    const checkboxes = document.querySelectorAll(`#engine-management-list input[type="checkbox"]:checked`);
-                    const countElement = document.getElementById("selected-count");
-                    if (countElement) {
-                        countElement.innerHTML = this.createInlineSVG('check-circle') + ` 已选择 ${checkboxes.length} 个引擎`;
-                    }
-                },
-
-                /**
-                 * 保存引擎按钮排序（更新到GM存储）
-                 */
-                saveButtonOrder() {
-                    const container = document.querySelector(`.${CLASS_NAMES.ENGINE_DISPLAY}`);
-                    if (!container) return;
-
-                    const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
-                    const newOrder = Array.from(buttons)
-                        .map(btn => btn.getAttribute('data-mark'))
-                        .filter(mark => mark !== null)
-                        .join('-');
-
-                    GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, newOrder);
-                },
-
-                /**
-                 * 创建内联SVG图标（替代Font Awesome）
-                 * @param {string} iconName - 图标名称
-                 * @param {string} color - 图标颜色
-                 * @returns {string} SVG字符串
-                 */
-                createInlineSVG(iconName, color = 'currentColor') {
-                    const icons = {
-                        search: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+    /**
+     * 创建内联SVG图标（替代Font Awesome）
+     * @param {string} iconName - 图标名称
+     * @param {string} color - 图标颜色
+     * @returns {string} SVG字符串
+     */
+    createInlineSVG(iconName, color = 'currentColor') {
+        const icons = {
+            search: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
             </svg>`,
-                        cog: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            cog: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
                 <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
             </svg>`,
-                        save: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            sog: `<svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24"><g fill="#999999" fill-rule="evenodd" clip-rule="evenodd"><path d="M12 8.25a3.75 3.75 0 1 0 0 7.5a3.75 3.75 0 0 0 0-7.5M9.75 12a2.25 2.25 0 1 1 4.5 0a2.25 2.25 0 0 1-4.5 0"/><path d="M12 1.25c-.705 0-1.348.194-2.051.52c-.68.317-1.469.783-2.454 1.367l-.754.446c-.986.584-1.773 1.05-2.38 1.496c-.628.462-1.11.934-1.458 1.553s-.505 1.279-.58 2.063c-.073.76-.073 1.691-.073 2.861v.888c0 1.17 0 2.1.073 2.86c.075.785.232 1.446.58 2.064c.349.619.83 1.091 1.458 1.553c.607.446 1.394.912 2.38 1.496l.754.446c.985.584 1.773 1.05 2.454 1.367c.703.326 1.346.52 2.051.52s1.348-.194 2.051-.52c.68-.317 1.469-.783 2.454-1.367l.754-.446c.986-.584 1.773-1.05 2.38-1.496c.628-.462 1.11-.934 1.458-1.553s.505-1.279.58-2.063c.073-.76.073-1.691.073-2.86v-.889c0-1.17 0-2.1-.073-2.86c-.075-.785-.232-1.446-.58-2.064c-.349-.619-.83-1.091-1.458-1.553c-.607-.446-1.394-.912-2.38-1.496l-.754-.446c-.985-.584-1.773-1.05-2.454-1.367c-.703-.326-1.346-.52-2.051-.52M8.225 4.447c1.027-.608 1.751-1.035 2.356-1.316c.59-.274 1.01-.381 1.419-.381s.83.107 1.42.38c.604.282 1.328.71 2.355 1.317l.686.407c1.027.608 1.75 1.037 2.29 1.434c.526.387.83.71 1.038 1.08c.21.371.33.806.395 1.47c.065.68.066 1.54.066 2.756v.812c0 1.216 0 2.075-.066 2.755c-.064.665-.185 1.1-.395 1.471c-.208.37-.512.693-1.038 1.08c-.54.397-1.263.826-2.29 1.434l-.686.407c-1.027.608-1.751 1.035-2.356 1.316c-.59.274-1.01.381-1.419.381s-.83-.107-1.42-.38c-.604-.282-1.328-.71-2.355-1.317l-.686-.407c-1.027-.608-1.75-1.037-2.29-1.434c-.526-.387-.83-.71-1.038-1.08c-.21-.371-.331-.806-.395-1.47c-.065-.68-.066-1.54-.066-2.756v-.812c0-1.216 0-2.075.066-2.755c.064-.665.185-1.1.394-1.471c.209-.37.513-.693 1.04-1.08c.54-.397 1.262-.826 2.29-1.434z"/></g></svg>`,
+            save: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
             </svg>`,
-                        check: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            check: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/>
             </svg>`,
-                        'check-circle': `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            'check-circle': `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
                 <path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/>
             </svg>`,
-                        times: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            times: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
             </svg>`,
-                        plus: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            plus: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
             </svg>`,
-                        globe: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            globe: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm7.5-6.923c-.67.204-1.335.82-1.887 1.855A7.97 7.97 0 0 0 5.145 4H7.5V1.077zM4.09 4a9.267 9.267 0 0 1 .64-1.539 6.7 6.7 0 0 1 .597-.933A7.025 7.025 0 0 0 2.255 4H4.09zm-.582 3.5c.03-.877.138-1.718.312-2.5H1.026a6.8 6.8 0 0 0-.34 2.5h2.49zM4.847 5.12c.38-.59.853-1.108 1.4-1.536.165-.13.335-.252.51-.367a6.7 6.7 0 0 1-.597.933A9.252 9.252 0 0 0 5.794 5.5H4.847zM8.5 1.077V4h1.191a7.9 7.9 0 0 0-1.318-1.142C8.072 2.702 7.78 2.275 8.5 1.077zM9.92 5.5H8.754a9.3 9.3 0 0 1-.64 1.539 6.7 6.7 0 0 1-.597.933c.23-.174.48-.34.743-.492.547-.428 1.02-.946 1.4-1.536zM13.974 7.5H11.49c.174.782.282 1.623.312 2.5h2.49a6.8 6.8 0 0 0 .34-2.5zm-1.487 3.5c-.165.13-.335.252-.51.367.13-.195.248-.4.352-.614.204-.67.382-1.375.429-2.153h2.205a6.7 6.7 0 0 1-.34 2.5h-2.136zm-2.572 2.072c.67-.204 1.335-.82 1.887-1.855.165.38.31.767.429 1.153H8.5v2.923zM11.145 12a7.9 7.9 0 0 0 1.318-1.142c.272.208.56.396.86.572a7.025 7.025 0 0 1-2.178 1.57h.001z"/>
             </svg>`,
-                        undo: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            undo: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
                 <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
             </svg>`,
-                        eye: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            eye: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
                 <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
             </svg>`,
-                        trash: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            trash: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
                 <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
             </svg>`,
-                        list: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            list: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/>
             </svg>`,
-                        magic: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            magic: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M9.5 2.672a.5.5 0 1 0 1 0V.843a.5.5 0 0 0-1 0v1.829zm4.5.035A.5.5 0 0 0 13.293 2L12 3.293a.5.5 0 1 0 .707.707L14 2.707zM7.293 4A.5.5 0 1 0 8 3.293L6.707 2A.5.5 0 0 0 6 2.707L7.293 4zm-.621 2.5a.5.5 0 1 0 0-1H4.843a.5.5 0 1 0 0 1h1.829zm8.485 0a.5.5 0 1 0 0-1h-1.829a.5.5 0 0 0 0 1h1.829zM13.293 10A.5.5 0 1 0 14 9.293L12.707 8a.5.5 0 1 0-.707.707L13.293 10zM9.5 11.157a.5.5 0 0 0 1 0V9.328a.5.5 0 0 0-1 0v1.829zm1.854-5.097a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L8.646 5.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0l1.293-1.293zm-3 3a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L.646 13.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0L8.354 9.06z"/>
             </svg>`,
-                        palette: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            palette: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M8 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm4 3a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5.5 7a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm.5 6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
                 <path d="M16 8c0 3.15-1.866 2.585-3.567 2.07C11.42 9.763 10.465 9.473 10 10c-.603.683-.475 1.819-.351 2.92C9.826 14.495 9.996 16 8 16a8 8 0 1 1 8-8zm-8 7c.611 0 .654-.171.655-.176.078-.146.124-.464.07-1.119-.014-.168-.037-.37-.061-.591-.052-.464-.112-1.005-.118-1.462-.01-.707.083-1.61.704-2.314.369-.417.845-.578 1.272-.618.404-.038.812.026 1.16.104.343.077.702.186 1.025.284l.028.008c.346.105.658.199.953.266.653.148.904.083.991.024C14.717 9.38 15 9.161 15 8a7 7 0 1 0-7 7z"/>
             </svg>`,
-                        circle: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            circle: `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
             </svg>`,
-                        'paper-plane': `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            'paper-plane': `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11zm-6.636 13.727L14.354 1.88 2.833 6.735l3.178 4.995 3.207-4.857z"/>
             </svg>`,
-                        'info-circle': `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
+            'info-circle': `<svg width="16" height="16" viewBox="0 0 16 16" fill="${color}">
                 <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
                 <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
             </svg>`
-                    };
+        };
 
-                    return icons[iconName] || icons['circle'];
-                }
-            };
+        return icons[iconName] || icons['circle'];
+    },
 
-            // ===== DOM操作模块 =====
-            /**
-             * DOM操作集合 - 封装DOM创建、样式注入、事件绑定等逻辑
-             */
-            const domHandler = {
-                /**
-                 * 注入核心样式（确保只注入一次）
-                 */
-                injectStyle() {
-                    if (document.querySelector(`style#${CLASS_NAMES.ENGINE_CONTAINER}-style`)) return;
+    /**
+     * 获取用户设置的底部偏移值
+     * @returns {number} 偏移值(px)
+     */
+    getEngineBarOffset() {
+        return GM_getValue(STORAGE_KEYS.ENGINE_BAR_OFFSET, DEFAULT_CONFIG.ENGINE_BAR_OFFSET_DEFAULT);
+    },
 
-                    const cssNode = document.createElement("style");
-                    cssNode.id = `${CLASS_NAMES.ENGINE_CONTAINER}-style`;
-                    cssNode.textContent = `
+    /**
+     * 设置底部偏移值
+     * @param {number} value - 偏移值(px)
+     */
+    setEngineBarOffset(value) {
+        GM_setValue(STORAGE_KEYS.ENGINE_BAR_OFFSET, parseInt(value));
+    }
+};
+
+// ===== DOM操作模块 =====
+/**
+ * DOM操作集合 - 封装DOM创建、样式注入、事件绑定等逻辑
+ */
+const domHandler = {
+    /**
+     * 注入核心样式（确保只注入一次）
+     */
+    injectStyle() {
+        if (document.querySelector(`style#${CLASS_NAMES.ENGINE_CONTAINER}-style`)) return;
+
+        const cssNode = document.createElement("style");
+        cssNode.id = `${CLASS_NAMES.ENGINE_CONTAINER}-style`;
+        cssNode.textContent = `
             .${CLASS_NAMES.ENGINE_CONTAINER} {
                 display: flex;
                 position: fixed;
@@ -3015,122 +3031,131 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                 to { opacity: 1; }
             }
         `;
-                    document.head.appendChild(cssNode);
-                },
+        document.head.appendChild(cssNode);
+    },
 
-                /**
-                 * 监控页面输入框（实时同步输入内容到sessionStorage）
-                 */
-                monitorInputFields() {
-                    const setupInputMonitoring = (input) => {
-                        if (input.dataset.monitored) return;
-                        input.dataset.monitored = true;
+    /**
+     * 监控页面输入框（实时同步输入内容到sessionStorage）
+     */
+    monitorInputFields() {
+        const setupInputMonitoring = (input) => {
+            if (input.dataset.monitored) return;
+            input.dataset.monitored = true;
 
-                        const updateCurrentInput = (event) => {
-                            // 使用防抖优化输入监控
-                            debounceUtils.debounce('input_monitor', () => {
-                                appState.currentInput = event.target.value.trim();
-                                sessionStorage.setItem(STORAGE_KEYS.CURRENT_INPUT, appState.currentInput);
-                            }, 500);
-                        };
+            const updateCurrentInput = (event) => {
+                // 使用防抖优化输入监控
+                debounceUtils.debounce('input_monitor', () => {
+                    appState.currentInput = event.target.value.trim();
+                    sessionStorage.setItem(STORAGE_KEYS.CURRENT_INPUT, appState.currentInput);
+                }, 500);
+            };
 
-                        input.addEventListener('input', updateCurrentInput);
-                        input.addEventListener('change', updateCurrentInput);
-                    };
+            input.addEventListener('input', updateCurrentInput);
+            input.addEventListener('change', updateCurrentInput);
+        };
 
-                    // 1. 初始化现有输入框监控
-                    document.querySelectorAll(DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR)
-                        .forEach(setupInputMonitoring);
+        // 1. 初始化现有输入框监控
+        document.querySelectorAll(DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR)
+            .forEach(setupInputMonitoring);
 
-                    // 2. 监听动态添加的输入框（MutationObserver）
-                    const observer = new MutationObserver(() => {
-                        document.querySelectorAll(`${DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR}:not([data-monitored])`)
-                            .forEach(setupInputMonitoring);
-                    });
+        // 2. 监听动态添加的输入框（MutationObserver）
+        const observer = new MutationObserver(() => {
+            document.querySelectorAll(`${DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR}:not([data-monitored])`)
+                .forEach(setupInputMonitoring);
+        });
 
-                    observer.observe(document.body, {
-                        childList: true,
-                        subtree: true
-                    });
-                },
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    },
 
-                /**
-                 * 更新搜索框位置与显示状态
-                 */
-                updateSearchBoxPosition() {
-                    const punkJetBox = document.getElementById("punkjet-search-box");
-                    if (!punkJetBox) return;
+    /**
+     * 更新搜索框位置与显示状态（增强版，支持底部偏移）
+     */
+    updateSearchBoxPosition() {
+        const punkJetBox = document.getElementById("punkjet-search-box");
+        if (!punkJetBox) return;
 
-                    // 基础位置配置
-                    punkJetBox.style.bottom = "0px";
-                    punkJetBox.style.left = "2%";
-                    punkJetBox.style.width = "96%";
+        // 获取用户设置的偏移值
+        const offsetValue = utils.getEngineBarOffset();
+        
+        // 判断是否需要应用偏移（输入法激活时）
+        const shouldOffset = document.activeElement && (
+            document.activeElement.tagName === 'INPUT' || 
+            document.activeElement.tagName === 'TEXTAREA'
+        );
 
-                    // 显示/隐藏状态切换
-                    punkJetBox.style.transform = appState.punkJetBoxVisible ?
-                        "translateY(0)" :
-                        "translateY(100%)";
-                    punkJetBox.style.opacity = appState.punkJetBoxVisible ? "1" : "0";
-                },
+        // 应用位置样式
+        punkJetBox.style.bottom = shouldOffset ? `${offsetValue}px` : '0px';
+        punkJetBox.style.left = '2%';
+        punkJetBox.style.width = '96%';
 
-                /**
-                 * 创建搜索引擎按钮
-                 * @param {Object} item - 搜索引擎配置项
-                 * @returns {HTMLButtonElement} 引擎按钮DOM元素
-                 */
-                createEngineButton(item) {
-                    const button = document.createElement('button');
-                    button.className = CLASS_NAMES.ENGINE_BUTTON;
-                    button.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(item.svgCode)}')`;
-                    button.setAttribute("url", item.searchUrl);
-                    button.setAttribute("title", item.name);
-                    button.setAttribute("data-mark", item.mark);
-                    button.innerHTML = '';
+        // 显示/隐藏状态切换
+        punkJetBox.style.transform = appState.punkJetBoxVisible ?
+            "translateY(0)" :
+            "translateY(100%)";
+        punkJetBox.style.opacity = appState.punkJetBoxVisible ? "1" : "0";
+    },
 
-                    // 鼠标hover事件
-                    const handleMouseEnter = () => {
-                        button.style.backgroundColor = 'rgba(241, 241, 241, 1)';
-                        button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                    };
+    /**
+     * 创建搜索引擎按钮
+     * @param {Object} item - 搜索引擎配置项
+     * @returns {HTMLButtonElement} 引擎按钮DOM元素
+     */
+    createEngineButton(item) {
+        const button = document.createElement('button');
+        button.className = CLASS_NAMES.ENGINE_BUTTON;
+        button.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(item.svgCode)}')`;
+        button.setAttribute("url", item.searchUrl);
+        button.setAttribute("title", item.name);
+        button.setAttribute("data-mark", item.mark);
+        button.innerHTML = '';
 
-                    const handleMouseLeave = () => {
-                        button.style.backgroundColor = 'rgba(240, 240, 244, 1)';
-                        button.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
-                    };
+        // 鼠标hover事件
+        const handleMouseEnter = () => {
+            button.style.backgroundColor = 'rgba(241, 241, 241, 1)';
+            button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        };
 
-                    button.addEventListener('mouseover', handleMouseEnter);
-                    button.addEventListener('mouseout', handleMouseLeave);
+        const handleMouseLeave = () => {
+            button.style.backgroundColor = 'rgba(240, 240, 244, 1)';
+            button.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
+        };
 
-                    // 点击事件（调用搜索逻辑）
-                    button.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        const url = button.getAttribute("url");
-                        const keywords = utils.getSearchKeywords();
+        button.addEventListener('mouseover', handleMouseEnter);
+        button.addEventListener('mouseout', handleMouseLeave);
 
-                        if (url && keywords) {
-                            const finalUrl = url.replace('{keyword}', encodeURIComponent(keywords));
-                            window.open(finalUrl, '_blank');
-                            if (appState.searchOverlayVisible) {
-                                searchOverlay.hideSearchOverlay();
-                            }
-                        } else {
-                            searchOverlay.showSearchOverlay();
-                        }
-                    });
+        // 点击事件（调用搜索逻辑）
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            const url = button.getAttribute("url");
+            const keywords = utils.getSearchKeywords();
 
-                    return button;
-                },
+            if (url && keywords) {
+                const finalUrl = url.replace('{keyword}', encodeURIComponent(keywords));
+                window.open(finalUrl, '_blank');
+                if (appState.searchOverlayVisible) {
+                    searchOverlay.hideSearchOverlay();
+                }
+            } else {
+                searchOverlay.showSearchOverlay();
+            }
+        });
 
-                /**
-                 * 创建汉堡菜单按钮
-                 * @returns {HTMLButtonElement} 汉堡菜单按钮DOM元素
-                 */
-                createHamburgerButton() {
-                    const hamburgerButton = document.createElement('button');
-                    hamburgerButton.className = "engine-hamburger-button";
-                    hamburgerButton.innerHTML = utils.createInlineSVG('paper-plane');
-                    hamburgerButton.title = "菜单 (Alt+M)";
-                    hamburgerButton.style.cssText = `
+        return button;
+    },
+
+    /**
+     * 创建汉堡菜单按钮
+     * @returns {HTMLButtonElement} 汉堡菜单按钮DOM元素
+     */
+    createHamburgerButton() {
+        const hamburgerButton = document.createElement('button');
+        hamburgerButton.className = "engine-hamburger-button";
+        hamburgerButton.innerHTML = utils.createInlineSVG('paper-plane');
+        hamburgerButton.title = "菜单 (Alt+M)";
+        hamburgerButton.style.cssText = `
             width: 32px;
             height: 32px;
             border: 1px solid #f0f0f0;
@@ -3152,348 +3177,352 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
             padding: 0;              
         `;
 
-                    // 鼠标hover效果
-                    hamburgerButton.addEventListener('mouseenter', () => {
-                        hamburgerButton.style.backgroundColor = 'rgba(241, 241, 241, 1)';
-                        hamburgerButton.style.transform = 'translateY(-2px)';
-                        hamburgerButton.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                    });
+        // 鼠标hover效果
+        hamburgerButton.addEventListener('mouseenter', () => {
+            hamburgerButton.style.backgroundColor = 'rgba(241, 241, 241, 1)';
+            hamburgerButton.style.transform = 'translateY(-2px)';
+            hamburgerButton.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        });
 
-                    hamburgerButton.addEventListener('mouseout', () => {
-                        hamburgerButton.style.backgroundColor = 'white';
-                        hamburgerButton.style.transform = 'translateY(0)';
-                        hamburgerButton.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
-                    });
+        hamburgerButton.addEventListener('mouseout', () => {
+            hamburgerButton.style.backgroundColor = 'white';
+            hamburgerButton.style.transform = 'translateY(0)';
+            hamburgerButton.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
+        });
 
-                    // 点击切换汉堡菜单
-                    hamburgerButton.addEventListener('click', () => {
-                        appState.hamburgerMenuOpen ?
-                            hamburgerMenu.hideHamburgerMenu() :
-                            hamburgerMenu.showHamburgerMenu();
-                    });
+        // 点击切换汉堡菜单
+        hamburgerButton.addEventListener('click', () => {
+            appState.hamburgerMenuOpen ?
+                hamburgerMenu.hideHamburgerMenu() :
+                hamburgerMenu.showHamburgerMenu();
+        });
 
-                    return hamburgerButton;
-                },
+        return hamburgerButton;
+    },
 
-                /**
-                 * 添加搜索框到页面（核心UI组件）
-                 */
-                addSearchBox() {
-                    try {
-                        if (utils.isEngineContainerExists()) return;
+    /**
+     * 添加搜索框到页面（核心UI组件）
+     */
+    addSearchBox() {
+        try {
+            if (utils.isEngineContainerExists()) return;
 
-                        // 1. 创建主容器
-                        const punkJetBox = document.createElement("div");
-                        punkJetBox.id = "punkjet-search-box";
-                        punkJetBox.className = CLASS_NAMES.ENGINE_CONTAINER;
-                        punkJetBox.style.cssText = `
+            // 1. 创建主容器
+            const punkJetBox = document.createElement("div");
+            punkJetBox.id = "punkjet-search-box";
+            punkJetBox.className = CLASS_NAMES.ENGINE_CONTAINER;
+            punkJetBox.style.cssText = `
                 display: flex;
                 z-index: 9999;
                 position: fixed;
                 transition: all 0.3s ease;
             `;
-                        this.updateSearchBoxPosition();
+            this.updateSearchBoxPosition();
 
-                        // 2. 创建引擎按钮容器（横向滚动）
-                        const ulList = document.createElement('div');
-                        ulList.className = CLASS_NAMES.ENGINE_DISPLAY;
-                        ulList.style.cssText = `
+            // 2. 创建引擎按钮容器（横向滚动）
+            const ulList = document.createElement('div');
+            ulList.className = CLASS_NAMES.ENGINE_DISPLAY;
+            ulList.style.cssText = `
                 overflow-x: auto;
                 overflow-y: hidden;
                 display: flex;
                 flex-grow: 1;
             `;
 
-                        // 3. 添加汉堡菜单按钮
-                        const hamburgerButton = this.createHamburgerButton();
-                        punkJetBox.appendChild(hamburgerButton);
+            // 3. 添加汉堡菜单按钮
+            const hamburgerButton = this.createHamburgerButton();
+            punkJetBox.appendChild(hamburgerButton);
 
-                        // 4. 添加引擎按钮（从配置中读取）
-                        const fragment = document.createDocumentFragment();
-                        const showList = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-');
+            // 4. 添加引擎按钮（从配置中读取）
+            const fragment = document.createDocumentFragment();
+            const showList = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-');
 
-                        showList.forEach(showMark => {
-                            const item = appState.searchUrlMap.find(engine => engine.mark === showMark);
-                            if (item) {
-                                const button = this.createEngineButton(item);
-                                fragment.appendChild(button);
-                            }
-                        });
-
-                        ulList.appendChild(fragment);
-                        punkJetBox.appendChild(ulList);
-                        document.body.appendChild(punkJetBox);
-
-                        // 5. 更新状态与绑定事件
-                        appState.containerAdded = true;
-                        this.initScrollListener();
-                        window.addEventListener('resize', () => this.updateSearchBoxPosition());
-
-                        // 6. 点击页面其他区域关闭汉堡菜单
-                        document.addEventListener('click', (e) => {
-                            if (!e.target.closest(`#${CLASS_NAMES.HAMBURGER_MENU}`) &&
-                                !e.target.closest('.engine-hamburger-button')) {
-                                hamburgerMenu.hideHamburgerMenu();
-                            }
-                        });
-
-                        // 7. 延迟启用拖拽排序
-                        setTimeout(() => this.enableDragAndSort(), DEFAULT_CONFIG.DRAG_SORT_DELAY);
-                    } catch (error) {
-                        console.error("添加搜索框失败:", error.message);
-                    }
-                },
-
-                /**
-                 * 启用引擎按钮拖拽排序功能
-                 */
-                enableDragAndSort() {
-                    const container = document.querySelector(`.${CLASS_NAMES.ENGINE_DISPLAY}`);
-                    if (!container) return;
-
-                    const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
-                    buttons.forEach(button => {
-                        button.draggable = true;
-
-                        // 拖拽开始
-                        button.addEventListener('dragstart', (e) => {
-                            button.classList.add(CLASS_NAMES.DRAGGING);
-                            e.dataTransfer.effectAllowed = 'move';
-                            e.dataTransfer.setData('text/plain', button.getAttribute('url'));
-                        });
-
-                        // 拖拽结束
-                        button.addEventListener('dragend', () => {
-                            button.classList.remove(CLASS_NAMES.DRAGGING);
-                            utils.saveButtonOrder();
-                        });
-
-                        // 拖拽经过
-                        button.addEventListener('dragover', (e) => e.preventDefault());
-
-                        // 拖拽进入
-                        button.addEventListener('dragenter', (e) => {
-                            e.preventDefault();
-                            button.classList.add(CLASS_NAMES.DRAG_OVER);
-                        });
-
-                        // 拖拽离开
-                        button.addEventListener('dragleave', () => {
-                            button.classList.remove(CLASS_NAMES.DRAG_OVER);
-                        });
-
-                        // 拖拽放下
-                        button.addEventListener('drop', (e) => {
-                            e.preventDefault();
-                            button.classList.remove(CLASS_NAMES.DRAG_OVER);
-                            const draggingButton = document.querySelector(`.${CLASS_NAMES.DRAGGING}`);
-
-                            if (draggingButton && draggingButton !== button) {
-                                const buttonsArray = Array.from(container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`));
-                                const draggedIndex = buttonsArray.indexOf(draggingButton);
-                                const targetIndex = buttonsArray.indexOf(button);
-
-                                // 根据索引位置插入
-                                if (draggedIndex < targetIndex) {
-                                    container.insertBefore(draggingButton, button.nextSibling);
-                                } else {
-                                    container.insertBefore(draggingButton, button);
-                                }
-
-                                utils.markUnsavedChanges();
-                            }
-                        });
-                    });
-                },
-
-                /**
-                 * 初始化滚动/触摸事件监听（控制搜索框显示/隐藏）
-                 */
-                initScrollListener() {
-                    const passiveOptions = {
-                        passive: true
-                    };
-
-                    // 1. 滚动事件 - 使用防抖优化
-                    const handleScroll = () => {
-                        const st = window.pageYOffset || document.documentElement.scrollTop;
-                        const isInteractingWithSearchBar = document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}:hover`) !== null;
-
-                        if (isInteractingWithSearchBar) return;
-
-                        utils.clearAllTimeouts();
-                        appState.isScrolling = true;
-
-                        // 使用防抖处理滚动显示/隐藏
-                        debounceUtils.debounce('scroll_hide', () => {
-                            // 向下滚动且距离顶部>50px：隐藏搜索框
-                            if (st > appState.lastScrollTop && st > 50) {
-                                this.hideSearchBox();
-                            } else {
-                                this.showSearchBoxImmediately();
-                            }
-
-                            appState.lastScrollTop = st <= 0 ? 0 : st;
-                        }, 50);
-
-                        // 滚动停止后延迟显示搜索框
-                        appState.scrollTimeout = setTimeout(() => {
-                            appState.isScrolling = false;
-                            this.showSearchBoxDelayed();
-                        }, DEFAULT_CONFIG.SCROLL_TIMEOUT_DURATION);
-                    };
-
-                    // 2. 触摸事件 - 使用节流优化
-                    const handleTouchStart = (e) => {
-                        appState.touchStartY = e.touches[0].clientY;
-                    };
-
-                    const handleTouchMove = (e) => {
-                        if (appState.touchStartY === null) return;
-                        if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
-
-                        const touchY = e.touches[0].clientY;
-                        const diff = appState.touchStartY - touchY;
-
-                        // 使用节流处理触摸移动
-                        debounceUtils.throttle('touch_move', () => {
-                            // 滑动距离>10px时触发显示/隐藏
-                            if (Math.abs(diff) > 10) {
-                                diff > 0 ? this.hideSearchBox() : this.showSearchBoxImmediately();
-                            }
-                        }, 100);
-                    };
-
-                    const handleTouchEnd = () => {
-                        appState.touchStartY = null;
-                        this.showSearchBoxDelayed();
-                    };
-
-                    // 3. 滚轮事件
-                    const handleWheel = () => {
-                        setTimeout(() => {
-                            const st = window.pageYOffset || document.documentElement.scrollTop;
-                            if (st > appState.lastScrollTop && st > 50) {
-                                this.hideSearchBox();
-                            } else {
-                                this.showSearchBoxImmediately();
-                            }
-                            appState.lastScrollTop = st <= 0 ? 0 : st;
-                            this.showSearchBoxDelayed();
-                        }, 10);
-                    };
-
-                    // 4. 绑定事件
-                    window.addEventListener('scroll', handleScroll, passiveOptions);
-                    window.addEventListener('wheel', handleWheel, passiveOptions);
-                    window.addEventListener('touchstart', handleTouchStart, passiveOptions);
-                    window.addEventListener('touchmove', handleTouchMove, passiveOptions);
-                    window.addEventListener('touchend', handleTouchEnd, passiveOptions);
-
-                    // 5. 点击事件：点击其他区域显示搜索框
-                    document.addEventListener('click', (e) => {
-                        if (!e.target.closest(`#${CLASS_NAMES.MANAGEMENT_PANEL}`) &&
-                            !e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
-                            this.showSearchBoxImmediately();
-                        }
-                    });
-
-                    // 6. 聚焦事件：输入框聚焦时显示搜索框
-                    document.addEventListener('focusin', (e) => {
-                        if (e.target.matches('input, textarea')) {
-                            this.showSearchBoxImmediately();
-                        }
-                    });
-
-                    // 7. 鼠标进入事件：进入引擎容器时显示搜索框
-                    document.addEventListener('mouseenter', (e) => {
-                        if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`) ||
-                            e.target.closest(`.${CLASS_NAMES.ENGINE_BUTTON}`)) {
-                            this.showSearchBoxImmediately();
-                        }
-                    }, true);
-
-                    // 8. 阻止引擎容器内滚动事件冒泡
-                    const stopPropagationHandler = (e) => {
-                        if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
-                            e.stopPropagation();
-                        }
-                    };
-
-                    document.addEventListener('wheel', stopPropagationHandler, passiveOptions);
-                    document.addEventListener('touchmove', stopPropagationHandler, passiveOptions);
-                },
-
-                /**
-                 * 立即显示搜索框
-                 */
-                showSearchBoxImmediately() {
-                    utils.clearAllTimeouts();
-                    if (!appState.punkJetBoxVisible) {
-                        appState.punkJetBoxVisible = true;
-                        this.updateSearchBoxPosition();
-                    }
-                },
-
-                /**
-                 * 延迟显示搜索框
-                 */
-                showSearchBoxDelayed() {
-                    utils.clearAllTimeouts();
-                    appState.hideTimeout = setTimeout(() => {
-                        this.showSearchBoxImmediately();
-                    }, DEFAULT_CONFIG.SHOW_SEARCH_BOX_DELAY);
-                },
-
-                /**
-                 * 隐藏搜索框
-                 */
-                hideSearchBox() {
-                    if (appState.punkJetBoxVisible) {
-                        appState.punkJetBoxVisible = false;
-                        this.updateSearchBoxPosition();
-                    }
-                },
-
-                /**
-                 * 隐藏汉堡菜单
-                 */
-                hideHamburgerMenu() {
-                    hamburgerMenu.hideHamburgerMenu();
-                },
-
-                /**
-                 * 显示汉堡菜单
-                 */
-                showHamburgerMenu() {
-                    hamburgerMenu.showHamburgerMenu();
-                },
-
-                /**
-                 * 切换汉堡菜单
-                 */
-                toggleHamburgerMenu() {
-                    hamburgerMenu.toggleHamburgerMenu();
+            showList.forEach(showMark => {
+                const item = appState.searchUrlMap.find(engine => engine.mark === showMark);
+                if (item) {
+                    const button = this.createEngineButton(item);
+                    fragment.appendChild(button);
                 }
-            };
+            });
 
-            // ===== 搜索遮罩层模块 =====
-            /**
-             * 搜索遮罩层功能模块 - 封装遮罩层创建、显示、隐藏、搜索逻辑
-             */
-            const searchOverlay = {
-                /**
-                 * 创建搜索遮罩层（确保只创建一次）
-                 * @returns {HTMLDivElement} 遮罩层DOM元素
-                 */
-                createSearchOverlay() {
-                    let overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
-                    if (overlay) return overlay;
+            ulList.appendChild(fragment);
+            punkJetBox.appendChild(ulList);
+            document.body.appendChild(punkJetBox);
 
-                    // 1. 创建遮罩层容器
-                    overlay = document.createElement("div");
-                    overlay.id = CLASS_NAMES.SEARCH_OVERLAY;
-                    overlay.style.cssText = `
+            // 5. 更新状态与绑定事件
+            appState.containerAdded = true;
+            this.initScrollListener();
+            
+            // 新增：绑定窗口大小变化和焦点事件
+            window.addEventListener('resize', () => this.updateSearchBoxPosition());
+            document.addEventListener('focusin', () => this.updateSearchBoxPosition());
+            document.addEventListener('focusout', () => this.updateSearchBoxPosition());
+
+            // 6. 点击页面其他区域关闭汉堡菜单
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest(`#${CLASS_NAMES.HAMBURGER_MENU}`) &&
+                    !e.target.closest('.engine-hamburger-button')) {
+                    hamburgerMenu.hideHamburgerMenu();
+                }
+            });
+
+            // 7. 延迟启用拖拽排序
+            setTimeout(() => this.enableDragAndSort(), DEFAULT_CONFIG.DRAG_SORT_DELAY);
+        } catch (error) {
+            console.error("添加搜索框失败:", error.message);
+        }
+    },
+
+    /**
+     * 启用引擎按钮拖拽排序功能
+     */
+    enableDragAndSort() {
+        const container = document.querySelector(`.${CLASS_NAMES.ENGINE_DISPLAY}`);
+        if (!container) return;
+
+        const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
+        buttons.forEach(button => {
+            button.draggable = true;
+
+            // 拖拽开始
+            button.addEventListener('dragstart', (e) => {
+                button.classList.add(CLASS_NAMES.DRAGGING);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', button.getAttribute('url'));
+            });
+
+            // 拖拽结束
+            button.addEventListener('dragend', () => {
+                button.classList.remove(CLASS_NAMES.DRAGGING);
+                utils.saveButtonOrder();
+            });
+
+            // 拖拽经过
+            button.addEventListener('dragover', (e) => e.preventDefault());
+
+            // 拖拽进入
+            button.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                button.classList.add(CLASS_NAMES.DRAG_OVER);
+            });
+
+            // 拖拽离开
+            button.addEventListener('dragleave', () => {
+                button.classList.remove(CLASS_NAMES.DRAG_OVER);
+            });
+
+            // 拖拽放下
+            button.addEventListener('drop', (e) => {
+                e.preventDefault();
+                button.classList.remove(CLASS_NAMES.DRAG_OVER);
+                const draggingButton = document.querySelector(`.${CLASS_NAMES.DRAGGING}`);
+
+                if (draggingButton && draggingButton !== button) {
+                    const buttonsArray = Array.from(container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`));
+                    const draggedIndex = buttonsArray.indexOf(draggingButton);
+                    const targetIndex = buttonsArray.indexOf(button);
+
+                    // 根据索引位置插入
+                    if (draggedIndex < targetIndex) {
+                        container.insertBefore(draggingButton, button.nextSibling);
+                    } else {
+                        container.insertBefore(draggingButton, button);
+                    }
+
+                    utils.markUnsavedChanges();
+                }
+            });
+        });
+    },
+
+    /**
+     * 初始化滚动/触摸事件监听（控制搜索框显示/隐藏）
+     */
+    initScrollListener() {
+        const passiveOptions = {
+            passive: true
+        };
+
+        // 1. 滚动事件 - 使用防抖优化
+        const handleScroll = () => {
+            const st = window.pageYOffset || document.documentElement.scrollTop;
+            const isInteractingWithSearchBar = document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}:hover`) !== null;
+
+            if (isInteractingWithSearchBar) return;
+
+            utils.clearAllTimeouts();
+            appState.isScrolling = true;
+
+            // 使用防抖处理滚动显示/隐藏
+            debounceUtils.debounce('scroll_hide', () => {
+                // 向下滚动且距离顶部>50px：隐藏搜索框
+                if (st > appState.lastScrollTop && st > 50) {
+                    this.hideSearchBox();
+                } else {
+                    this.showSearchBoxImmediately();
+                }
+
+                appState.lastScrollTop = st <= 0 ? 0 : st;
+            }, 50);
+
+            // 滚动停止后延迟显示搜索框
+            appState.scrollTimeout = setTimeout(() => {
+                appState.isScrolling = false;
+                this.showSearchBoxDelayed();
+            }, DEFAULT_CONFIG.SCROLL_TIMEOUT_DURATION);
+        };
+
+        // 2. 触摸事件 - 使用节流优化
+        const handleTouchStart = (e) => {
+            appState.touchStartY = e.touches[0].clientY;
+        };
+
+        const handleTouchMove = (e) => {
+            if (appState.touchStartY === null) return;
+            if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
+
+            const touchY = e.touches[0].clientY;
+            const diff = appState.touchStartY - touchY;
+
+            // 使用节流处理触摸移动
+            debounceUtils.throttle('touch_move', () => {
+                // 滑动距离>10px时触发显示/隐藏
+                if (Math.abs(diff) > 10) {
+                    diff > 0 ? this.hideSearchBox() : this.showSearchBoxImmediately();
+                }
+            }, 100);
+        };
+
+        const handleTouchEnd = () => {
+            appState.touchStartY = null;
+            this.showSearchBoxDelayed();
+        };
+
+        // 3. 滚轮事件
+        const handleWheel = () => {
+            setTimeout(() => {
+                const st = window.pageYOffset || document.documentElement.scrollTop;
+                if (st > appState.lastScrollTop && st > 50) {
+                    this.hideSearchBox();
+                } else {
+                    this.showSearchBoxImmediately();
+                }
+                appState.lastScrollTop = st <= 0 ? 0 : st;
+                this.showSearchBoxDelayed();
+            }, 10);
+        };
+
+        // 4. 绑定事件
+        window.addEventListener('scroll', handleScroll, passiveOptions);
+        window.addEventListener('wheel', handleWheel, passiveOptions);
+        window.addEventListener('touchstart', handleTouchStart, passiveOptions);
+        window.addEventListener('touchmove', handleTouchMove, passiveOptions);
+        window.addEventListener('touchend', handleTouchEnd, passiveOptions);
+
+        // 5. 点击事件：点击其他区域显示搜索框
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest(`#${CLASS_NAMES.MANAGEMENT_PANEL}`) &&
+                !e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
+                this.showSearchBoxImmediately();
+            }
+        });
+
+        // 6. 聚焦事件：输入框聚焦时显示搜索框
+        document.addEventListener('focusin', (e) => {
+            if (e.target.matches('input, textarea')) {
+                this.showSearchBoxImmediately();
+            }
+        });
+
+        // 7. 鼠标进入事件：进入引擎容器时显示搜索框
+        document.addEventListener('mouseenter', (e) => {
+            if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`) ||
+                e.target.closest(`.${CLASS_NAMES.ENGINE_BUTTON}`)) {
+                this.showSearchBoxImmediately();
+            }
+        }, true);
+
+        // 8. 阻止引擎容器内滚动事件冒泡
+        const stopPropagationHandler = (e) => {
+            if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
+                e.stopPropagation();
+            }
+        };
+
+        document.addEventListener('wheel', stopPropagationHandler, passiveOptions);
+        document.addEventListener('touchmove', stopPropagationHandler, passiveOptions);
+    },
+
+    /**
+     * 立即显示搜索框
+     */
+    showSearchBoxImmediately() {
+        utils.clearAllTimeouts();
+        if (!appState.punkJetBoxVisible) {
+            appState.punkJetBoxVisible = true;
+            this.updateSearchBoxPosition();
+        }
+    },
+
+    /**
+     * 延迟显示搜索框
+     */
+    showSearchBoxDelayed() {
+        utils.clearAllTimeouts();
+        appState.hideTimeout = setTimeout(() => {
+            this.showSearchBoxImmediately();
+        }, DEFAULT_CONFIG.SHOW_SEARCH_BOX_DELAY);
+    },
+
+    /**
+     * 隐藏搜索框
+     */
+    hideSearchBox() {
+        if (appState.punkJetBoxVisible) {
+            appState.punkJetBoxVisible = false;
+            this.updateSearchBoxPosition();
+        }
+    },
+
+    /**
+     * 隐藏汉堡菜单
+     */
+    hideHamburgerMenu() {
+        hamburgerMenu.hideHamburgerMenu();
+    },
+
+    /**
+     * 显示汉堡菜单
+     */
+    showHamburgerMenu() {
+        hamburgerMenu.showHamburgerMenu();
+    },
+
+    /**
+     * 切换汉堡菜单
+     */
+    toggleHamburgerMenu() {
+        hamburgerMenu.toggleHamburgerMenu();
+    }
+};
+
+// ===== 搜索遮罩层模块 =====
+/**
+ * 搜索遮罩层功能模块 - 封装遮罩层创建、显示、隐藏、搜索逻辑
+ */
+const searchOverlay = {
+    /**
+     * 创建搜索遮罩层（确保只创建一次）
+     * @returns {HTMLDivElement} 遮罩层DOM元素
+     */
+    createSearchOverlay() {
+        let overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
+        if (overlay) return overlay;
+
+        // 1. 创建遮罩层容器
+        overlay = document.createElement("div");
+        overlay.id = CLASS_NAMES.SEARCH_OVERLAY;
+        overlay.style.cssText = `
             position: fixed;
             top: 0;
             left: 0;
@@ -3507,9 +3536,9 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
             backdrop-filter: blur(5px);
         `;
 
-                    // 2. 创建搜索内容容器
-                    const searchContainer = document.createElement("div");
-                    searchContainer.style.cssText = `
+        // 2. 创建搜索内容容器
+        const searchContainer = document.createElement("div");
+        searchContainer.style.cssText = `
             width: 90%;
             max-width: 500px;
             background: linear-gradient(145deg, #f0f0f0, #ffffff);
@@ -3524,10 +3553,10 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
             border: 1px solid rgba(255, 255, 255, 0.3);
         `;
 
-                    // 3. 创建关闭按钮
-                    const closeBtn = document.createElement("button");
-                    closeBtn.innerHTML = utils.createInlineSVG('times');
-                    closeBtn.style.cssText = `
+        // 3. 创建关闭按钮
+        const closeBtn = document.createElement("button");
+        closeBtn.innerHTML = utils.createInlineSVG('times');
+        closeBtn.style.cssText = `
             position: absolute;
             top: 15px;
             right: 15px;
@@ -3551,25 +3580,25 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
             border: 1px solid rgba(255, 255, 255, 0.3);
         `;
 
-                    // 关闭按钮hover效果
-                    closeBtn.addEventListener('mouseenter', () => {
-                        closeBtn.style.background = 'linear-gradient(145deg, #ff6b6b, #ff5252)';
-                        closeBtn.style.color = 'white';
-                        closeBtn.style.transform = 'translateY(-2px)';
-                    });
+        // 关闭按钮hover效果
+        closeBtn.addEventListener('mouseenter', () => {
+            closeBtn.style.background = 'linear-gradient(145deg, #ff6b6b, #ff5252)';
+            closeBtn.style.color = 'white';
+            closeBtn.style.transform = 'translateY(-2px)';
+        });
 
-                    closeBtn.addEventListener('mouseleave', () => {
-                        closeBtn.style.background = 'linear-gradient(145deg, #e8e8e8, #ffffff)';
-                        closeBtn.style.color = '#666';
-                        closeBtn.style.transform = 'translateY(0)';
-                    });
+        closeBtn.addEventListener('mouseleave', () => {
+            closeBtn.style.background = 'linear-gradient(145deg, #e8e8e8, #ffffff)';
+            closeBtn.style.color = '#666';
+            closeBtn.style.transform = 'translateY(0)';
+        });
 
-                    closeBtn.addEventListener('click', () => this.hideSearchOverlay());
+        closeBtn.addEventListener('click', () => this.hideSearchOverlay());
 
-                    // 4. 创建标题
-                    const title = document.createElement("h2");
-                    title.innerHTML = utils.createInlineSVG('search') + ' 快捷搜索 (Alt+S)';
-                    title.style.cssText = `
+        // 4. 创建标题
+        const title = document.createElement("h2");
+        title.innerHTML = utils.createInlineSVG('search') + ' 快捷搜索 (Alt+S)';
+        title.style.cssText = `
             margin: 0 0 20px 0;
             color: #2c3e50;
             text-align: center;
@@ -3581,12 +3610,12 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
             gap: 10px;
         `;
 
-                    // 5. 创建搜索输入框
-                    const searchInput = document.createElement("input");
-                    searchInput.type = "text";
-                    searchInput.placeholder = "输入关键词或网址...";
-                    searchInput.id = "overlay-search-input";
-                    searchInput.style.cssText = `
+        // 5. 创建搜索输入框
+        const searchInput = document.createElement("input");
+        searchInput.type = "text";
+        searchInput.placeholder = "输入关键词或网址...";
+        searchInput.id = "overlay-search-input";
+        searchInput.style.cssText = `
             width: 100%;
             padding: 12px 15px;
             box-sizing: border-box;
@@ -3603,21 +3632,21 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
             height: 48px;
         `;
 
-                    // 输入框focus/blur效果
-                    searchInput.addEventListener('focus', () => {
-                        searchInput.style.boxShadow =
-                            'inset 4px 4px 8px rgba(0, 0, 0, 0.08), inset -4px -4px 8px rgba(255, 255, 255, 0.9), 8px 8px 20px rgba(0, 0, 0, 0.15)';
-                    });
+        // 输入框focus/blur效果
+        searchInput.addEventListener('focus', () => {
+            searchInput.style.boxShadow =
+                'inset 4px 4px 8px rgba(0, 0, 0, 0.08), inset -4px -4px 8px rgba(255, 255, 255, 0.9), 8px 8px 20px rgba(0, 0, 0, 0.15)';
+        });
 
-                    searchInput.addEventListener('blur', () => {
-                        searchInput.style.boxShadow =
-                            'inset 4px 4px 8px rgba(0, 0, 0, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.8), 5px 5px 15px rgba(0, 0, 0, 0.1)';
-                    });
+        searchInput.addEventListener('blur', () => {
+            searchInput.style.boxShadow =
+                'inset 4px 4px 8px rgba(0, 0, 0, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.8), 5px 5px 15px rgba(0, 0, 0, 0.1)';
+        });
 
-                    // 6. 创建提示文本
-                    const tipText = document.createElement("p");
-                    tipText.innerHTML = utils.createInlineSVG('info-circle') + ' 提示：输入关键词后按回车使用默认搜索引擎搜索，或点击下方搜索引擎按钮选择特定引擎';
-                    tipText.style.cssText = `
+        // 6. 创建提示文本
+        const tipText = document.createElement("p");
+        tipText.innerHTML = utils.createInlineSVG('info-circle') + ' 提示：输入关键词后按回车使用默认搜索引擎搜索，或点击下方搜索引擎按钮选择特定引擎';
+        tipText.style.cssText = `
             margin: 15px 0 0 0;
             color: #7f8c8d;
             font-size: 12px;
@@ -3629,117 +3658,117 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
             gap: 5px;
         `;
 
-                    // 7. 组装结构
-                    searchContainer.appendChild(closeBtn);
-                    searchContainer.appendChild(title);
-                    searchContainer.appendChild(searchInput);
-                    searchContainer.appendChild(tipText);
-                    overlay.appendChild(searchContainer);
+        // 7. 组装结构
+        searchContainer.appendChild(closeBtn);
+        searchContainer.appendChild(title);
+        searchContainer.appendChild(searchInput);
+        searchContainer.appendChild(tipText);
+        overlay.appendChild(searchContainer);
 
-                    // 8. 绑定事件
-                    searchInput.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') {
-                            this.performOverlaySearch();
-                        }
-                    });
+        // 8. 绑定事件
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.performOverlaySearch();
+            }
+        });
 
-                    // 点击遮罩层背景关闭
-                    overlay.addEventListener('click', (e) => {
-                        if (e.target === overlay) {
-                            this.hideSearchOverlay();
-                        }
-                    });
+        // 点击遮罩层背景关闭
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                this.hideSearchOverlay();
+            }
+        });
 
-                    document.body.appendChild(overlay);
-                    return overlay;
-                },
+        document.body.appendChild(overlay);
+        return overlay;
+    },
 
-                /**
-                 * 显示搜索遮罩层
-                 */
-                showSearchOverlay() {
-                    const overlay = this.createSearchOverlay();
-                    const searchInput = document.getElementById("overlay-search-input");
+    /**
+     * 显示搜索遮罩层
+     */
+    showSearchOverlay() {
+        const overlay = this.createSearchOverlay();
+        const searchInput = document.getElementById("overlay-search-input");
 
-                    overlay.style.display = 'flex';
-                    appState.searchOverlayVisible = true;
+        overlay.style.display = 'flex';
+        appState.searchOverlayVisible = true;
 
-                    // 应用焦点陷阱
-                    accessibility.trapFocus(overlay);
+        // 应用焦点陷阱
+        accessibility.trapFocus(overlay);
 
-                    // 延迟聚焦输入框（确保动画完成）
-                    setTimeout(() => {
-                        searchInput.focus();
-                        searchInput.select();
-                    }, 100);
+        // 延迟聚焦输入框（确保动画完成）
+        setTimeout(() => {
+            searchInput.focus();
+            searchInput.select();
+        }, 100);
 
-                    // 隐藏汉堡菜单
-                    domHandler.hideHamburgerMenu();
-                },
+        // 隐藏汉堡菜单
+        domHandler.hideHamburgerMenu();
+    },
 
-                /**
-                 * 隐藏搜索遮罩层
-                 */
-                hideSearchOverlay() {
-                    const overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
-                    if (overlay) {
-                        overlay.style.display = 'none';
-                        appState.searchOverlayVisible = false;
+    /**
+     * 隐藏搜索遮罩层
+     */
+    hideSearchOverlay() {
+        const overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
+        if (overlay) {
+            overlay.style.display = 'none';
+            appState.searchOverlayVisible = false;
 
-                        // 移除焦点陷阱
-                        accessibility.removeFocusTrap(overlay);
-                    }
-                },
+            // 移除焦点陷阱
+            accessibility.removeFocusTrap(overlay);
+        }
+    },
 
-                /**
-                 * 执行遮罩层搜索逻辑（URL直接跳转，关键词用默认引擎搜索）
-                 */
-                performOverlaySearch() {
-                    const searchInput = document.getElementById("overlay-search-input");
-                    const query = searchInput.value.trim();
+    /**
+     * 执行遮罩层搜索逻辑（URL直接跳转，关键词用默认引擎搜索）
+     */
+    performOverlaySearch() {
+        const searchInput = document.getElementById("overlay-search-input");
+        const query = searchInput.value.trim();
 
-                    if (!query) {
-                        searchInput.focus();
-                        return;
-                    }
+        if (!query) {
+            searchInput.focus();
+            return;
+        }
 
-                    // 1. 是有效URL则直接打开
-                    if (utils.isValidUrl(query)) {
-                        window.open(query, '_blank');
-                        this.hideSearchOverlay();
-                        return;
-                    }
+        // 1. 是有效URL则直接打开
+        if (utils.isValidUrl(query)) {
+            window.open(query, '_blank');
+            this.hideSearchOverlay();
+            return;
+        }
 
-                    // 2. 是关键词则用默认引擎搜索
-                    const showList = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-');
-                    if (showList.length > 0) {
-                        const firstEngine = appState.searchUrlMap.find(item => item.mark === showList[0]);
-                        if (firstEngine) {
-                            const searchUrl = firstEngine.searchUrl.replace('{keyword}', encodeURIComponent(query));
-                            window.open(searchUrl, '_blank');
-                            this.hideSearchOverlay();
-                        }
-                    }
-                }
-            };
+        // 2. 是关键词则用默认引擎搜索
+        const showList = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-');
+        if (showList.length > 0) {
+            const firstEngine = appState.searchUrlMap.find(item => item.mark === showList[0]);
+            if (firstEngine) {
+                const searchUrl = firstEngine.searchUrl.replace('{keyword}', encodeURIComponent(query));
+                window.open(searchUrl, '_blank');
+                this.hideSearchOverlay();
+            }
+        }
+    }
+};
 
-            // ===== 汉堡菜单模块 =====
-            /**
-             * 汉堡菜单功能模块 - 封装菜单创建、显示、隐藏逻辑
-             */
-            const hamburgerMenu = {
-                /**
-                 * 创建汉堡菜单（确保只创建一次）
-                 * @returns {HTMLDivElement} 汉堡菜单DOM元素
-                 */
-                createHamburgerMenu() {
-                    let menu = document.getElementById(CLASS_NAMES.HAMBURGER_MENU);
-                    if (menu) return menu;
+// ===== 汉堡菜单模块 =====
+/**
+ * 汉堡菜单功能模块 - 封装菜单创建、显示、隐藏逻辑
+ */
+const hamburgerMenu = {
+    /**
+     * 创建汉堡菜单（确保只创建一次）
+     * @returns {HTMLDivElement} 汉堡菜单DOM元素
+     */
+    createHamburgerMenu() {
+        let menu = document.getElementById(CLASS_NAMES.HAMBURGER_MENU);
+        if (menu) return menu;
 
-                    // 1. 创建菜单容器
-                    menu = document.createElement("div");
-                    menu.id = CLASS_NAMES.HAMBURGER_MENU;
-                    menu.style.cssText = `
+        // 1. 创建菜单容器
+        menu = document.createElement("div");
+        menu.id = CLASS_NAMES.HAMBURGER_MENU;
+        menu.style.cssText = `
             position: fixed;
             bottom: 50px;
             left: 20px;
@@ -3756,29 +3785,29 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
             border: 1px solid rgba(255, 255, 255, 0.2);
         `;
 
-                    // 2. 定义菜单项配置
-                    const menuItems = [{
-                            icon: 'search',
-                            text: '快捷搜索 (Alt+S)',
-                            action: () => searchOverlay.showSearchOverlay()
-                        },
-                        {
-                            icon: 'cog',
-                            text: '引擎管理 (Alt+E)',
-                            action: () => managementPanel.showManagementPanel()
-                        },
-                        {
-                            icon: 'keyboard',
-                            text: '快捷键说明',
-                            action: () => this.showKeyboardShortcuts()
-                        }
-                    ];
+        // 2. 定义菜单项配置
+        const menuItems = [{
+                icon: 'search',
+                text: '快捷搜索 (Alt+S)',
+                action: () => searchOverlay.showSearchOverlay()
+            },
+            {
+                icon: 'cog',
+                text: '引擎管理 (Alt+E)',
+                action: () => managementPanel.showManagementPanel()
+            },
+            {
+                icon: 'keyboard',
+                text: '快捷键说明',
+                action: () => this.showKeyboardShortcuts()
+            }
+        ];
 
-                    // 3. 创建菜单项按钮
-                    menuItems.forEach(item => {
-                        const menuItem = document.createElement("button");
-                        menuItem.innerHTML = utils.createInlineSVG(item.icon) + ` ${item.text}`;
-                        menuItem.style.cssText = `
+        // 3. 创建菜单项按钮
+        menuItems.forEach(item => {
+            const menuItem = document.createElement("button");
+            menuItem.innerHTML = utils.createInlineSVG(item.icon) + ` ${item.text}`;
+            menuItem.style.cssText = `
                 display: flex;
                 align-items: center;
                 gap: 10px;
@@ -3793,114 +3822,157 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                 text-align: left;
             `;
 
-                        // 菜单项hover效果
-                        menuItem.addEventListener('mouseenter', () => {
-                            menuItem.style.background = 'rgba(52, 152, 219, 0.1)';
-                        });
+            // 菜单项hover效果
+            menuItem.addEventListener('mouseenter', () => {
+                menuItem.style.background = 'rgba(52, 152, 219, 0.1)';
+            });
 
-                        menuItem.addEventListener('mouseleave', () => {
-                            menuItem.style.background = 'none';
-                        });
+            menuItem.addEventListener('mouseleave', () => {
+                menuItem.style.background = 'none';
+            });
 
-                        // 绑定菜单项点击事件
-                        menuItem.addEventListener('click', item.action);
-                        menu.appendChild(menuItem);
-                    });
+            // 绑定菜单项点击事件
+            menuItem.addEventListener('click', item.action);
+            menu.appendChild(menuItem);
+        });
 
-                    document.body.appendChild(menu);
-                    return menu;
-                },
+        // 4. 添加底部偏移设置按钮
+        const setOffsetButton = document.createElement('button');
+        setOffsetButton.innerHTML = utils.createInlineSVG('sog') + ' 设置底部偏移';
+        setOffsetButton.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            border: none;
+            background: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #2c3e50;
+            transition: all 0.3s ease;
+            text-align: left;
+            margin-top: 5px;
+        `;
 
-                /**
-                 * 显示汉堡菜单
-                 */
-                showHamburgerMenu() {
-                    const menu = this.createHamburgerMenu();
-                    menu.style.display = 'flex';
-                    appState.hamburgerMenuOpen = true;
+        // 设置按钮hover效果
+        setOffsetButton.addEventListener('mouseenter', () => {
+            setOffsetButton.style.background = 'rgba(52, 152, 219, 0.1)';
+        });
 
-                    // 更新ARIA状态
-                    accessibility.updateHamburgerAriaState();
+        setOffsetButton.addEventListener('mouseleave', () => {
+            setOffsetButton.style.background = 'none';
+        });
 
-                    // 应用焦点陷阱
-                    accessibility.trapFocus(menu);
-                },
+        // 设置按钮点击事件
+        setOffsetButton.addEventListener('click', () => {
+            const currentValue = utils.getEngineBarOffset();
+            const userValue = prompt(`请输入搜索栏在输入法弹出时的底部偏移（单位px）：`, currentValue);
+            
+            if (userValue !== null && !isNaN(userValue)) {
+                utils.setEngineBarOffset(userValue);
+                alert(`偏移值已设置为 ${userValue}px`);
+                domHandler.updateSearchBoxPosition();
+            }
+            this.hideHamburgerMenu();
+        });
 
-                /**
-                 * 隐藏汉堡菜单
-                 */
-                hideHamburgerMenu() {
-                    const menu = document.getElementById(CLASS_NAMES.HAMBURGER_MENU);
-                    if (menu) {
-                        menu.style.display = 'none';
-                        appState.hamburgerMenuOpen = false;
+        menu.appendChild(setOffsetButton);
 
-                        // 更新ARIA状态
-                        accessibility.updateHamburgerAriaState();
+        document.body.appendChild(menu);
+        return menu;
+    },
 
-                        // 移除焦点陷阱
-                        accessibility.removeFocusTrap(menu);
-                    }
-                },
+    /**
+     * 显示汉堡菜单
+     */
+    showHamburgerMenu() {
+        const menu = this.createHamburgerMenu();
+        menu.style.display = 'flex';
+        appState.hamburgerMenuOpen = true;
 
-                /**
-                 * 切换汉堡菜单显示/隐藏状态
-                 */
-                toggleHamburgerMenu() {
-                    appState.hamburgerMenuOpen ?
-                        this.hideHamburgerMenu() :
-                        this.showHamburgerMenu();
-                },
+        // 更新ARIA状态
+        accessibility.updateHamburgerAriaState();
 
-                /**
-                 * 显示键盘快捷键说明
-                 */
-                showKeyboardShortcuts() {
-                    const shortcuts = [{
-                            key: 'Alt + S',
-                            action: '打开搜索框'
-                        },
-                        {
-                            key: 'Alt + E',
-                            action: '打开引擎管理'
-                        },
-                        {
-                            key: 'Alt + M',
-                            action: '打开/关闭菜单'
-                        },
-                        {
-                            key: 'ESC',
-                            action: '关闭当前弹窗'
-                        }
-                    ];
+        // 应用焦点陷阱
+        accessibility.trapFocus(menu);
+    },
 
-                    let message = '键盘快捷键:\n\n';
-                    shortcuts.forEach(shortcut => {
-                        message += `${shortcut.key} - ${shortcut.action}\n`;
-                    });
+    /**
+     * 隐藏汉堡菜单
+     */
+    hideHamburgerMenu() {
+        const menu = document.getElementById(CLASS_NAMES.HAMBURGER_MENU);
+        if (menu) {
+            menu.style.display = 'none';
+            appState.hamburgerMenuOpen = false;
 
-                    alert(message);
-                    this.hideHamburgerMenu();
-                }
-            };
+            // 更新ARIA状态
+            accessibility.updateHamburgerAriaState();
 
-            // ===== 管理面板模块 =====
-            /**
-             * 引擎管理面板模块 - 封装面板创建、引擎管理、配置保存等核心逻辑
-             */
-            const managementPanel = {
-                /**
-                 * 创建操作按钮（通用按钮组件）
-                 * @param {string} html - 按钮内部HTML
-                 * @param {string} color - 按钮背景色
-                 * @param {string} title - 按钮提示文本
-                 * @returns {HTMLButtonElement} 操作按钮DOM元素
-                 */
-                createActionButton(html, color, title) {
-                    const button = document.createElement("button");
-                    button.innerHTML = html;
-                    button.title = title;
-                    button.style.cssText = `
+            // 移除焦点陷阱
+            accessibility.removeFocusTrap(menu);
+        }
+    },
+
+    /**
+     * 切换汉堡菜单显示/隐藏状态
+     */
+    toggleHamburgerMenu() {
+        appState.hamburgerMenuOpen ?
+            this.hideHamburgerMenu() :
+            this.showHamburgerMenu();
+    },
+
+    /**
+     * 显示键盘快捷键说明
+     */
+    showKeyboardShortcuts() {
+        const shortcuts = [{
+                key: 'Alt + S',
+                action: '打开搜索框'
+            },
+            {
+                key: 'Alt + E',
+                action: '打开引擎管理'
+            },
+            {
+                key: 'Alt + M',
+                action: '打开/关闭菜单'
+            },
+            {
+                key: 'ESC',
+                action: '关闭当前弹窗'
+            }
+        ];
+
+        let message = '键盘快捷键:\n\n';
+        shortcuts.forEach(shortcut => {
+            message += `${shortcut.key} - ${shortcut.action}\n`;
+        });
+
+        alert(message);
+        this.hideHamburgerMenu();
+    }
+};
+
+// ===== 管理面板模块 =====
+/**
+ * 引擎管理面板模块 - 封装面板创建、引擎管理、配置保存等核心逻辑
+ */
+const managementPanel = {
+    /**
+     * 创建操作按钮（通用按钮组件）
+     * @param {string} html - 按钮内部HTML
+     * @param {string} color - 按钮背景色
+     * @param {string} title - 按钮提示文本
+     * @returns {HTMLButtonElement} 操作按钮DOM元素
+     */
+    createActionButton(html, color, title) {
+        const button = document.createElement("button");
+        button.innerHTML = html;
+        button.title = title;
+        button.style.cssText = `
             padding: 10px 15px;
             background-color: ${color};
             color: white;
@@ -3916,7 +3988,7 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
             justify-content: center;
         `;
 
-                    // 按钮hover效果
+       // 按钮hover效果
                     button.addEventListener("mouseenter", () => {
                         button.style.transform = "translateY(-2px)";
                         button.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
@@ -5213,6 +5285,510 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                     return panel;
                 },
 
+    /**
+     * 显示管理面板
+     */
+    showManagementPanel() {
+        const panel = this.createManagementPanel();
+        // 重置未保存状态
+        appState.hasUnsavedChanges = false;
+        utils.clearUnsavedChanges();
+        // 刷新引擎列表
+        this.refreshEngineList();
+        // 显示面板
+        panel.style.display = "block";
+
+        // 应用焦点陷阱
+        accessibility.trapFocus(panel);
+
+        // 隐藏汉堡菜单
+        hamburgerMenu.hideHamburgerMenu();
+    },
+
+     /**
+                 * 创建管理面板DOM结构（核心配置界面）
+                 */
+                createManagementPanel() {
+                    let panel = document.getElementById(CLASS_NAMES.MANAGEMENT_PANEL);
+                    if (panel) return panel;
+
+                    // 1. 面板主容器
+                    panel = document.createElement("div");
+                    panel.id = CLASS_NAMES.MANAGEMENT_PANEL;
+                    panel.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            max-height: 90vh;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            padding: 0;
+            z-index: 10000;
+            display: none;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        `;
+
+                    // 2. 面板头部
+                    const header = document.createElement("div");
+                    header.style.cssText = `
+            height: 15vh;
+            min-height: 80px;
+            max-height: 120px;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 15px 15px 0 0;
+            position: relative;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        `;
+                    const title = document.createElement("h2");
+                    title.innerHTML = utils.createInlineSVG('cog', 'white') + ' 搜索引擎管理中心';
+                    title.style.cssText = `
+            margin: 0;
+            font-size: 1.5em;
+            font-weight: 300;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+                    const subtitle = document.createElement("p");
+                    subtitle.textContent = "管理您的搜索快捷方式";
+                    subtitle.style.cssText = `
+            margin: 5px 0 0 0;
+            opacity: 0.8;
+            font-size: 0.9em;
+        `;
+                    // 未保存更改指示器
+                    const unsavedIndicator = document.createElement("div");
+                    unsavedIndicator.id = "unsaved-indicator";
+                    unsavedIndicator.innerHTML = utils.createInlineSVG('circle', '#e74c3c') + ' 有未保存的更改';
+                    unsavedIndicator.style.cssText = `
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            color: #e74c3c;
+            font-size: 0.8em;
+            display: none;
+            align-items: center;
+            gap: 5px;
+        `;
+                    header.appendChild(title);
+                    header.appendChild(subtitle);
+                    header.appendChild(unsavedIndicator);
+                    panel.appendChild(header);
+
+                    // 3. 面板内容区
+                    const content = document.createElement("div");
+                    content.style.cssText = `
+            height: 65vh;
+            min-height: 300px;
+            position: relative;
+            overflow: hidden;
+            padding: 0;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        `;
+
+                    // 3.1 快捷操作栏
+                    const quickActions = document.createElement("div");
+                    quickActions.style.cssText = `
+            padding: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            background-color: #ffffff;
+            border-bottom: 1px solid #ecf0f1;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        `;
+                    // 左侧操作组
+                    const leftActionGroup = document.createElement("div");
+                    leftActionGroup.style.cssText = `
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        `;
+                    const extractBtn = this.createActionButton(utils.createInlineSVG('globe') + ' 自动添加', "#3498db", "自动识别当前页面的搜索引擎");
+                    const addBtn = this.createActionButton(utils.createInlineSVG('plus') + ' 手动添加', "#27ae60", "手动添加新的搜索引擎");
+                    leftActionGroup.appendChild(extractBtn);
+                    leftActionGroup.appendChild(addBtn);
+                    // 右侧操作组
+                    const rightActionGroup = document.createElement("div");
+                    rightActionGroup.style.cssText = `
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        `;
+                    const saveBtn = document.createElement("button");
+                    saveBtn.id = "panel-save-btn";
+                    saveBtn.innerHTML = utils.createInlineSVG('save') + ' 保存设置';
+                    saveBtn.title = "保存当前设置";
+                    saveBtn.style.cssText = `
+            padding: 10px 20px;
+            background: #95a5a6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+            opacity: 0.7;
+            pointer-events: none;
+            min-width: 120px;
+            justify-content: center;
+        `;
+                    const resetBtn = this.createActionButton(utils.createInlineSVG('undo') + ' 恢复默认', "#e74c3c", "恢复默认搜索引擎设置");
+                    rightActionGroup.appendChild(saveBtn);
+                    rightActionGroup.appendChild(resetBtn);
+                    quickActions.appendChild(leftActionGroup);
+                    quickActions.appendChild(rightActionGroup);
+                    content.appendChild(quickActions);
+
+                    // 3.2 引擎列表区
+                    const listSection = document.createElement("div");
+                    listSection.style.cssText = `
+            flex: 1;
+            overflow: hidden;
+            padding: 0 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            overflow: auto;
+        `;
+                    const listTitle = document.createElement("h3");
+                    listTitle.innerHTML = utils.createInlineSVG('list') + ' 已配置的搜索引擎';
+                    listTitle.style.cssText = `
+            color: #2c3e50;
+            margin: 15px 0;
+            font-weight: 500;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+                    const engineList = document.createElement("div");
+                    engineList.id = "engine-management-list";
+                    engineList.style.cssText = `
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            padding-bottom: 10px;
+            box-sizing: border-box;
+        `;
+                    listSection.appendChild(listTitle);
+                    listSection.appendChild(engineList);
+
+                    // 3.3 添加引擎表单
+                    const formSection = document.createElement("div");
+                    formSection.id = "add-engine-form";
+                    formSection.style.cssText = `
+            display: none;
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        `;
+                    const formTitle = document.createElement("h3");
+                    formTitle.innerHTML = utils.createInlineSVG('magic') + ' 添加新搜索引擎';
+                    formTitle.style.cssText = `
+            color: #2c3e50;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+                    formSection.appendChild(formTitle);
+
+                    // 表单字段容器
+                    const form = document.createElement("div");
+                    form.style.cssText = `
+            display: grid;
+            gap: 15px;
+            grid-template-columns: 1fr 1fr;
+        `;
+                    // 表单字段配置
+                    const fields = [{
+                            label: "引擎名称",
+                            placeholder: "例如: Google",
+                            type: "text",
+                            id: "engine-name",
+                            required: true
+                        },
+                        {
+                            label: "唯一标识",
+                            placeholder: "例如: google",
+                            type: "text",
+                            id: "engine-mark",
+                            required: true
+                        },
+                        {
+                            label: "搜索URL",
+                            placeholder: "使用 {keyword} 作为占位符",
+                            type: "text",
+                            id: "engine-url",
+                            required: true,
+                            fullWidth: true
+                        },
+                        {
+                            label: "关键词参数",
+                            placeholder: "例如: q,query,search",
+                            type: "text",
+                            id: "engine-keys",
+                            required: true,
+                            fullWidth: true
+                        }
+                    ];
+                    // 创建表单字段
+                    fields.forEach(field => {
+                        const container = document.createElement("div");
+                        if (field.fullWidth) {
+                            container.style.gridColumn = "1 / -1";
+                        }
+                        const label = document.createElement("label");
+                        label.textContent = field.label;
+                        label.style.cssText = `
+                display: block;
+                margin-bottom: 5px;
+                font-weight: 500;
+                color: #34495e;
+            `;
+                        const input = document.createElement("input");
+                        input.type = field.type;
+                        input.placeholder = field.placeholder;
+                        input.id = field.id;
+                        input.required = field.required;
+                        input.style.cssText = `
+                width: 100%;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                font-size: 14px;
+            `;
+                        container.appendChild(label);
+                        container.appendChild(input);
+                        form.appendChild(container);
+                    });
+
+                    // 图标设置区域
+                    const iconContainer = document.createElement("div");
+                    iconContainer.style.gridColumn = "1 / -1";
+                    const iconTitle = document.createElement("h4");
+                    iconTitle.innerHTML = utils.createInlineSVG('palette') + ' 图标设置';
+                    iconTitle.style.cssText = `
+            margin-bottom: 10px;
+            color: #34495e;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        `;
+                    iconContainer.appendChild(iconTitle);
+                    // 图标设置网格
+                    const iconGrid = document.createElement("div");
+                    iconGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 10px;
+            align-items: end;
+        `;
+                    // 图标类型选择
+                    const typeGroup = document.createElement("div");
+                    const typeLabel = document.createElement("label");
+                    typeLabel.textContent = "图标类型";
+                    typeLabel.style.cssText = `
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        `;
+                    typeGroup.appendChild(typeLabel);
+                    const iconTypeSelect = document.createElement("select");
+                    iconTypeSelect.id = "icon-type";
+                    iconTypeSelect.style.cssText = `
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        `;
+                    ["svg", "image", "text", "emoji"].forEach(type => {
+                        const option = document.createElement("option");
+                        option.value = type;
+                        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                        iconTypeSelect.appendChild(option);
+                    });
+                    typeGroup.appendChild(iconTypeSelect);
+                    // 图标内容输入
+                    const inputGroup = document.createElement("div");
+                    const inputLabel = document.createElement("label");
+                    inputLabel.textContent = "图标内容";
+                    inputLabel.style.cssText = `
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        `;
+                    inputGroup.appendChild(inputLabel);
+                    const iconInput = document.createElement("input");
+                    iconInput.type = "text";
+                    iconInput.id = "icon-input";
+                    iconInput.placeholder = "SVG代码、图片URL、文字或表情符号";
+                    iconInput.style.cssText = `
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        `;
+                    inputGroup.appendChild(iconInput);
+                    // 预览按钮
+                    const previewGroup = document.createElement("div");
+                    const previewButton = document.createElement("button");
+                    previewButton.innerHTML = utils.createInlineSVG('eye') + ' 预览图标';
+                    previewButton.style.cssText = `
+            width: 100%;
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        `;
+                    previewButton.id = "preview-icon";
+                    previewGroup.appendChild(previewButton);
+                    // 组装图标设置网格
+                    iconGrid.appendChild(typeGroup);
+                    iconGrid.appendChild(inputGroup);
+                    iconGrid.appendChild(previewGroup);
+                    iconContainer.appendChild(iconGrid);
+                    // 图标预览区域
+                    const previewContainer = document.createElement("div");
+                    previewContainer.style.gridColumn = "1 / -1";
+                    previewContainer.style.cssText = `
+            margin-top: 15px;
+            text-align: center;
+        `;
+                    const previewLabel = document.createElement("label");
+                    previewLabel.textContent = "图标预览 (推荐比例 8:5)";
+                    previewLabel.style.cssText = `
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+        `;
+                    const iconPreview = document.createElement("div");
+                    iconPreview.id = "icon-preview";
+                    iconPreview.style.cssText = `
+            width: 88px;
+            height: 55px;
+            border: 2px dashed #bdc3c7;
+            border-radius: 8px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background: #ecf0f1;
+        `;
+                    previewContainer.appendChild(previewLabel);
+                    previewContainer.appendChild(iconPreview);
+                    iconContainer.appendChild(previewContainer);
+                    form.appendChild(iconContainer);
+                    // 表单操作按钮
+                    const formActions = document.createElement("div");
+                    formActions.style.cssText = `
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        `;
+                    const saveFormBtn = this.createActionButton(utils.createInlineSVG('save') + ' 保存引擎', "#27ae60", "");
+                    const cancelFormBtn = this.createActionButton(utils.createInlineSVG('times') + ' 取消', "#95a5a6", "");
+                    formActions.appendChild(saveFormBtn);
+                    formActions.appendChild(cancelFormBtn);
+                    formSection.appendChild(form);
+                    formSection.appendChild(formActions);
+                    listSection.appendChild(formSection);
+                    content.appendChild(listSection);
+                    panel.appendChild(content);
+
+                    // 4. 面板底部
+                    const footer = document.createElement("div");
+                    footer.style.cssText = `
+            height: 20vh;
+            min-height: 60px;
+            max-height: 90px;
+            background-color: #ecf0f1;
+            padding: 15px 20px;
+            border-top: 1px solid #bdc3c7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            flex-shrink: 0;
+            border-radius: 0 0 15px 15px;
+        `;
+                    const selectedCount = document.createElement("span");
+                    selectedCount.id = "selected-count";
+                    selectedCount.innerHTML = utils.createInlineSVG('check-circle') + ' 已选择 0 个引擎';
+                    selectedCount.style.cssText = `
+            color: #7f8c8d;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        `;
+                    const footerActions = document.createElement("div");
+                    footerActions.style.cssText = `
+            display: flex;
+            gap: 10px;
+        `;
+                    const closeBtn = this.createActionButton(utils.createInlineSVG('times') + ' 关闭', "#95a5a6", "");
+                    footerActions.appendChild(closeBtn);
+                    footer.appendChild(selectedCount);
+                    footer.appendChild(footerActions);
+                    panel.appendChild(footer);
+
+                    // 5. 绑定事件
+                    extractBtn.addEventListener("click", () => this.extractFromCurrentPage());
+                    addBtn.addEventListener("click", () => this.showAddForm(true));
+                    resetBtn.addEventListener("click", () => this.resetToDefault());
+                    previewButton.addEventListener("click", () => this.previewIcon());
+                    saveFormBtn.addEventListener("click", () => this.saveNewEngine());
+                    cancelFormBtn.addEventListener("click", () => this.showAddForm(false));
+                    saveBtn.addEventListener("click", () => this.saveEngineSettings());
+                    closeBtn.addEventListener("click", () => this.closeManagementPanel());
+                    // 点击面板背景关闭
+                    panel.addEventListener("click", (e) => {
+                        if (e.target === panel) {
+                            this.closeManagementPanel();
+                        }
+                    });
+
+                    document.body.appendChild(panel);
+                    return panel;
+                },
+
                 /**
                  * 显示管理面板
                  */
@@ -5234,133 +5810,133 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                 }
             };
 
-            // ===== 应用初始化模块 =====
-            /**
-             * 应用初始化模块 - 封装初始化、脚本重载、页面事件监听等入口逻辑
-             */
-            const appInitializer = {
-                /**
-                 * 重新加载脚本（清理DOM、重置状态、重新初始化）
-                 */
-                reloadScript() {
-                    // 1. 清理所有创建的DOM元素
-                    [
-                        "#punkjet-search-box",
-                        `#${CLASS_NAMES.HAMBURGER_MENU}`,
-                        `#${CLASS_NAMES.SEARCH_OVERLAY}`,
-                        `#${CLASS_NAMES.MANAGEMENT_PANEL}`
-                    ].forEach(selector => {
-                        const element = document.querySelector(selector);
-                        if (element) {
-                            // 移除焦点陷阱
-                            accessibility.removeFocusTrap(element);
-                            element.remove();
-                        }
-                    });
+// ===== 应用初始化模块 =====
+/**
+ * 应用初始化模块 - 封装初始化、脚本重载、页面事件监听等入口逻辑
+ */
+const appInitializer = {
+    /**
+     * 重新加载脚本（清理DOM、重置状态、重新初始化）
+     */
+    reloadScript() {
+        // 1. 清理所有创建的DOM元素
+        [
+            "#punkjet-search-box",
+            `#${CLASS_NAMES.HAMBURGER_MENU}`,
+            `#${CLASS_NAMES.SEARCH_OVERLAY}`,
+            `#${CLASS_NAMES.MANAGEMENT_PANEL}`
+        ].forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                // 移除焦点陷阱
+                accessibility.removeFocusTrap(element);
+                element.remove();
+            }
+        });
 
-                    // 2. 清除所有定时器和防抖器
-                    utils.clearAllTimeouts();
-                    debounceUtils.clearAll();
+        // 2. 清除所有定时器和防抖器
+        utils.clearAllTimeouts();
+        debounceUtils.clearAll();
 
-                    // 3. 移除全局事件监听器
-                    const events = ['scroll', 'wheel', 'touchstart', 'touchmove', 'touchend'];
-                    events.forEach(event => {
-                        window.removeEventListener(event, () => {});
-                    });
+        // 3. 移除全局事件监听器
+        const events = ['scroll', 'wheel', 'touchstart', 'touchmove', 'touchend'];
+        events.forEach(event => {
+            window.removeEventListener(event, () => {});
+        });
 
-                    // 4. 重置应用状态
-                    appState.scriptLoaded = false;
-                    appState.containerAdded = false;
-                    appState.hamburgerMenuOpen = false;
-                    appState.searchOverlayVisible = false;
+        // 4. 重置应用状态
+        appState.scriptLoaded = false;
+        appState.containerAdded = false;
+        appState.hamburgerMenuOpen = false;
+        appState.searchOverlayVisible = false;
 
-                    // 5. 重新初始化
-                    this.init();
-                },
+        // 5. 重新初始化
+        this.init();
+    },
 
-                /**
-                 * 百度搜索特殊处理（延迟同步输入框内容）
-                 */
-                handleBaiduSpecialCase() {
-                    if (window.location.hostname.includes('baidu')) {
-                        setTimeout(() => {
-                            const baiduInput = document.querySelector('input#kw');
-                            if (baiduInput && baiduInput.value) {
-                                appState.currentInput = baiduInput.value.trim();
-                                sessionStorage.setItem(STORAGE_KEYS.CURRENT_INPUT, appState.currentInput);
-                            }
-                        }, DEFAULT_CONFIG.BAIDU_INPUT_DELAY);
-                    }
-                },
-
-                /**
-                 * 初始化应用（核心入口函数）
-                 */
-                init() {
-                    try {
-                        // 前置校验：避免重复初始化或无效作用域初始化
-                        if (appState.containerAdded || appState.scriptLoaded || !utils.isValidScope()) {
-                            return;
-                        }
-
-                        // 1. 初始化默认存储配置（若未设置过）
-                        if (!GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH)) {
-                            GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK);
-                        }
-
-                        // 2. 从sessionStorage恢复当前输入内容
-                        appState.currentInput = sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '';
-
-                        // 3. 执行初始化流程
-                        domHandler.monitorInputFields(); // 监控输入框
-                        domHandler.addSearchBox(); // 添加搜索框
-                        domHandler.injectStyle(); // 注入样式
-                        accessibility.init(); // 初始化可访问性功能
-                        this.handleBaiduSpecialCase(); // 百度特殊处理
-
-                        // 4. 更新初始化状态
-                        appState.scriptLoaded = true;
-                    } catch (error) {
-                        console.error("应用初始化失败:", error.message);
-                    }
-                },
-
-                /**
-                 * 初始化页面事件监听（ visibilitychange、pageshow 等）
-                 */
-                initPageEventListeners() {
-                    // 1. 页面可见性变化时重新检查初始化
-                    document.addEventListener("visibilitychange", () => {
-                        if (document.visibilityState === 'visible' && !appState.containerAdded) {
-                            this.init();
-                        }
-                    });
-
-                    // 2. 页面从缓存恢复时重新检查初始化
-                    document.addEventListener("pageshow", (event) => {
-                        if (event.persisted && !appState.containerAdded) {
-                            this.init();
-                        }
-                    });
-
-                    // 3. DOM加载完成后初始化
-                    document.addEventListener("DOMContentLoaded", () => {
-                        if (utils.isValidScope()) {
-                            this.init();
-                        }
-                    });
-
-                    // 4. 定期检查作用域（确保页面动态变化后仍能正常初始化）
-                    setInterval(() => {
-                        if (utils.isValidScope() && !appState.containerAdded) {
-                            this.init();
-                        } else if (!utils.isValidScope() && appState.containerAdded) {
-                            this.reloadScript();
-                        }
-                    }, DEFAULT_CONFIG.CHECK_SCOPE_INTERVAL);
+    /**
+     * 百度搜索特殊处理（延迟同步输入框内容）
+     */
+    handleBaiduSpecialCase() {
+        if (window.location.hostname.includes('baidu')) {
+            setTimeout(() => {
+                const baiduInput = document.querySelector('input#kw');
+                if (baiduInput && baiduInput.value) {
+                    appState.currentInput = baiduInput.value.trim();
+                    sessionStorage.setItem(STORAGE_KEYS.CURRENT_INPUT, appState.currentInput);
                 }
-            };
+            }, DEFAULT_CONFIG.BAIDU_INPUT_DELAY);
+        }
+    },
 
-            // ===== 应用启动入口 =====
-            // 初始化页面事件监听并启动应用
-            appInitializer.initPageEventListeners();
+    /**
+     * 初始化应用（核心入口函数）
+     */
+    init() {
+        try {
+            // 前置校验：避免重复初始化或无效作用域初始化
+            if (appState.containerAdded || appState.scriptLoaded || !utils.isValidScope()) {
+                return;
+            }
+
+            // 1. 初始化默认存储配置（若未设置过）
+            if (!GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH)) {
+                GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK);
+            }
+
+            // 2. 从sessionStorage恢复当前输入内容
+            appState.currentInput = sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '';
+
+            // 3. 执行初始化流程
+            domHandler.monitorInputFields(); // 监控输入框
+            domHandler.addSearchBox(); // 添加搜索框
+            domHandler.injectStyle(); // 注入样式
+            accessibility.init(); // 初始化可访问性功能
+            this.handleBaiduSpecialCase(); // 百度特殊处理
+
+            // 4. 更新初始化状态
+            appState.scriptLoaded = true;
+        } catch (error) {
+            console.error("应用初始化失败:", error.message);
+        }
+    },
+
+    /**
+     * 初始化页面事件监听（ visibilitychange、pageshow 等）
+     */
+    initPageEventListeners() {
+        // 1. 页面可见性变化时重新检查初始化
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === 'visible' && !appState.containerAdded) {
+                this.init();
+            }
+        });
+
+        // 2. 页面从缓存恢复时重新检查初始化
+        document.addEventListener("pageshow", (event) => {
+            if (event.persisted && !appState.containerAdded) {
+                this.init();
+            }
+        });
+
+        // 3. DOM加载完成后初始化
+        document.addEventListener("DOMContentLoaded", () => {
+            if (utils.isValidScope()) {
+                this.init();
+            }
+        });
+
+        // 4. 定期检查作用域（确保页面动态变化后仍能正常初始化）
+        setInterval(() => {
+            if (utils.isValidScope() && !appState.containerAdded) {
+                this.init();
+            } else if (!utils.isValidScope() && appState.containerAdded) {
+                this.reloadScript();
+            }
+        }, DEFAULT_CONFIG.CHECK_SCOPE_INTERVAL);
+    }
+};
+
+// ===== 应用启动入口 =====
+// 初始化页面事件监听并启动应用
+appInitializer.initPageEventListeners();
