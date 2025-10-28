@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         聚合搜索引擎切换导航(自用)
+// @name         聚合搜索引擎切换导航(移动端优化)(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.30
+// @version      v1.33
 // @author       晚风知我意
 // @match        *://*/*searchstring=*
 // @match        *://*/*searchquery=*
@@ -50,6 +50,7 @@
 // @run-at       document-body
 // @license     MIT
 // @description * 搜索引擎快捷工具 * 核心功能：页面底部搜索引擎快捷栏、拖拽排序、自定义引擎管理、快捷搜索 、增加底部搜索引擎栏偏移设置(确保任何浏览器内搜索引擎导航栏都能够聚焦在输入法键盘上方)
+// @downloadURL none
 // ==/UserScript==
 
             const punkDeafultMark = "Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
@@ -2339,10 +2340,9 @@ const DEFAULT_CONFIG = {
 };
 
 // ===== 全局状态管理 =====
-// 用对象封装全局状态，避免零散变量污染作用域
 const appState = {
     userSearchEngines: GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, []),
-    searchUrlMap: [...defaultSearchEngines, ...GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, [])], // defaultSearchEngines为原代码默认引擎数组
+    searchUrlMap: [...defaultSearchEngines, ...GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, [])],
     lastScrollTop: 0,
     punkJetBoxVisible: true,
     currentInput: sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '',
@@ -2354,7 +2354,9 @@ const appState = {
     hideTimeout: null,
     touchStartY: null,
     hamburgerMenuOpen: false,
-    searchOverlayVisible: false
+    searchOverlayVisible: false,
+    // 新增：标记是否正在与引擎按钮栏交互
+    isInteractingWithEngineBar: false
 };
 
 // ===== 可访问性模块 =====
@@ -3084,7 +3086,7 @@ const domHandler = {
         const shouldOffset = document.activeElement && (
             document.activeElement.tagName === 'INPUT' || 
             document.activeElement.tagName === 'TEXTAREA'
-        );
+        ) && !appState.isInteractingWithEngineBar; // 新增：与引擎栏交互时不偏移
 
         // 应用位置样式
         punkJetBox.style.bottom = shouldOffset ? `${offsetValue}px` : '0px';
@@ -3126,9 +3128,26 @@ const domHandler = {
         button.addEventListener('mouseover', handleMouseEnter);
         button.addEventListener('mouseout', handleMouseLeave);
 
+        // 增强触摸事件处理
+        button.addEventListener('touchstart', (e) => {
+            // 标记为引擎栏交互，防止输入框失焦
+            appState.isInteractingWithEngineBar = true;
+            e.stopPropagation(); // 阻止事件冒泡
+        }, { passive: true });
+
+        button.addEventListener('touchend', (e) => {
+            // 短暂延迟后重置状态
+            setTimeout(() => {
+                appState.isInteractingWithEngineBar = false;
+            }, 150);
+            e.stopPropagation();
+        }, { passive: true });
+
         // 点击事件（调用搜索逻辑）
         button.addEventListener('click', (event) => {
             event.preventDefault();
+            event.stopPropagation(); // 阻止事件冒泡
+            
             const url = button.getAttribute("url");
             const keywords = utils.getSearchKeywords();
 
@@ -3372,12 +3391,32 @@ const domHandler = {
             }, DEFAULT_CONFIG.SCROLL_TIMEOUT_DURATION);
         };
 
-        // 2. 触摸事件 - 使用节流优化
+        // 2. 触摸事件 - 增强版，防止引擎按钮栏触摸导致输入框失焦
         const handleTouchStart = (e) => {
+            // 检查是否触摸在引擎按钮栏上
+            const isTouchingEngineBar = e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`) !== null;
+            
+            if (isTouchingEngineBar) {
+                // 标记当前正在与引擎栏交互，防止失焦
+                appState.isInteractingWithEngineBar = true;
+                
+                // 如果是按钮，阻止默认行为避免失焦
+                if (e.target.closest(`.${CLASS_NAMES.ENGINE_BUTTON}`)) {
+                    e.preventDefault();
+                }
+            } else {
+                appState.isInteractingWithEngineBar = false;
+            }
+            
             appState.touchStartY = e.touches[0].clientY;
         };
 
         const handleTouchMove = (e) => {
+            // 如果正在与引擎栏交互，不处理滑动隐藏逻辑
+            if (appState.isInteractingWithEngineBar) {
+                return;
+            }
+            
             if (appState.touchStartY === null) return;
             if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
 
@@ -3393,13 +3432,25 @@ const domHandler = {
             }, 100);
         };
 
-        const handleTouchEnd = () => {
+        const handleTouchEnd = (e) => {
+            // 如果是引擎栏的触摸结束，短暂延迟后重置状态
+            if (appState.isInteractingWithEngineBar) {
+                setTimeout(() => {
+                    appState.isInteractingWithEngineBar = false;
+                }, 100);
+            }
+            
             appState.touchStartY = null;
             this.showSearchBoxDelayed();
         };
 
         // 3. 滚轮事件
-        const handleWheel = () => {
+        const handleWheel = (e) => {
+            // 如果滚轮事件发生在引擎栏上，不处理隐藏逻辑
+            if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
+                return;
+            }
+            
             setTimeout(() => {
                 const st = window.pageYOffset || document.documentElement.scrollTop;
                 if (st > appState.lastScrollTop && st > 50) {
@@ -3419,22 +3470,30 @@ const domHandler = {
         window.addEventListener('touchmove', handleTouchMove, passiveOptions);
         window.addEventListener('touchend', handleTouchEnd, passiveOptions);
 
-        // 5. 点击事件：点击其他区域显示搜索框
+        // 5. 新增：引擎按钮栏触摸事件处理，防止失焦
+        this.initEngineBarTouchHandling();
+
+        // 6. 点击事件：点击其他区域显示搜索框
         document.addEventListener('click', (e) => {
+            // 如果点击的是引擎按钮栏，不触发显示逻辑
+            if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
+                return;
+            }
+            
             if (!e.target.closest(`#${CLASS_NAMES.MANAGEMENT_PANEL}`) &&
                 !e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
                 this.showSearchBoxImmediately();
             }
         });
 
-        // 6. 聚焦事件：输入框聚焦时显示搜索框
+        // 7. 聚焦事件：输入框聚焦时显示搜索框
         document.addEventListener('focusin', (e) => {
             if (e.target.matches('input, textarea')) {
                 this.showSearchBoxImmediately();
             }
         });
 
-        // 7. 鼠标进入事件：进入引擎容器时显示搜索框
+        // 8. 鼠标进入事件：进入引擎容器时显示搜索框
         document.addEventListener('mouseenter', (e) => {
             if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`) ||
                 e.target.closest(`.${CLASS_NAMES.ENGINE_BUTTON}`)) {
@@ -3442,7 +3501,7 @@ const domHandler = {
             }
         }, true);
 
-        // 8. 阻止引擎容器内滚动事件冒泡
+        // 9. 阻止引擎容器内滚动事件冒泡
         const stopPropagationHandler = (e) => {
             if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) {
                 e.stopPropagation();
@@ -3451,6 +3510,46 @@ const domHandler = {
 
         document.addEventListener('wheel', stopPropagationHandler, passiveOptions);
         document.addEventListener('touchmove', stopPropagationHandler, passiveOptions);
+    },
+
+    /**
+     * 初始化引擎按钮栏触摸事件处理
+     */
+    initEngineBarTouchHandling() {
+        const engineContainer = document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}`);
+        if (!engineContainer) return;
+
+        // 阻止引擎栏内的触摸事件冒泡，避免影响输入框焦点
+        const preventPropagation = (e) => {
+            e.stopPropagation();
+        };
+
+        // 为引擎容器和所有按钮添加触摸事件处理
+        const touchEvents = ['touchstart', 'touchmove', 'touchend', 'touchcancel'];
+        touchEvents.forEach(eventType => {
+            engineContainer.addEventListener(eventType, preventPropagation, { passive: true });
+            
+            // 为所有引擎按钮也添加相同处理
+            const buttons = engineContainer.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
+            buttons.forEach(button => {
+                button.addEventListener(eventType, preventPropagation, { passive: true });
+            });
+        });
+
+        // 特殊处理按钮的触摸开始事件，避免触发页面滚动
+        engineContainer.addEventListener('touchstart', (e) => {
+            if (e.target.closest(`.${CLASS_NAMES.ENGINE_BUTTON}`)) {
+                // 标记为引擎栏交互状态
+                appState.isInteractingWithEngineBar = true;
+            }
+        }, { passive: true });
+
+        // 触摸结束后重置状态
+        engineContainer.addEventListener('touchend', () => {
+            setTimeout(() => {
+                appState.isInteractingWithEngineBar = false;
+            }, 150);
+        }, { passive: true });
     },
 
     /**
@@ -3797,9 +3896,9 @@ const hamburgerMenu = {
                 action: () => managementPanel.showManagementPanel()
             },
             {
-                icon: 'keyboard',
-                text: '快捷键说明',
-                action: () => this.showKeyboardShortcuts()
+                icon: 'info-circle',
+                text: '使用说明',
+                action: () => this.showUsageGuide()
             }
         ];
 
@@ -3925,37 +4024,321 @@ const hamburgerMenu = {
     },
 
     /**
-     * 显示键盘快捷键说明
+     * 显示使用说明界面（全屏简洁版）
      */
-    showKeyboardShortcuts() {
-        const shortcuts = [{
-                key: 'Alt + S',
-                action: '打开搜索框'
-            },
-            {
-                key: 'Alt + E',
-                action: '打开引擎管理'
-            },
-            {
-                key: 'Alt + M',
-                action: '打开/关闭菜单'
-            },
-            {
-                key: 'ESC',
-                action: '关闭当前弹窗'
-            }
-        ];
+    showUsageGuide() {
+        this.hideHamburgerMenu();
+        
+        // 创建使用说明遮罩层 - 全屏
+        const guideOverlay = document.createElement("div");
+        guideOverlay.id = "usage-guide-overlay";
+        guideOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            z-index: 10002;
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.3s ease;
+            overflow: hidden;
+        `;
 
-        let message = '键盘快捷键:\n\n';
-        shortcuts.forEach(shortcut => {
-            message += `${shortcut.key} - ${shortcut.action}\n`;
+        // 头部栏
+        const header = document.createElement("div");
+        header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            flex-shrink: 0;
+        `;
+
+        const title = document.createElement("h1");
+        title.innerHTML = utils.createInlineSVG('info-circle', '#3498db') + ' 使用说明';
+        title.style.cssText = `
+            margin: 0;
+            color: #2c3e50;
+            font-size: 1.5em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        `;
+
+        const closeBtn = document.createElement("button");
+        closeBtn.innerHTML = utils.createInlineSVG('times');
+        closeBtn.style.cssText = `
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #666;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        `;
+
+        closeBtn.addEventListener('mouseenter', () => {
+            closeBtn.style.background = '#e9ecef';
         });
 
-        alert(message);
-        this.hideHamburgerMenu();
+        closeBtn.addEventListener('mouseleave', () => {
+            closeBtn.style.background = 'none';
+        });
+
+        closeBtn.addEventListener('click', () => {
+            guideOverlay.remove();
+        });
+
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+
+        // 内容区域 - 全屏滚动
+        const content = document.createElement("div");
+        content.style.cssText = `
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: white;
+        `;
+
+        // 创建网格布局
+        const gridContainer = document.createElement("div");
+        gridContainer.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            max-width: 1200px;
+            margin: 0 auto;
+        `;
+
+        // 快捷键卡片
+        const shortcutsCard = this.createCard('🎯 快捷键', this.createShortcutsContent());
+        // 核心功能卡片
+        const featuresCard = this.createCard('🚀 核心功能', this.createFeaturesContent());
+        // 使用技巧卡片
+        const tipsCard = this.createCard('💡 使用技巧', this.createTipsContent());
+
+        gridContainer.appendChild(shortcutsCard);
+        gridContainer.appendChild(featuresCard);
+        gridContainer.appendChild(tipsCard);
+
+        content.appendChild(gridContainer);
+
+        // 组装结构
+        guideOverlay.appendChild(header);
+        guideOverlay.appendChild(content);
+        document.body.appendChild(guideOverlay);
+
+        // 绑定ESC键关闭
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                guideOverlay.remove();
+                document.removeEventListener('keydown', handleKeyDown);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+
+        // 应用焦点陷阱
+        accessibility.trapFocus(guideOverlay);
+    },
+
+    /**
+     * 创建卡片容器
+     */
+    createCard(titleText, content) {
+        const card = document.createElement("div");
+        card.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+            transition: transform 0.2s ease;
+        `;
+
+        card.addEventListener('mouseenter', () => {
+            card.style.transform = 'translateY(-2px)';
+        });
+
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = 'translateY(0)';
+        });
+
+        const title = document.createElement("h2");
+        title.textContent = titleText;
+        title.style.cssText = `
+            margin: 0 0 20px 0;
+            color: #2c3e50;
+            font-size: 1.3em;
+            font-weight: 600;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        `;
+
+        card.appendChild(title);
+        card.appendChild(content);
+
+        return card;
+    },
+
+    /**
+     * 创建快捷键内容
+     */
+    createShortcutsContent() {
+        const content = document.createElement("div");
+        content.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        `;
+
+        const shortcuts = [
+            { keys: 'Alt + S', action: '打开搜索框' },
+            { keys: 'Alt + E', action: '打开引擎管理' },
+            { keys: 'Alt + M', action: '打开/关闭菜单' },
+            { keys: 'ESC', action: '关闭当前弹窗' }
+        ];
+
+        shortcuts.forEach(shortcut => {
+            const item = document.createElement("div");
+            item.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 15px;
+                background: #f8f9fa;
+                border-radius: 8px;
+                border-left: 4px solid #3498db;
+            `;
+
+            const keys = document.createElement("span");
+            keys.textContent = shortcut.keys;
+            keys.style.cssText = `
+                font-family: 'Courier New', monospace;
+                font-weight: 600;
+                color: #e67e22;
+                font-size: 0.95em;
+            `;
+
+            const action = document.createElement("span");
+            action.textContent = shortcut.action;
+            action.style.cssText = `
+                color: #2c3e50;
+                font-weight: 500;
+            `;
+
+            item.appendChild(keys);
+            item.appendChild(action);
+            content.appendChild(item);
+        });
+
+        return content;
+    },
+
+    /**
+     * 创建核心功能内容
+     */
+    createFeaturesContent() {
+        const content = document.createElement("div");
+        content.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        `;
+
+        const features = [
+            '🔍 底部搜索栏一键切换搜索引擎',
+            '⚙️ 支持自定义添加和管理搜索引擎',
+            '📱 智能隐藏，滚动时自动收起',
+            '⌨️ 偏移设置-调整搜索引擎栏位置',
+            '🔀 拖拽排序个性化布局',
+            '🌐 自动识别页面搜索引擎'
+        ];
+
+        features.forEach(feature => {
+            const item = document.createElement("div");
+            item.style.cssText = `
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 10px;
+                background: #f8f9fa;
+                border-radius: 8px;
+                font-size: 0.95em;
+                line-height: 1.5;
+            `;
+
+            const text = document.createElement("span");
+            text.textContent = feature;
+            text.style.cssText = `
+                color: #2c3e50;
+            `;
+
+            item.appendChild(text);
+            content.appendChild(item);
+        });
+
+        return content;
+    },
+
+    /**
+     * 创建使用技巧内容
+     */
+    createTipsContent() {
+        const content = document.createElement("div");
+        content.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        `;
+
+        const tips = [
+            '💡 在搜索框直接输入网址可快速打开网站',
+            '💡 拖动引擎按钮可调整顺序，常用引擎放前面',
+            '💡 设置合适的底部偏移避免输入法遮挡',
+            '💡 使用"自动添加"快速识别当前页面搜索引擎',
+            '💡 搜索栏会在滚动时隐藏，鼠标移到底部显示',
+            '💡 支持触摸屏滑动控制搜索栏显示隐藏'
+        ];
+
+        tips.forEach(tip => {
+            const item = document.createElement("div");
+            item.style.cssText = `
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 10px;
+                background: #fff3cd;
+                border-radius: 8px;
+                border-left: 4px solid #ffc107;
+                font-size: 0.95em;
+                line-height: 1.5;
+            `;
+
+            const text = document.createElement("span");
+            text.textContent = tip;
+            text.style.cssText = `
+                color: #856404;
+            `;
+
+            item.appendChild(text);
+            content.appendChild(item);
+        });
+
+        return content;
     }
 };
-
 // ===== 管理面板模块 =====
 /**
  * 引擎管理面板模块 - 封装面板创建、引擎管理、配置保存等核心逻辑
