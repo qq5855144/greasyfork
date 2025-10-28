@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航(移动端优化)(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.33
+// @version      v1.34
 // @author       晚风知我意
 // @match        *://*/*searchstring=*
 // @match        *://*/*searchquery=*
@@ -3166,58 +3166,69 @@ const domHandler = {
     },
 
     /**
-     * 创建汉堡菜单按钮
-     * @returns {HTMLButtonElement} 汉堡菜单按钮DOM元素
-     */
-    createHamburgerButton() {
-        const hamburgerButton = document.createElement('button');
-        hamburgerButton.className = "engine-hamburger-button";
-        hamburgerButton.innerHTML = utils.createInlineSVG('paper-plane');
-        hamburgerButton.title = "菜单 (Alt+M)";
-        hamburgerButton.style.cssText = `
-            width: 32px;
-            height: 32px;
-            border: 1px solid #f0f0f0;
-            border-radius: 7px;
-            background-color: rgba(255, 255, 255, 1);
-            box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1), 
-                        0px 0px 0px rgba(255, 255, 255, 0.5), 
-                        6px 6px 10px rgba(0, 0, 0, 0.1) inset, 
-                        -6px -6px 10px rgba(255, 255, 255, 0) inset;
-            cursor: pointer;
-            margin: 3px;
-            flex-shrink: 0;
-            display: flex;
-            justify-content: center; 
-            align-items: center;      
-            font-size: 16px;
-            color: #999999;
-            transition: all 0.3s ease;
-            padding: 0;              
-        `;
+ * 创建汉堡菜单按钮
+ */
+createHamburgerButton() {
+    const hamburgerButton = document.createElement('button');
+    hamburgerButton.className = "engine-hamburger-button";
+    hamburgerButton.innerHTML = utils.createInlineSVG('paper-plane');
+    hamburgerButton.title = "菜单 (Alt+M)";
+    hamburgerButton.style.cssText = `
+        width: 32px;
+        height: 32px;
+        border: 1px solid #f0f0f0;
+        border-radius: 7px;
+        background-color: rgba(255, 255, 255, 1);
+        box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1), 
+                    0px 0px 0px rgba(255, 255, 255, 0.5), 
+                    6px 6px 10px rgba(0, 0, 0, 0.1) inset, 
+                    -6px -6px 10px rgba(255, 255, 255, 0) inset;
+        cursor: pointer;
+        margin: 3px;
+        flex-shrink: 0;
+        display: flex;
+        justify-content: center; 
+        align-items: center;      
+        font-size: 16px;
+        color: #999999;
+        transition: all 0.3s ease;
+        padding: 0;
+        outline: none;
+    `;
 
-        // 鼠标hover效果
-        hamburgerButton.addEventListener('mouseenter', () => {
-            hamburgerButton.style.backgroundColor = 'rgba(241, 241, 241, 1)';
-            hamburgerButton.style.transform = 'translateY(-2px)';
-            hamburgerButton.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        });
+    // 鼠标hover效果
+    hamburgerButton.addEventListener('mouseenter', () => {
+        hamburgerButton.style.backgroundColor = 'rgba(241, 241, 241, 1)';
+        hamburgerButton.style.transform = 'translateY(-2px)';
+        hamburgerButton.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    });
 
-        hamburgerButton.addEventListener('mouseout', () => {
-            hamburgerButton.style.backgroundColor = 'white';
-            hamburgerButton.style.transform = 'translateY(0)';
-            hamburgerButton.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
-        });
+    hamburgerButton.addEventListener('mouseleave', () => {
+        hamburgerButton.style.backgroundColor = 'white';
+        hamburgerButton.style.transform = 'translateY(0)';
+        hamburgerButton.style.boxShadow = '1px 1px 1px rgba(0, 0, 0, 0.1), 0px 0px 0px rgba(255, 255, 255, 0.5), 6px 6px 10px rgba(0, 0, 0, 0.1) inset, -6px -6px 10px rgba(255, 255, 255, 0) inset';
+    });
 
-        // 点击切换汉堡菜单
-        hamburgerButton.addEventListener('click', () => {
-            appState.hamburgerMenuOpen ?
-                hamburgerMenu.hideHamburgerMenu() :
-                hamburgerMenu.showHamburgerMenu();
-        });
+    // 修复焦点问题：阻止默认焦点行为
+    hamburgerButton.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+    });
 
-        return hamburgerButton;
-    },
+    // 点击切换汉堡菜单
+    hamburgerButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // 立即移除焦点
+        hamburgerButton.blur();
+        
+        appState.hamburgerMenuOpen ?
+            hamburgerMenu.hideHamburgerMenu() :
+            hamburgerMenu.showHamburgerMenu();
+    });
+
+    return hamburgerButton;
+},
 
     /**
      * 添加搜索框到页面（核心UI组件）
@@ -3857,88 +3868,56 @@ const searchOverlay = {
  */
 const hamburgerMenu = {
     /**
-     * 创建汉堡菜单（确保只创建一次）
-     * @returns {HTMLDivElement} 汉堡菜单DOM元素
-     */
-    createHamburgerMenu() {
-        let menu = document.getElementById(CLASS_NAMES.HAMBURGER_MENU);
-        if (menu) return menu;
+ * 创建汉堡菜单（确保只创建一次）
+ */
+createHamburgerMenu() {
+    let menu = document.getElementById(CLASS_NAMES.HAMBURGER_MENU);
+    if (menu) return menu;
 
-        // 1. 创建菜单容器
-        menu = document.createElement("div");
-        menu.id = CLASS_NAMES.HAMBURGER_MENU;
-        menu.style.cssText = `
-            position: fixed;
-            bottom: 50px;
-            left: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
-            backdrop-filter: blur(5px);
-            z-index: 10001;
-            display: none;
-            flex-direction: column;
-            padding: 10px;
-            gap: 5px;
-            min-width: 180px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        `;
+    // 1. 创建菜单容器
+    menu = document.createElement("div");
+    menu.id = CLASS_NAMES.HAMBURGER_MENU;
+    menu.style.cssText = `
+        position: fixed;
+        bottom: 50px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 15px;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+        backdrop-filter: blur(5px);
+        z-index: 10001;
+        display: none;
+        flex-direction: column;
+        padding: 10px;
+        gap: 5px;
+        min-width: 180px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    `;
 
-        // 2. 定义菜单项配置
-        const menuItems = [{
-                icon: 'search',
-                text: '快捷搜索 (Alt+S)',
-                action: () => searchOverlay.showSearchOverlay()
-            },
-            {
-                icon: 'cog',
-                text: '引擎管理 (Alt+E)',
-                action: () => managementPanel.showManagementPanel()
-            },
-            {
-                icon: 'info-circle',
-                text: '使用说明',
-                action: () => this.showUsageGuide()
-            }
-        ];
+    // 2. 定义菜单项配置
+    const menuItems = [
+        {
+            icon: 'search',
+            text: '快捷搜索 (Alt+S)',
+            action: () => searchOverlay.showSearchOverlay()
+        },
+        {
+            icon: 'cog',
+            text: '引擎管理 (Alt+E)',
+            action: () => managementPanel.showManagementPanel()
+        },
+        {
+            icon: 'info-circle',
+            text: '使用说明',
+            action: () => this.showUsageGuide()
+        }
+    ];
 
-        // 3. 创建菜单项按钮
-        menuItems.forEach(item => {
-            const menuItem = document.createElement("button");
-            menuItem.innerHTML = utils.createInlineSVG(item.icon) + ` ${item.text}`;
-            menuItem.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 12px 15px;
-                border: none;
-                background: none;
-                border-radius: 8px;
-                cursor: pointer;
-                font-size: 14px;
-                color: #2c3e50;
-                transition: all 0.3s ease;
-                text-align: left;
-            `;
-
-            // 菜单项hover效果
-            menuItem.addEventListener('mouseenter', () => {
-                menuItem.style.background = 'rgba(52, 152, 219, 0.1)';
-            });
-
-            menuItem.addEventListener('mouseleave', () => {
-                menuItem.style.background = 'none';
-            });
-
-            // 绑定菜单项点击事件
-            menuItem.addEventListener('click', item.action);
-            menu.appendChild(menuItem);
-        });
-
-        // 4. 添加底部偏移设置按钮
-        const setOffsetButton = document.createElement('button');
-        setOffsetButton.innerHTML = utils.createInlineSVG('sog') + ' 设置底部偏移';
-        setOffsetButton.style.cssText = `
+    // 3. 创建菜单项按钮
+    menuItems.forEach(item => {
+        const menuItem = document.createElement("button");
+        menuItem.innerHTML = utils.createInlineSVG(item.icon) + ` ${item.text}`;
+        menuItem.style.cssText = `
             display: flex;
             align-items: center;
             gap: 10px;
@@ -3951,36 +3930,95 @@ const hamburgerMenu = {
             color: #2c3e50;
             transition: all 0.3s ease;
             text-align: left;
-            margin-top: 5px;
+            outline: none;
         `;
 
-        // 设置按钮hover效果
-        setOffsetButton.addEventListener('mouseenter', () => {
-            setOffsetButton.style.background = 'rgba(52, 152, 219, 0.1)';
+        // 菜单项hover效果
+        menuItem.addEventListener('mouseenter', () => {
+            menuItem.style.background = 'rgba(52, 152, 219, 0.1)';
         });
 
-        setOffsetButton.addEventListener('mouseleave', () => {
-            setOffsetButton.style.background = 'none';
+        menuItem.addEventListener('mouseleave', () => {
+            menuItem.style.background = 'none';
         });
 
-        // 设置按钮点击事件
-        setOffsetButton.addEventListener('click', () => {
-            const currentValue = utils.getEngineBarOffset();
-            const userValue = prompt(`请输入搜索栏在输入法弹出时的底部偏移（单位px）：`, currentValue);
+        // 修复焦点问题：点击时移除焦点
+        menuItem.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // 防止按钮获得焦点
+        });
+
+        menuItem.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             
-            if (userValue !== null && !isNaN(userValue)) {
-                utils.setEngineBarOffset(userValue);
-                alert(`偏移值已设置为 ${userValue}px`);
-                domHandler.updateSearchBoxPosition();
-            }
+            // 立即移除焦点
+            menuItem.blur();
+            
+            // 执行菜单项动作
+            item.action();
+            
+            // 隐藏菜单
             this.hideHamburgerMenu();
         });
 
-        menu.appendChild(setOffsetButton);
+        menu.appendChild(menuItem);
+    });
 
-        document.body.appendChild(menu);
-        return menu;
-    },
+    // 4. 添加底部偏移设置按钮（同样修复焦点问题）
+    const setOffsetButton = document.createElement('button');
+    setOffsetButton.innerHTML = utils.createInlineSVG('sog') + ' 设置底部偏移';
+    setOffsetButton.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 15px;
+        border: none;
+        background: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #2c3e50;
+        transition: all 0.3s ease;
+        text-align: left;
+        margin-top: 5px;
+        outline: none;
+    `;
+
+    setOffsetButton.addEventListener('mouseenter', () => {
+        setOffsetButton.style.background = 'rgba(52, 152, 219, 0.1)';
+    });
+
+    setOffsetButton.addEventListener('mouseleave', () => {
+        setOffsetButton.style.background = 'none';
+    });
+
+    // 修复焦点问题
+    setOffsetButton.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+    });
+
+    setOffsetButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        setOffsetButton.blur();
+        
+        const currentValue = utils.getEngineBarOffset();
+        const userValue = prompt(`请输入搜索栏在输入法弹出时的底部偏移（单位px）：`, currentValue);
+        
+        if (userValue !== null && !isNaN(userValue)) {
+            utils.setEngineBarOffset(userValue);
+            alert(`偏移值已设置为 ${userValue}px`);
+            domHandler.updateSearchBoxPosition();
+        }
+        this.hideHamburgerMenu();
+    });
+
+    menu.appendChild(setOffsetButton);
+
+    document.body.appendChild(menu);
+    return menu;
+},
 
     /**
      * 显示汉堡菜单
