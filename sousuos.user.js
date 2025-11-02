@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航(移动端优化)(自用)
 // @namespace    http://tampermonkey.net/
-// @version      v1.34
+// @version      v1.38
 // @author       晚风知我意
 // @match        *://*/*searchstring=*
 // @match        *://*/*searchquery=*
@@ -50,7 +50,8 @@
 // @run-at       document-body
 // @license     MIT
 // @description * 搜索引擎快捷工具 * 核心功能：页面底部搜索引擎快捷栏、拖拽排序、自定义引擎管理、快捷搜索 、增加底部搜索引擎栏偏移设置(确保任何浏览器内搜索引擎导航栏都能够聚焦在输入法键盘上方)
-// @downloadURL none
+// @downloadURL https://update.greasyfork.org/scripts/513481/%E8%81%9A%E5%90%88%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E%E5%88%87%E6%8D%A2%E5%AF%BC%E8%88%AA%28%E7%A7%BB%E5%8A%A8%E7%AB%AF%E4%BC%98%E5%8C%96%29%28%E8%87%AA%E7%94%A8%29.user.js
+// @updateURL https://update.greasyfork.org/scripts/513481/%E8%81%9A%E5%90%88%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E%E5%88%87%E6%8D%A2%E5%AF%BC%E8%88%AA%28%E7%A7%BB%E5%8A%A8%E7%AB%AF%E4%BC%98%E5%8C%96%29%28%E8%87%AA%E7%94%A8%29.meta.js
 // ==/UserScript==
 
             const punkDeafultMark = "Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
@@ -1866,6 +1867,23 @@ MTItMjdUMTE6MzQ6MTArMDA6MDAFTOZdAAAAAElFTkSuQmCC" />
 </svg>
 `
                 },
+                
+                {
+name: "扩展搜索",
+searchUrl: "https://www.crxsoso.com/search?keyword={keyword}&store=chrome",
+searchkeyName: ["keyword"],
+matchUrl: /crxsoso\.com\/search\?keyword=/g,
+mark: "Crxsoso",
+svgCode: ` 
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="-20 -20 112 112" fill="none">
+    <path d="M34.2 0H0V34.2H34.2V0Z" fill="#f25022"/>
+    <path d="M72.0008 0H37.8008V34.2H72.0008V0Z" fill="#7fba00"/>
+    <path d="M34.2 37.7998H0V71.9998H34.2V37.7998Z" fill="#00a4ef"/>
+    <path d="M72.0008 37.7998H37.8008V71.9998H72.0008V37.7998Z" fill="#ffb900"/>
+</svg>
+  `
+},
+                
                 {
                     name: "知乎",
                     searchUrl: "https://www.zhihu.com/search?type=content&q={keyword}",
@@ -3638,144 +3656,621 @@ const searchOverlay = {
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(255, 255, 255, 1);
+            background: rgba(255, 255, 255, 0.98);
             z-index: 9998;
             display: none;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(5px);
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         `;
 
-        // 2. 创建搜索内容容器
+        // 2. 创建外层滚动容器
+        const scrollContainer = document.createElement("div");
+        scrollContainer.style.cssText = `
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding: 10px 0;
+            box-sizing: border-box;
+        `;
+
+        // 3. 创建搜索内容容器
         const searchContainer = document.createElement("div");
         searchContainer.style.cssText = `
-            width: 90%;
-            max-width: 500px;
-            background: linear-gradient(145deg, #f0f0f0, #ffffff);
-            border-radius: 25px;
-            padding: 30px;
+            width: 95%;
+            max-width: 900px;
+            min-height: min-content;
+            background: linear-gradient(145deg, #f8f9fa, #ffffff);
+            border-radius: 20px;
+            padding: 25px 20px;
             box-shadow: 
-                20px 20px 60px rgba(0, 0, 0, 0.1),
-                -20px -20px 60px rgba(255, 255, 255, 0.8),
-                inset 1px 1px 2px rgba(255, 255, 255, 0.6),
-                inset -1px -1px 2px rgba(0, 0, 0, 0.05);
+                0 10px 40px rgba(0, 0, 0, 0.1),
+                0 2px 10px rgba(0, 0, 0, 0.05);
             position: relative;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            margin: 10px auto;
+            box-sizing: border-box;
         `;
 
-        // 3. 创建关闭按钮
+        // 响应式调整
+        const updateSearchContainerStyle = () => {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                searchContainer.style.width = '92%';
+                searchContainer.style.padding = '20px 15px';
+                searchContainer.style.borderRadius = '16px';
+                searchContainer.style.margin = '5px auto';
+            } else {
+                searchContainer.style.width = '95%';
+                searchContainer.style.padding = '25px 20px';
+                searchContainer.style.borderRadius = '20px';
+                searchContainer.style.margin = '10px auto';
+            }
+        };
+
+        // 初始设置
+        updateSearchContainerStyle();
+        // 监听窗口大小变化
+        window.addEventListener('resize', updateSearchContainerStyle);
+
+         // 4. 创建关闭按钮
         const closeBtn = document.createElement("button");
         closeBtn.innerHTML = utils.createInlineSVG('times');
+        closeBtn.setAttribute('aria-label', '关闭搜索');
         closeBtn.style.cssText = `
             position: absolute;
-            top: 15px;
-            right: 15px;
-            background: linear-gradient(145deg, #e8e8e8, #ffffff);
+            top: 16px;
+            right: 16px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
             border: none;
-            font-size: 20px;
-            color: #666;
+            font-size: 18px;
+            color: #64748b;
             cursor: pointer;
-            padding: 8px;
+            padding: 3px;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 24px;
+            height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: 
-                5px 5px 10px rgba(0, 0, 0, 0.1),
-                -5px -5px 10px rgba(255, 255, 255, 0.8),
-                inset 1px 1px 2px rgba(255, 255, 255, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+                0 4px 12px rgba(0, 0, 0, 0.1),
+                0 2px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            z-index: 1;
+            backdrop-filter: blur(10px);
         `;
 
-        // 关闭按钮hover效果
+        // 关闭按钮交互效果
         closeBtn.addEventListener('mouseenter', () => {
-            closeBtn.style.background = 'linear-gradient(145deg, #ff6b6b, #ff5252)';
+            closeBtn.style.background = 'linear-gradient(135deg, #ff4757 0%, #ff3742 100%)';
             closeBtn.style.color = 'white';
-            closeBtn.style.transform = 'translateY(-2px)';
+            closeBtn.style.transform = 'scale(1.1) rotate(90deg)';
+            closeBtn.style.boxShadow = '0 8px 25px rgba(255, 71, 87, 0.4)';
         });
 
         closeBtn.addEventListener('mouseleave', () => {
-            closeBtn.style.background = 'linear-gradient(145deg, #e8e8e8, #ffffff)';
-            closeBtn.style.color = '#666';
-            closeBtn.style.transform = 'translateY(0)';
+            closeBtn.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)';
+            closeBtn.style.color = '#64748b';
+            closeBtn.style.transform = 'scale(1) rotate(0deg)';
+            closeBtn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05)';
         });
 
         closeBtn.addEventListener('click', () => this.hideSearchOverlay());
 
-        // 4. 创建标题
+        // 5. 创建标题
         const title = document.createElement("h2");
         title.innerHTML = utils.createInlineSVG('search') + ' 快捷搜索 (Alt+S)';
         title.style.cssText = `
             margin: 0 0 20px 0;
             color: #2c3e50;
             text-align: center;
-            font-size: 24px;
+            font-size: clamp(18px, 4vw, 24px);
             text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
+            flex-wrap: wrap;
+            word-break: break-word;
         `;
 
-        // 5. 创建搜索输入框
+        // 6. 创建搜索输入框
         const searchInput = document.createElement("input");
         searchInput.type = "text";
         searchInput.placeholder = "输入关键词或网址...";
         searchInput.id = "overlay-search-input";
+        searchInput.setAttribute('autocomplete', 'off');
+        searchInput.setAttribute('autocorrect', 'off');
+        searchInput.setAttribute('autocapitalize', 'off');
+        searchInput.setAttribute('spellcheck', 'false');
         searchInput.style.cssText = `
             width: 100%;
-            padding: 12px 15px;
+            padding: 20px 24px; 
             box-sizing: border-box;
-            background: linear-gradient(145deg, #f8f9fa, #ffffff);
+            background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
             border-radius: 16px;
-            font-size: 16px;
-            color: #2c3e50;
+            font-size: 18px;
+            color: #1e293b;
             outline: none;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: 
-                inset 4px 4px 8px rgba(0, 0, 0, 0.05),
-                inset -4px -4px 8px rgba(255, 255, 255, 0.8),
-                5px 5px 15px rgba(0, 0, 0, 0.1);
-            height: 48px;
+                inset 3px 3px 6px rgba(0, 0, 0, 0.04),
+                inset -3px -3px 6px rgba(255, 255, 255, 0.8),
+                0 8px 30px rgba(0, 0, 0, 0.08);
+            border: 2px solid transparent; 
+            margin-bottom: 28px;
+            -webkit-appearance: none;
+            font-weight: 500;
+            line-height: 1.5;
+            min-height: 64px; 
         `;
 
-        // 输入框focus/blur效果
+        // 移动端优化
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            searchInput.style.fontSize = '16px';
+            searchInput.style.padding = '20px 22px'; 
+            searchInput.style.minHeight = '50px';
+        }
+
+        // 输入框交互效果
         searchInput.addEventListener('focus', () => {
-            searchInput.style.boxShadow =
-                'inset 4px 4px 8px rgba(0, 0, 0, 0.08), inset -4px -4px 8px rgba(255, 255, 255, 0.9), 8px 8px 20px rgba(0, 0, 0, 0.15)';
+            searchInput.style.boxShadow = 
+                'inset 3px 3px 6px rgba(0, 0, 0, 0.06), inset -3px -3px 6px rgba(255, 255, 255, 0.9), 0 12px 40px rgba(99, 102, 241, 0.15)'; 
+            searchInput.style.borderColor = 'transparent'; 
+            searchInput.style.background = 'linear-gradient(135deg, #ffffff 0%, #fefefe 100%)';
+            searchInput.style.transform = 'translateY(-2px)';
         });
 
         searchInput.addEventListener('blur', () => {
-            searchInput.style.boxShadow =
-                'inset 4px 4px 8px rgba(0, 0, 0, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.8), 5px 5px 15px rgba(0, 0, 0, 0.1)';
+            searchInput.style.boxShadow = 
+                'inset 3px 3px 6px rgba(0, 0, 0, 0.04), inset -3px -3px 6px rgba(255, 255, 255, 0.8), 0 8px 30px rgba(0, 0, 0, 0.08)';
+            searchInput.style.borderColor = 'transparent'; 
+            searchInput.style.transform = 'translateY(0)';
         });
 
-        // 6. 创建提示文本
-        const tipText = document.createElement("p");
-        tipText.innerHTML = utils.createInlineSVG('info-circle') + ' 提示：输入关键词后按回车使用默认搜索引擎搜索，或点击下方搜索引擎按钮选择特定引擎';
-        tipText.style.cssText = `
-            margin: 15px 0 0 0;
-            color: #7f8c8d;
-            font-size: 12px;
-            text-align: center;
-            line-height: 1.4;
+        // 7. 创建网址分类导航
+        const navigationSection = document.createElement("div");
+        navigationSection.style.cssText = `
+            margin-top: 10px;
+        `;
+
+        // 创建分类导航标题
+        const navTitle = document.createElement("h3");
+        navTitle.innerHTML = utils.createInlineSVG('globe') + ' 常用网站导航';
+        navTitle.style.cssText = `
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: clamp(16px, 3.5vw, 18px);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 5px;
+            gap: 8px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            text-align: center;
+            flex-wrap: wrap;
         `;
 
-        // 7. 组装结构
+        navigationSection.appendChild(navTitle);
+
+        // 创建分类容器
+        const categoriesContainer = document.createElement("div");
+        categoriesContainer.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 10px;
+        `;
+
+        // 响应式网格调整
+        const updateGridLayout = () => {
+            const width = window.innerWidth;
+            if (width <= 480) {
+                categoriesContainer.style.gridTemplateColumns = '1fr';
+                categoriesContainer.style.gap = '12px';
+            } else if (width <= 768) {
+                categoriesContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(250px, 1fr))';
+                categoriesContainer.style.gap = '14px';
+            } else {
+                categoriesContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
+                categoriesContainer.style.gap = '16px';
+            }
+        };
+
+        updateGridLayout();
+        window.addEventListener('resize', updateGridLayout);
+
+        // 定义网站分类数据
+const websiteCategories = [
+    {
+        title: "🔧 逆向论坛区",
+        sites: [
+            { name: "MT论坛", url: "https://bbs.binmt.cc" },
+            { name: "吾爱破解", url: "https://www.52pojie.cn" },
+            { name: "看雪论坛", url: "https://bbs.pediy.com" },            
+            { name: "飘云阁", url: "https://www.chinapyg.com" },
+            { name: "卡饭论坛", url: "https://www.kafan.cn" },
+            { name: "绿盟科技社区", url: "https://www.nsfocus.net" },
+            { name: "乌云漏洞平台", url: "https://wooyun.x10sec.org" },
+            { name: "渗透测试论坛", url: "https://www.hetianlab.com" },
+            { name: "XDA Developers", url: "https://forum.xda-developers.com" },
+            { name: "Reddit ReverseEngineering", url: "https://www.reddit.com/r/ReverseEngineering" },
+            { name: "CrackWatch", url: "https://www.reddit.com/r/CrackWatch" }
+        ]
+    },
+    {
+        title: "💎 软件资源区",
+        sites: [  
+            { name: "GETMODS", url: "https://getmodsapk.com/" },
+            { name: "APKdone", url: "https://apkdone.com/" },
+            { name: "LITEAPKS", url: "https://liteapks.com/" },
+            { name: "APKMODY", url: "https://apkmody.com/" },
+            { name: "423Down", url: "https://www.423down.com" },
+            { name: "果核剥壳", url: "https://www.ghxi.com" },
+            { name: "大眼仔旭", url: "https://www.dayanzai.me" },
+            { name: "ZD423", url: "https://www.zdfans.com" },         
+            { name: "软件缘", url: "https://www.appcgn.com" },
+            { name: "小众软件", url: "https://www.appinn.com" },         
+            { name: "Rutor", url: "http://rutor.info" },
+            { name: "RuTracker", url: "https://rutracker.org" }
+        ]
+    },
+    
+    {
+    title: "🤖 AI工具",
+    sites: [
+        { name: "ChatGPT", url: "https://chat.openai.com" },
+        { name: "deepseek", url: "https://www.deepseek.com/" },  // 加上 {
+        { name: "Claude", url: "https://claude.ai" },
+        { name: "文心一言", url: "https://yiyan.baidu.com" },
+        { name: "豆包", url: "https://www.doubao.com/chat/" },
+        { name: "讯飞星火", url: "https://xinghuo.xfyun.cn" },
+        { name: "智谱清言", url: "https://chatglm.cn" },
+        { name: "Midjourney", url: "https://www.midjourney.com" },
+        { name: "Stable Diffusion", url: "https://stability.ai" },
+        { name: "Notion AI", url: "https://www.notion.so" }
+    ]
+},
+
+    {
+        title: "🎬 影视区",
+        sites: [
+            { name: "网飞猫", url: "https://www.ncat21.com/" },
+            { name: "毒舌电影", url: "https://www.ncat21.com/" },
+            { name: "诺影导航", url: "https://nuoin.com/" },
+            { name: "哔哩哔哩", url: "https://www.bilibili.com" },
+            { name: "YouTube", url: "https://www.youtube.com" },
+            { name: "Netflix", url: "https://www.netflix.com" },
+            { name: "低端影视", url: "https://ddys.tv" },
+            { name: "NT动漫", url: "https://ntdm8.com/" },
+            { name: "AGE动漫", url: "https://m.agedm.io/#/" },
+            { name: "樱花动漫", url: "https://www.yhdm.io" },
+            { name: "樱花动漫2", url: "https://www.295yhw.com/" },
+            { name: "腾讯视频", url: "https://v.qq.com" },
+            { name: "爱奇艺", url: "https://www.iqiyi.com" },
+            { name: "芒果TV", url: "https://www.mgtv.com" },
+            { name: "1905电影网", url: "https://www.1905.com" }                     
+        ]
+    },
+    {
+        title: "🛠️ 工具区",
+        sites: [
+            { name: "ProcessOn", url: "https://www.processon.com" },
+            { name: "SmallPDF", url: "https://smallpdf.com" },
+            { name: "iLovePDF", url: "https://www.ilovepdf.com" },
+            { name: "TinyPNG", url: "https://tinypng.com" },
+            { name: "RemoveBG", url: "https://www.remove.bg" },
+            { name: "Canva", url: "https://www.canva.com" },
+            { name: "草料二维码", url: "https://cli.im" },
+            { name: "石墨文档", url: "https://shimo.im" },
+            { name: "腾讯文档", url: "https://docs.qq.com" },
+            { name: "讯飞听见", url: "https://www.iflyrec.com" },
+            { name: "格式工厂在线版", url: "https://www.pcgeshi.com" },
+            { name: "Figma", url: "https://www.figma.com" },
+            { name: "Excalidraw", url: "https://excalidraw.com" },
+            { name: "Photopea", url: "https://www.photopea.com" }
+        ]
+    },
+    {
+        title: "📚 学习资源",
+        sites: [
+            { name: "知乎", url: "https://www.zhihu.com" },
+            { name: "豆瓣", url: "https://www.douban.com" },
+            { name: "慕课网", url: "https://www.imooc.com" },
+            { name: "B站学习区", url: "https://www.bilibili.com" },
+            { name: "Coursera", url: "https://www.coursera.org" },
+            { name: "网易云课堂", url: "https://study.163.com" },
+            { name: "腾讯课堂", url: "https://ke.qq.com" },
+            { name: "可汗学院", url: "https://www.khanacademy.org" },
+            { name: "中国大学MOOC", url: "https://www.icourse163.org" },
+            { name: "知乎大学", url: "https://www.zhihu.com/university" },
+            { name: "豆包文库", url: "https://www.docin.com" },
+            { name: "Library Genesis", url: "http://libgen.is" },
+            { name: "Z-Library", url: "https://z-lib.is" },
+            { name: "Sci-Hub", url: "https://sci-hub.se" }
+        ]
+    },
+    {
+        title: "🛒 生活购物",
+        sites: [
+            { name: "淘宝", url: "https://www.taobao.com" },
+            { name: "京东", url: "https://www.jd.com" },
+            { name: "拼多多", url: "https://www.pinduoduo.com" },
+            { name: "美团", url: "https://www.meituan.com" },
+            { name: "饿了么", url: "https://www.ele.me" },
+            { name: "苏宁易购", url: "https://www.suning.com" },
+            { name: "唯品会", url: "https://www.vip.com" },          
+            { name: "闲鱼", url: "https://2.taobao.com" },
+            { name: "盒马鲜生", url: "https://www.hemaxiansheng.com" },
+            { name: "每日优鲜", url: "https://www.missfresh.cn" },
+            { name: "亚马逊", url: "https://www.amazon.cn" },
+            { name: "当当网", url: "https://www.dangdang.com" },
+            { name: "考拉海购", url: "https://www.kaola.com" }
+        ]
+    },
+    {
+        title: "📰 新闻资讯",
+        sites: [
+            { name: "微博", url: "https://weibo.com" },
+            { name: "今日头条", url: "https://www.toutiao.com" },
+            { name: "澎湃新闻", url: "https://www.thepaper.cn" },
+            { name: "虎嗅", url: "https://www.huxiu.com" },
+            { name: "36氪", url: "https://www.36kr.com" },
+            { name: "人民日报网", url: "https://www.people.com.cn" },
+            { name: "新华网", url: "https://www.xinhuanet.com" },
+            { name: "央视新闻", url: "https://news.cctv.com" },
+            { name: "财新网", url: "https://www.caixin.com" },
+            { name: "第一财经", url: "https://www.yicai.com" },
+            { name: "界面新闻", url: "https://www.jiemian.com" },
+            { name: "华尔街见闻", url: "https://wallstreetcn.com" },
+            { name: "雪球", url: "https://xueqiu.com" }
+        ]
+    },
+    {
+        title: "🎵 音乐娱乐",
+        sites: [
+            { name: "网易云音乐", url: "https://music.163.com" },
+            { name: "QQ音乐", url: "https://y.qq.com" },
+            { name: "酷狗音乐", url: "https://www.kugou.com" },
+            { name: "Spotify", url: "https://open.spotify.com" },
+            { name: "喜马拉雅", url: "https://www.ximalaya.com" },
+            { name: "酷我音乐", url: "https://www.kuwo.cn" },
+            { name: "咪咕音乐", url: "https://music.migu.cn" },
+            { name: "荔枝FM", url: "https://www.lizhi.fm" },
+            { name: "蜻蜓FM", url: "https://www.qingting.fm" },
+            { name: "网易云音乐播客", url: "https://music.163.com/podcast" },
+            { name: "Bandcamp（独立音乐）", url: "https://bandcamp.com" },
+            { name: "SoundCloud", url: "https://soundcloud.com" },
+            { name: "Audius", url: "https://audius.co" }
+        ]
+    },
+    {
+        title: "💻 技术社区",
+        sites: [
+            { name: "V2EX", url: "https://www.v2ex.com" },
+            { name: "掘金", url: "https://juejin.cn" },
+            { name: "SegmentFault", url: "https://segmentfault.com" },
+            { name: "CSDN", url: "https://www.csdn.net" },
+            { name: "开源中国", url: "https://www.oschina.net" },
+            { name: "GitHub", url: "https://github.com" },
+            { name: "GitLab", url: "https://about.gitlab.com" },
+            { name: "Stack Overflow", url: "https://stackoverflow.com" },
+            { name: "华为开发者联盟", url: "https://developer.huawei.com" },
+            { name: "小米开发者平台", url: "https://dev.mi.com" },
+            { name: "阿里开发者社区", url: "https://developer.aliyun.com" },
+            { name: "腾讯云开发者社区", url: "https://cloud.tencent.com/developer" },
+            { name: "字节跳动技术团队", url: "https://techblog.bytedance.com" }
+        ]
+    },
+    {
+        title: "🎮 游戏区",
+        sites: [
+            { name: "Steam", url: "https://store.steampowered.com" },
+            { name: "Epic Games", url: "https://www.epicgames.com" },
+            { name: "GOG", url: "https://www.gog.com" },
+            { name: "3DMGAME", url: "https://www.3dmgame.com" },
+            { name: "游民星空", url: "https://www.gamersky.com" },
+            { name: "游侠网", url: "https://www.ali213.net" },
+            { name: "NGA玩家社区", url: "https://bbs.nga.cn" },
+            { name: "TapTap", url: "https://www.taptap.cn" },
+            { name: "好游快爆", url: "https://www.3839.com" },
+            { name: "itch.io", url: "https://itch.io" },
+            { name: "GameJolt", url: "https://gamejolt.com" }
+        ]
+    },
+    {
+        title: "🔐 网络安全",
+        sites: [
+            { name: "FreeBuf", url: "https://www.freebuf.com" },
+            { name: "安全客", url: "https://www.anquanke.com" },
+            { name: "SecWiki", url: "https://www.sec-wiki.com" },
+            { name: "HackerOne", url: "https://www.hackerone.com" },
+            { name: "Bugcrowd", url: "https://www.bugcrowd.com" },
+            { name: "Exploit Database", url: "https://www.exploit-db.com" },
+            { name: "Metasploit", url: "https://www.metasploit.com" },
+            { name: "Kali Linux", url: "https://www.kali.org" },
+            { name: "OWASP", url: "https://owasp.org" },
+            { name: "SANS Institute", url: "https://www.sans.org" }
+        ]
+    },
+    {
+        title: "📱 应用下载",
+        sites: [
+            { name: "Google Play", url: "https://play.google.com" },
+            { name: "APKPure", url: "https://apkpure.com" },
+            { name: "APKMirror", url: "https://www.apkmirror.com" },
+            { name: "F-Droid", url: "https://f-droid.org" },
+            { name: "Aptoide", url: "https://www.aptoide.com" },
+            { name: "豌豆荚", url: "https://www.wandoujia.com" },
+            { name: "应用宝", url: "https://sj.qq.com" },
+            { name: "小米应用商店", url: "https://app.mi.com" },
+            { name: "华为应用市场", url: "https://appgallery.huawei.com" },
+            { name: "酷安", url: "https://www.coolapk.com" }
+        ]
+    },
+    {
+        title: "🌐 开发者工具",
+        sites: [
+            { name: "CodePen", url: "https://codepen.io" },
+            { name: "JSFiddle", url: "https://jsfiddle.net" },
+            { name: "Replit", url: "https://replit.com" },
+            { name: "Glitch", url: "https://glitch.com" },
+            { name: "CodeSandbox", url: "https://codesandbox.io" },
+            { name: "Postman", url: "https://www.postman.com" },
+            { name: "Swagger", url: "https://swagger.io" },
+            { name: "JSON Formatter", url: "https://jsonformatter.org" },
+            { name: "RegExr", url: "https://regexr.com" },
+            { name: "DevDocs", url: "https://devdocs.io" }
+        ]
+    },
+    {
+        title: "🎨 设计资源",
+        sites: [
+            { name: "Dribbble", url: "https://dribbble.com" },
+            { name: "Behance", url: "https://www.behance.net" },
+            { name: "UI中国", url: "https://www.ui.cn" },
+            { name: "站酷", url: "https://www.zcool.com.cn" },
+            { name: "花瓣网", url: "https://huaban.com" },
+            { name: "Pinterest", url: "https://www.pinterest.com" },
+            { name: "Unsplash", url: "https://unsplash.com" },
+            { name: "Pexels", url: "https://www.pexels.com" },
+            { name: "Iconfont", url: "https://www.iconfont.cn" },
+            { name: "Flaticon", url: "https://www.flaticon.com" }
+        ]
+    },
+    {
+        title: "📊 数据资源",
+        sites: [
+            { name: "Kaggle", url: "https://www.kaggle.com" },
+            { name: "天池大数据", url: "https://tianchi.aliyun.com" },
+            { name: "和鲸社区", url: "https://www.kesci.com" },
+            { name: "Data.gov", url: "https://www.data.gov" },
+            { name: "Google Dataset", url: "https://datasetsearch.research.google.com" },
+            { name: "UCI数据集", url: "https://archive.ics.uci.edu" },
+            { name: "国家统计局", url: "https://www.stats.gov.cn" },
+            { name: "世界银行数据", url: "https://data.worldbank.org" },
+            { name: "GitHub数据集", url: "https://github.com/awesomedata/awesome-public-datasets" }
+        ]
+    }
+];
+
+
+        // 创建每个分类
+        websiteCategories.forEach(category => {
+            const categoryElement = document.createElement("div");
+            categoryElement.style.cssText = `
+                background: rgba(255, 255, 255, 0.9);
+                border-radius: 12px;
+                padding: 16px;
+                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+                border: 1px solid rgba(0, 0, 0, 0.06);
+                transition: transform 0.2s ease;
+                break-inside: avoid;
+            `;
+
+            // 分类卡片hover效果
+            categoryElement.addEventListener('mouseenter', () => {
+                categoryElement.style.transform = 'translateY(-2px)';
+                categoryElement.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.12)';
+            });
+
+            categoryElement.addEventListener('mouseleave', () => {
+                categoryElement.style.transform = 'translateY(0)';
+                categoryElement.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.08)';
+            });
+
+            const categoryTitle = document.createElement("h4");
+            categoryTitle.textContent = category.title;
+            categoryTitle.style.cssText = `
+                margin: 0 0 12px 0;
+                color: #2c3e50;
+                font-size: 14px;
+                font-weight: 600;
+                border-bottom: 1px solid #ecf0f1;
+                padding-bottom: 8px;
+                word-break: break-word;
+            `;
+
+            const sitesContainer = document.createElement("div");
+            sitesContainer.style.cssText = `
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            `;
+
+            // 创建每个网站链接
+            category.sites.forEach(site => {
+                const siteLink = document.createElement("a");
+                siteLink.textContent = site.name;
+                siteLink.href = site.url;
+                siteLink.target = "_blank";
+                siteLink.rel = "noopener noreferrer";
+                siteLink.style.cssText = `
+                    display: inline-block;
+                    padding: 6px 10px;
+                    background: linear-gradient(145deg, #f8f9fa, #ffffff);
+                    border: 1px solid #e9ecef;
+                    border-radius: 6px;
+                    text-decoration: none;
+                    color: #495057;
+                    font-size: 12px;
+                    transition: all 0.2s ease;
+                    cursor: pointer;
+                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    max-width: 100%;
+                    flex-shrink: 0;
+                `;
+
+                // 链接hover效果
+                siteLink.addEventListener('mouseenter', () => {
+                    siteLink.style.background = 'linear-gradient(145deg, #3498db, #2980b9)';
+                    siteLink.style.color = 'white';
+                    siteLink.style.transform = 'translateY(-1px)';
+                    siteLink.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.15)';
+                    siteLink.style.borderColor = '#2980b9';
+                });
+
+                siteLink.addEventListener('mouseleave', () => {
+                    siteLink.style.background = 'linear-gradient(145deg, #f8f9fa, #ffffff)';
+                    siteLink.style.color = '#495057';
+                    siteLink.style.transform = 'translateY(0)';
+                    siteLink.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.08)';
+                    siteLink.style.borderColor = '#e9ecef';
+                });
+
+                // 触摸设备优化
+                siteLink.addEventListener('touchstart', () => {
+                    siteLink.style.background = 'linear-gradient(145deg, #3498db, #2980b9)';
+                    siteLink.style.color = 'white';
+                }, { passive: true });
+
+                sitesContainer.appendChild(siteLink);
+            });
+
+            categoryElement.appendChild(categoryTitle);
+            categoryElement.appendChild(sitesContainer);
+            categoriesContainer.appendChild(categoryElement);
+        });
+
+        navigationSection.appendChild(categoriesContainer);
+
+        // 8. 组装结构
         searchContainer.appendChild(closeBtn);
         searchContainer.appendChild(title);
         searchContainer.appendChild(searchInput);
-        searchContainer.appendChild(tipText);
-        overlay.appendChild(searchContainer);
+        searchContainer.appendChild(navigationSection);
+        scrollContainer.appendChild(searchContainer);
+        overlay.appendChild(scrollContainer);
 
-        // 8. 绑定事件
+        // 9. 绑定事件
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.performOverlaySearch();
@@ -3787,6 +4282,11 @@ const searchOverlay = {
             if (e.target === overlay) {
                 this.hideSearchOverlay();
             }
+        });
+
+        // 阻止内容区域点击事件冒泡
+        searchContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
 
         document.body.appendChild(overlay);
@@ -3814,6 +4314,9 @@ const searchOverlay = {
 
         // 隐藏汉堡菜单
         domHandler.hideHamburgerMenu();
+
+        // 阻止body滚动
+        document.body.style.overflow = 'hidden';
     },
 
     /**
@@ -3827,6 +4330,9 @@ const searchOverlay = {
 
             // 移除焦点陷阱
             accessibility.removeFocusTrap(overlay);
+
+            // 恢复body滚动
+            document.body.style.overflow = '';
         }
     },
 
