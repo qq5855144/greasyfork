@@ -15,3 +15,6 @@ https://gitee.com/maotoumao/MusicFreePlugins/raw/v0.1/dist/bilibili/index.js
 https://gitee.com/maotoumao/MusicFreePlugins/raw/v0.1/dist/yinyuetai/index.js
 
 https://gitee.com/maotoumao/MusicFreePlugins/raw/v0.1/dist/maoerfm/index.js
+
+
+https://musicfreepluginshub.2020818.xyz/plugins.json
