@@ -2673,7 +2673,7 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                     searchkeyName: ["query"],
                     matchUrl: /coursera\.org.*?query=/g,
                     mark: "Coursera",
-                    svgCode: `<svg class="icon" style="width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;" viewBox="-200 -200 1424 1424" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2406" data-spm-anchor-id="a313x.search_index.i1.i4.24d13a817z7S6A"><path d="M1023.65408 503.712a215.904 215.904 0 0 0-0.832-12.768l0.064 0.864v-0.16a254.4 254.4 0 0 0-42.816-120.96l0.576 0.896a268.128 268.128 0 0 0-36.896-44.256l-0.096-0.064a268.704 268.704 0 0 0-68.384-47.52l-1.6-0.704a295.104 295.104 0 0 0-127.52-28.512h-2.816 0.128-1.28a312.864 312.864 0 0 0-109.504 19.648l2.176-0.704a269.76 269.76 0 0 0-78.304 42.944l0.576-0.448a280 280 0 0 0-14.368 12.512l0.16-0.16-3.616 3.616-4.992 5.344h0.032l-2.4 2.336-1.12 1.184-6.016 6.272c-4.448 4.992-8.608 9.984-12.64 14.88v-0.096L512.00608 357.728a258.24 258.24 0 0 0-21.344 29.568c-3.808 5.984-7.52 12.064-11.04 18.208l-48.928 98.944 0.096 0.032-2.56 5.024-5.376 10.912c-10.72 21.728-22.24 43.392-35.04 61.216-28.672 31.456-61.056 46.848-102.656 46.848a120.96 120.96 0 0 1-8.928-0.352c-25.088-0.992-46.592-6.912-65.664-18.208a110.528 110.528 0 0 1-42.112-43.36l-0.288-0.576a112 112 0 0 1-13.92-58.624v0.192l0.096-1.44c1.312-32.416 13.696-57.696 38.56-79.392 6.048-5.28 12.416-9.728 19.04-13.664 0.896-0.544 1.888-1.024 2.784-1.536 18.528-10.112 39.552-15.136 63.648-15.136l7.52 0.224c38.368 1.44 67.936 13.408 91.52 36.832l73.984-132.832a288 288 0 0 0-57.696-29.632l-2.016-0.672c-0.8-0.288-1.696-0.672-2.56-0.928-2.656-0.928-5.248-1.92-7.936-2.784a307.04 307.04 0 0 0-72.064-14.784l-1.152-0.064-3.2-0.384 1.248 0.128c-3.872-0.224-7.84-0.672-11.744-0.864a350.304 350.304 0 0 0-12.48-0.288h-4.16c-46.336 0-90.208 10.56-129.344 29.376l1.792-0.768a265.6 265.6 0 0 0-106.144 91.456l-0.608 0.96a253.856 253.856 0 0 0-43.36 142.624v1.728-0.096c-0.096 66.72 24.224 125.344 72.576 174.624 50.528 51.68 116.096 79.52 194.848 82.816 5.024 0.224 10.016 0.352 15.072 0.352 44.576 0 85.792-7.936 122.784-23.808a288 288 0 0 0 27.392-13.728c4.992-2.848 9.728-5.92 14.432-9.184l3.424-2.336 5.856-3.968c7.008-5.024 13.536-10.496 19.936-16.256l2.208-2.144a295.36 295.36 0 0 0 11.04-10.88l13.28-15.008 5.024-6.304 2.4-3.456 2.336-3.36c19.712-33.12 83.84-153.632 83.84-153.632v-0.256l3.84-7.328 3.168-5.76c9.472-17.184 16.288-29.408 25.344-42.24l0.256-0.416c21.024-30.592 57.344-52.352 100.096-56.032 71.68-6.176 134.496 40.928 140.256 105.184 5.76 64.288-47.648 121.44-119.392 127.616a145.12 145.12 0 0 1-44.096-2.912l0.96 0.192-0.384 0.128c-52.576-10.976-86.048-49.28-102.56-66.464l-68.992 126.88s21.472 21.6 36.128 32.384a279.008 279.008 0 0 0 48.896 28 299.616 299.616 0 0 0 121.088 25.12c5.152 0 4.128 0 9.472-0.224 78.688-3.296 148.864-33.44 199.456-85.12 47.904-49.056 73.952-105.088 74.144-171.424v-2.016l-0.48-10.976z" fill="#2A73CC" p-id="2407"></path></svg>`
+                    svgCode: ``
                 },
 
                 {
@@ -2841,7 +2841,8 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                     mark: "Tianyancha",
                     svgCode: `<svg class="icon" style="width: 1em;height: 1em;vertical-align: middle;fill: currentColor;overflow: hidden;" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5330"><path d="M0 0m136.533333 0l750.933334 0q136.533333 0 136.533333 136.533333l0 750.933334q0 136.533333-136.533333 136.533333l-750.933334 0q-136.533333 0-136.533333-136.533333l0-750.933334q0-136.533333 136.533333-136.533333Z" fill="transparent" p-id="5331"></path><path d="M776.874667 455.68c0-13.312 17.408-123.562667-145.749334-114.688-224.938667 17.408-375.466667 264.533333-405.845333 348.16A337.237333 337.237333 0 0 1 331.093333 221.866667a349.184 349.184 0 0 1 375.466667 8.874666 418.133333 418.133333 0 0 0-313.344 70.314667C626.688 204.8 759.125333 270.336 785.066667 309.930667c48.810667 70.656 13.312 132.437333-8.533334 145.749333zM853.333333 512a330.410667 330.410667 0 0 1-44.032 167.594667 204.8 204.8 0 0 1-247.125333-88.405334 204.8 204.8 0 0 0 286.72-119.125333A122.88 122.88 0 0 1 853.333333 512z" fill="#0081EE" p-id="5332"></path><path d="M556.032 848.213333c-12.970667 0-30.72 4.437333-44.032 4.437334a344.405333 344.405333 0 0 1-264.533333-123.562667A593.92 593.92 0 0 1 546.133333 385.024a390.485333 390.485333 0 0 0 9.898667 463.189333z" fill="#0081EE" p-id="5333"></path><path d="M516.437333 508.586667a224.256 224.256 0 0 0 260.437334 216.064 339.285333 339.285333 0 0 1-176.469334 110.250666 359.082667 359.082667 0 0 1-83.968-326.314666z" fill="#0081EE" p-id="5334"></path></svg>`
                 },
-                {
+             
+{
                     name: "Ecosia",
                     searchUrl: "https://www.ecosia.org/search?q={keyword}",
                     searchkeyName: ["q"],
@@ -2850,7 +2851,7 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                     svgCode: `
       <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="-5 -5 34 34"><path fill="#dc2626" d="M15.198 6.818H8.786v10.48h6.412v-3.342h-3.98v-1.262H13.8V11.42h-2.584v-1.261h3.981zM11.972.06A12.003 12.003 0 0 0 0 12.064a12 12 0 0 0 10.083 11.848c.068-1.277.196-2.723.434-3.652v-.014c0-.005 0-.007-.01-.012c0-.005-.01-.007-.012-.009c0-.002-.01-.002-.014-.002h-.356c-2.307 0-5.943-.333-6.916-3.45c-1.458-4.642 2.025-6.314 3.484-4.97c0 .004.012.008.019.008q.013.001.02-.005q.014-.007.015-.016v-.021c-.322-.945-2.148-6.867 2.64-8.496c4.08-1.369 8.07 1.491 7.461 5.265v.017c0 .007.01.012.012.014c0 .002.012.005.016.005c0 0 .012-.002.016-.005c.298-.246 1.603-1.186 2.919-.148c1.247.982.844 3.73-1.627 5.003q-.013.003-.02.014v.023c0 .01.01.014.015.02q.014.006.023.001c1.596-.239 4.316 1.193 2.11 4.375c-1.447 2.1-4.71 2.365-6.168 2.365h-1.071s-.01 0-.012.002c0 .002-.01.005-.012.007c0 .002 0 .005-.01.009v.012c-.021.751.331 2.304.693 3.688A12 12 0 0 0 24 12.063A12.003 12.003 0 0 0 11.997.06h-.03z"/></svg>
     `
-                },                          
+                },              
             ];
                                  
          // ===== 常量定义区 =====
@@ -3712,6 +3713,7 @@ const searchOverlay = {
     createSearchOverlay() {
         let overlay = document.getElementById(CLASS_NAMES.SEARCH_OVERLAY);
         if (overlay) return overlay;
+
         overlay = document.createElement("div");
         overlay.id = CLASS_NAMES.SEARCH_OVERLAY;
         overlay.style.cssText = `
@@ -3720,14 +3722,14 @@ const searchOverlay = {
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(255, 255, 255, 0.98);
+            background-color: #E0E5EC;
             z-index: 9998;
             display: none;
             flex-direction: column;
-            backdrop-filter: blur(10px);
             overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         `;
+
         const scrollContainer = document.createElement("div");
         scrollContainer.style.cssText = `
             width: 100%;
@@ -3738,22 +3740,22 @@ const searchOverlay = {
             padding: 10px 0;
             box-sizing: border-box;
         `;
+
         const searchContainer = document.createElement("div");
         searchContainer.style.cssText = `
             width: 95%;
             max-width: 900px;
             min-height: min-content;
-            background: linear-gradient(145deg, #f8f9fa, #ffffff);
+            background-color: #E0E5EC;
             border-radius: 20px;
             padding: 25px 20px;
-            box-shadow: 
-                0 10px 40px rgba(0, 0, 0, 0.1),
-                0 2px 10px rgba(0, 0, 0, 0.05);
+            box-shadow: 20px 20px 60px #bebebe,
+                        -20px -20px 60px #ffffff;
             position: relative;
-            border: 1px solid rgba(255, 255, 255, 0.5);
             margin: 10px auto;
             box-sizing: border-box;
         `;
+
         const updateSearchContainerStyle = () => {
             const isMobile = window.innerWidth <= 768;
             if (isMobile) {
@@ -3770,6 +3772,8 @@ const searchOverlay = {
         };
         updateSearchContainerStyle();
         window.addEventListener('resize', updateSearchContainerStyle);
+
+        // 关闭按钮（新拟态凸起圆钮）
         const closeBtn = document.createElement("button");
         closeBtn.innerHTML = utils.createInlineSVG('times');
         closeBtn.setAttribute('aria-label', '关闭搜索');
@@ -3777,39 +3781,34 @@ const searchOverlay = {
             position: absolute;
             top: 16px;
             right: 16px;
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            background-color: #E0E5EC;
             border: none;
             font-size: 18px;
-            color: #64748b;
+            color: #4b4b4b;
             cursor: pointer;
-            padding: 3px;
+            padding: 0;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 36px;
+            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 
-                0 4px 12px rgba(0, 0, 0, 0.1),
-                0 2px 6px rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.8);
+            transition: all 0.2s ease;
+            box-shadow: 6px 6px 12px #bebebe,
+                        -6px -6px 12px #ffffff;
             z-index: 1;
-            backdrop-filter: blur(10px);
         `;
         closeBtn.addEventListener('mouseenter', () => {
-            closeBtn.style.background = 'linear-gradient(135deg, #ff4757 0%, #ff3742 100%)';
-            closeBtn.style.color = 'white';
-            closeBtn.style.transform = 'scale(1.1) rotate(90deg)';
-            closeBtn.style.boxShadow = '0 8px 25px rgba(255, 71, 87, 0.4)';
+            closeBtn.style.boxShadow = '4px 4px 8px #bebebe, -4px -4px 8px #ffffff';
+            closeBtn.style.transform = 'scale(0.98)';
         });
         closeBtn.addEventListener('mouseleave', () => {
-            closeBtn.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)';
-            closeBtn.style.color = '#64748b';
-            closeBtn.style.transform = 'scale(1) rotate(0deg)';
-            closeBtn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05)';
+            closeBtn.style.boxShadow = '6px 6px 12px #bebebe, -6px -6px 12px #ffffff';
+            closeBtn.style.transform = 'scale(1)';
         });
         closeBtn.addEventListener('click', () => this.hideSearchOverlay());
+
+        // 标题
         const title = document.createElement("h2");
         title.innerHTML = utils.createInlineSVG('search') + ' 快捷搜索 (Alt+S)';
         title.style.cssText = `
@@ -3817,7 +3816,6 @@ const searchOverlay = {
             color: #2c3e50;
             text-align: center;
             font-size: clamp(18px, 4vw, 24px);
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -3825,6 +3823,8 @@ const searchOverlay = {
             flex-wrap: wrap;
             word-break: break-word;
         `;
+
+        // 搜索输入框（凹陷效果）
         const searchInput = document.createElement("input");
         searchInput.type = "text";
         searchInput.placeholder = "输入关键词或网址...";
@@ -3835,45 +3835,34 @@ const searchOverlay = {
         searchInput.setAttribute('spellcheck', 'false');
         searchInput.style.cssText = `
             width: 100%;
-            padding: 20px 24px; 
+            padding: 20px 24px;
             box-sizing: border-box;
-            background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+            background-color: #E0E5EC;
+            border: none;
             border-radius: 16px;
             font-size: 18px;
             color: #1e293b;
             outline: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 
-                inset 3px 3px 6px rgba(0, 0, 0, 0.04),
-                inset -3px -3px 6px rgba(255, 255, 255, 0.8),
-                0 8px 30px rgba(0, 0, 0, 0.08);
-            border: 2px solid transparent; 
+            transition: all 0.2s ease;
+            box-shadow: inset 6px 6px 12px #bebebe,
+                        inset -6px -6px 12px #ffffff;
             margin-bottom: 28px;
             -webkit-appearance: none;
             font-weight: 500;
             line-height: 1.5;
-            min-height: 64px; 
+            min-height: 50px;
         `;
-        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-            searchInput.style.fontSize = '16px';
-            searchInput.style.padding = '20px 22px'; 
-            searchInput.style.minHeight = '50px';
-        }
         searchInput.addEventListener('focus', () => {
-            searchInput.style.boxShadow = 
-                'inset 3px 3px 6px rgba(0, 0, 0, 0.06), inset -3px -3px 6px rgba(255, 255, 255, 0.9), 0 12px 40px rgba(99, 102, 241, 0.15)'; 
-            searchInput.style.borderColor = 'transparent'; 
-            searchInput.style.background = 'linear-gradient(135deg, #ffffff 0%, #fefefe 100%)';
-            searchInput.style.transform = 'translateY(-2px)';
+            searchInput.style.boxShadow = 'inset 8px 8px 16px #bebebe, inset -8px -8px 16px #ffffff';
         });
         searchInput.addEventListener('blur', () => {
-            searchInput.style.boxShadow = 
-                'inset 3px 3px 6px rgba(0, 0, 0, 0.04), inset -3px -3px 6px rgba(255, 255, 255, 0.8), 0 8px 30px rgba(0, 0, 0, 0.08)';
-            searchInput.style.borderColor = 'transparent'; 
-            searchInput.style.transform = 'translateY(0)';
+            searchInput.style.boxShadow = 'inset 6px 6px 12px #bebebe, inset -6px -6px 12px #ffffff';
         });
+
+        // 导航分类区
         const navigationSection = document.createElement("div");
         navigationSection.style.cssText = `margin-top: 10px;`;
+
         const navTitle = document.createElement("h3");
         navTitle.innerHTML = utils.createInlineSVG('globe') + ' 常用网站导航';
         navTitle.style.cssText = `
@@ -3884,12 +3873,13 @@ const searchOverlay = {
             align-items: center;
             justify-content: center;
             gap: 8px;
-            border-bottom: 2px solid #3498db;
+            border-bottom: 2px solid #a3b1c6;
             padding-bottom: 8px;
             text-align: center;
             flex-wrap: wrap;
         `;
         navigationSection.appendChild(navTitle);
+
         const categoriesContainer = document.createElement("div");
         categoriesContainer.style.cssText = `
             display: grid;
@@ -3912,312 +3902,335 @@ const searchOverlay = {
         };
         updateGridLayout();
         window.addEventListener('resize', updateGridLayout);
+
+        // 网站分类数据（与原脚本完全一致，此处保留完整数据）
         const websiteCategories = [
-            {
-                title: "🔧 逆向论坛区",
-                sites: [
-                    { name: "MT论坛", url: "https://bbs.binmt.cc" },
-                    { name: "吾爱破解", url: "https://www.52pojie.cn" },
-                    { name: "看雪论坛", url: "https://bbs.pediy.com" },            
-                    { name: "飘云阁", url: "https://www.chinapyg.com" },
-                    { name: "卡饭论坛", url: "https://www.kafan.cn" },
-                    { name: "绿盟科技社区", url: "https://www.nsfocus.net" },
-                    { name: "乌云漏洞平台", url: "https://wooyun.x10sec.org" },
-                    { name: "渗透测试论坛", url: "https://www.hetianlab.com" },
-                    { name: "XDA Developers", url: "https://forum.xda-developers.com" },
-                    { name: "Reddit ReverseEngineering", url: "https://www.reddit.com/r/ReverseEngineering" },
-                    { name: "CrackWatch", url: "https://www.reddit.com/r/CrackWatch" }
-                ]
-            },
-            {
-                title: "💎 软件资源区",
-                sites: [  
-                    { name: "GETMODS", url: "https://getmodsapk.com/" },
-                    { name: "APKdone", url: "https://apkdone.com/" },
-                    { name: "LITEAPKS", url: "https://liteapks.com/" },
-                    { name: "APKMODY", url: "https://apkmody.com/" },
-                    { name: "423Down", url: "https://www.423down.com" },
-                    { name: "果核剥壳", url: "https://www.ghxi.com" },
-                    { name: "大眼仔旭", url: "https://www.dayanzai.me" },
-                    { name: "ZD423", url: "https://www.zdfans.com" },         
-                    { name: "软件缘", url: "https://www.appcgn.com" },
-                    { name: "小众软件", url: "https://www.appinn.com" },         
-                    { name: "Rutor", url: "http://rutor.info" },
-                    { name: "RuTracker", url: "https://rutracker.org" }
-                ]
-            },
-            {
-                title: "🤖 AI工具",
-                sites: [
-                    { name: "ChatGPT", url: "https://chat.openai.com" },
-                    { name: "deepseek", url: "https://www.deepseek.com/" },
-                    { name: "Claude", url: "https://claude.ai" },
-                    { name: "文心一言", url: "https://yiyan.baidu.com" },
-                    { name: "豆包", url: "https://www.doubao.com/chat/" },
-                    { name: "讯飞星火", url: "https://xinghuo.xfyun.cn" },
-                    { name: "智谱清言", url: "https://chatglm.cn" },
-                    { name: "Midjourney", url: "https://www.midjourney.com" },
-                    { name: "Stable Diffusion", url: "https://stability.ai" },
-                    { name: "Notion AI", url: "https://www.notion.so" }
-                ]
-            },
-            {
-                title: "🎬 影视区",
-                sites: [
-                    { name: "网飞猫", url: "https://www.ncat21.com/" },
-                    { name: "毒舌电影", url: "https://www.ncat21.com/" },
-                    { name: "诺影导航", url: "https://nuoin.com/" },
-                    { name: "哔哩哔哩", url: "https://www.bilibili.com" },
-                    { name: "YouTube", url: "https://www.youtube.com" },
-                    { name: "Netflix", url: "https://www.netflix.com" },
-                    { name: "低端影视", url: "https://ddys.tv" },
-                    { name: "NT动漫", url: "https://ntdm8.com/" },
-                    { name: "AGE动漫", url: "https://m.agedm.io/#/" },
-                    { name: "樱花动漫", url: "https://www.yhdm.io" },
-                    { name: "樱花动漫2", url: "https://www.295yhw.com/" },
-                    { name: "腾讯视频", url: "https://v.qq.com" },
-                    { name: "爱奇艺", url: "https://www.iqiyi.com" },
-                    { name: "芒果TV", url: "https://www.mgtv.com" },
-                    { name: "1905电影网", url: "https://www.1905.com" }                     
-                ]
-            },
-            {
-                title: "🛠️ 工具区",
-                sites: [
-                    { name: "ProcessOn", url: "https://www.processon.com" },
-                    { name: "SmallPDF", url: "https://smallpdf.com" },
-                    { name: "iLovePDF", url: "https://www.ilovepdf.com" },
-                    { name: "TinyPNG", url: "https://tinypng.com" },
-                    { name: "RemoveBG", url: "https://www.remove.bg" },
-                    { name: "Canva", url: "https://www.canva.com" },
-                    { name: "草料二维码", url: "https://cli.im" },
-                    { name: "石墨文档", url: "https://shimo.im" },
-                    { name: "腾讯文档", url: "https://docs.qq.com" },
-                    { name: "讯飞听见", url: "https://www.iflyrec.com" },
-                    { name: "格式工厂在线版", url: "https://www.pcgeshi.com" },
-                    { name: "Figma", url: "https://www.figma.com" },
-                    { name: "Excalidraw", url: "https://excalidraw.com" },
-                    { name: "Photopea", url: "https://www.photopea.com" }
-                ]
-            },
-            {
-                title: "📚 学习资源",
-                sites: [
-                    { name: "知乎", url: "https://www.zhihu.com" },
-                    { name: "豆瓣", url: "https://www.douban.com" },
-                    { name: "慕课网", url: "https://www.imooc.com" },
-                    { name: "B站学习区", url: "https://www.bilibili.com" },
-                    { name: "Coursera", url: "https://www.coursera.org" },
-                    { name: "网易云课堂", url: "https://study.163.com" },
-                    { name: "腾讯课堂", url: "https://ke.qq.com" },
-                    { name: "可汗学院", url: "https://www.khanacademy.org" },
-                    { name: "中国大学MOOC", url: "https://www.icourse163.org" },
-                    { name: "知乎大学", url: "https://www.zhihu.com/university" },
-                    { name: "豆包文库", url: "https://www.docin.com" },
-                    { name: "Library Genesis", url: "http://libgen.is" },
-                    { name: "Z-Library", url: "https://z-lib.is" },
-                    { name: "Sci-Hub", url: "https://sci-hub.se" }
-                ]
-            },
-            {
-                title: "🛒 生活购物",
-                sites: [
-                    { name: "淘宝", url: "https://www.taobao.com" },
-                    { name: "京东", url: "https://www.jd.com" },
-                    { name: "拼多多", url: "https://www.pinduoduo.com" },
-                    { name: "美团", url: "https://www.meituan.com" },
-                    { name: "饿了么", url: "https://www.ele.me" },
-                    { name: "苏宁易购", url: "https://www.suning.com" },
-                    { name: "唯品会", url: "https://www.vip.com" },          
-                    { name: "闲鱼", url: "https://2.taobao.com" },
-                    { name: "盒马鲜生", url: "https://www.hemaxiansheng.com" },
-                    { name: "每日优鲜", url: "https://www.missfresh.cn" },
-                    { name: "亚马逊", url: "https://www.amazon.cn" },
-                    { name: "当当网", url: "https://www.dangdang.com" },
-                    { name: "考拉海购", url: "https://www.kaola.com" }
-                ]
-            },
-            {
-                title: "📰 新闻资讯",
-                sites: [
-                    { name: "微博", url: "https://weibo.com" },
-                    { name: "今日头条", url: "https://www.toutiao.com" },
-                    { name: "澎湃新闻", url: "https://www.thepaper.cn" },
-                    { name: "虎嗅", url: "https://www.huxiu.com" },
-                    { name: "36氪", url: "https://www.36kr.com" },
-                    { name: "人民日报网", url: "https://www.people.com.cn" },
-                    { name: "新华网", url: "https://www.xinhuanet.com" },
-                    { name: "央视新闻", url: "https://news.cctv.com" },
-                    { name: "财新网", url: "https://www.caixin.com" },
-                    { name: "第一财经", url: "https://www.yicai.com" },
-                    { name: "界面新闻", url: "https://www.jiemian.com" },
-                    { name: "华尔街见闻", url: "https://wallstreetcn.com" },
-                    { name: "雪球", url: "https://xueqiu.com" }
-                ]
-            },
-            {
-                title: "🎵 音乐娱乐",
-                sites: [
-                    { name: "网易云音乐", url: "https://music.163.com" },
-                    { name: "QQ音乐", url: "https://y.qq.com" },
-                    { name: "酷狗音乐", url: "https://www.kugou.com" },
-                    { name: "Spotify", url: "https://open.spotify.com" },
-                    { name: "喜马拉雅", url: "https://www.ximalaya.com" },
-                    { name: "酷我音乐", url: "https://www.kuwo.cn" },
-                    { name: "咪咕音乐", url: "https://music.migu.cn" },
-                    { name: "荔枝FM", url: "https://www.lizhi.fm" },
-                    { name: "蜻蜓FM", url: "https://www.qingting.fm" },
-                    { name: "网易云音乐播客", url: "https://music.163.com/podcast" },
-                    { name: "Bandcamp（独立音乐）", url: "https://bandcamp.com" },
-                    { name: "SoundCloud", url: "https://soundcloud.com" },
-                    { name: "Audius", url: "https://audius.co" }
-                ]
-            },
-            {
-                title: "💻 技术社区",
-                sites: [
-                    { name: "V2EX", url: "https://www.v2ex.com" },
-                    { name: "掘金", url: "https://juejin.cn" },
-                    { name: "SegmentFault", url: "https://segmentfault.com" },
-                    { name: "CSDN", url: "https://www.csdn.net" },
-                    { name: "开源中国", url: "https://www.oschina.net" },
-                    { name: "GitHub", url: "https://github.com" },
-                    { name: "GitLab", url: "https://about.gitlab.com" },
-                    { name: "Stack Overflow", url: "https://stackoverflow.com" },
-                    { name: "华为开发者联盟", url: "https://developer.huawei.com" },
-                    { name: "小米开发者平台", url: "https://dev.mi.com" },
-                    { name: "阿里开发者社区", url: "https://developer.aliyun.com" },
-                    { name: "腾讯云开发者社区", url: "https://cloud.tencent.com/developer" },
-                    { name: "字节跳动技术团队", url: "https://techblog.bytedance.com" }
-                ]
-            },
-            {
-                title: "🎮 游戏区",
-                sites: [
-                    { name: "Steam", url: "https://store.steampowered.com" },
-                    { name: "Epic Games", url: "https://www.epicgames.com" },
-                    { name: "GOG", url: "https://www.gog.com" },
-                    { name: "3DMGAME", url: "https://www.3dmgame.com" },
-                    { name: "游民星空", url: "https://www.gamersky.com" },
-                    { name: "游侠网", url: "https://www.ali213.net" },
-                    { name: "NGA玩家社区", url: "https://bbs.nga.cn" },
-                    { name: "TapTap", url: "https://www.taptap.cn" },
-                    { name: "好游快爆", url: "https://www.3839.com" },
-                    { name: "itch.io", url: "https://itch.io" },
-                    { name: "GameJolt", url: "https://gamejolt.com" }
-                ]
-            },
-            {
-                title: "🔐 网络安全",
-                sites: [
-                    { name: "FreeBuf", url: "https://www.freebuf.com" },
-                    { name: "安全客", url: "https://www.anquanke.com" },
-                    { name: "SecWiki", url: "https://www.sec-wiki.com" },
-                    { name: "HackerOne", url: "https://www.hackerone.com" },
-                    { name: "Bugcrowd", url: "https://www.bugcrowd.com" },
-                    { name: "Exploit Database", url: "https://www.exploit-db.com" },
-                    { name: "Metasploit", url: "https://www.metasploit.com" },
-                    { name: "Kali Linux", url: "https://www.kali.org" },
-                    { name: "OWASP", url: "https://owasp.org" },
-                    { name: "SANS Institute", url: "https://www.sans.org" }
-                ]
-            },
-            {
-                title: "📱 应用下载",
-                sites: [
-                    { name: "Google Play", url: "https://play.google.com" },
-                    { name: "APKPure", url: "https://apkpure.com" },
-                    { name: "APKMirror", url: "https://www.apkmirror.com" },
-                    { name: "F-Droid", url: "https://f-droid.org" },
-                    { name: "Aptoide", url: "https://www.aptoide.com" },
-                    { name: "豌豆荚", url: "https://www.wandoujia.com" },
-                    { name: "应用宝", url: "https://sj.qq.com" },
-                    { name: "小米应用商店", url: "https://app.mi.com" },
-                    { name: "华为应用市场", url: "https://appgallery.huawei.com" },
-                    { name: "酷安", url: "https://www.coolapk.com" }
-                ]
-            },
-            {
-                title: "🌐 开发者工具",
-                sites: [
-                    { name: "CodePen", url: "https://codepen.io" },
-                    { name: "JSFiddle", url: "https://jsfiddle.net" },
-                    { name: "Replit", url: "https://replit.com" },
-                    { name: "Glitch", url: "https://glitch.com" },
-                    { name: "CodeSandbox", url: "https://codesandbox.io" },
-                    { name: "Postman", url: "https://www.postman.com" },
-                    { name: "Swagger", url: "https://swagger.io" },
-                    { name: "JSON Formatter", url: "https://jsonformatter.org" },
-                    { name: "RegExr", url: "https://regexr.com" },
-                    { name: "DevDocs", url: "https://devdocs.io" }
-                ]
-            },
-            {
-                title: "🎨 设计资源",
-                sites: [
-                    { name: "Dribbble", url: "https://dribbble.com" },
-                    { name: "Behance", url: "https://www.behance.net" },
-                    { name: "UI中国", url: "https://www.ui.cn" },
-                    { name: "站酷", url: "https://www.zcool.com.cn" },
-                    { name: "花瓣网", url: "https://huaban.com" },
-                    { name: "Pinterest", url: "https://www.pinterest.com" },
-                    { name: "Unsplash", url: "https://unsplash.com" },
-                    { name: "Pexels", url: "https://www.pexels.com" },
-                    { name: "Iconfont", url: "https://www.iconfont.cn" },
-                    { name: "Flaticon", url: "https://www.flaticon.com" }
-                ]
-            },
-            {
-                title: "📊 数据资源",
-                sites: [
-                    { name: "Kaggle", url: "https://www.kaggle.com" },
-                    { name: "天池大数据", url: "https://tianchi.aliyun.com" },
-                    { name: "和鲸社区", url: "https://www.kesci.com" },
-                    { name: "Data.gov", url: "https://www.data.gov" },
-                    { name: "Google Dataset", url: "https://datasetsearch.research.google.com" },
-                    { name: "UCI数据集", url: "https://archive.ics.uci.edu" },
-                    { name: "国家统计局", url: "https://www.stats.gov.cn" },
-                    { name: "世界银行数据", url: "https://data.worldbank.org" },
-                    { name: "GitHub数据集", url: "https://github.com/awesomedata/awesome-public-datasets" }
-                ]
-            }
-        ];
+        {
+            title: "🔧 逆向论坛区",
+            sites: [
+                { name: "MT论坛", url: "https://bbs.binmt.cc" },
+                { name: "吾爱破解", url: "https://www.52pojie.cn" },
+                { name: "看雪论坛", url: "https://bbs.pediy.com" },            
+                { name: "飘云阁", url: "https://www.chinapyg.com" },
+                { name: "卡饭论坛", url: "https://www.kafan.cn" },
+                { name: "绿盟科技社区", url: "https://www.nsfocus.net" },
+                { name: "乌云漏洞平台", url: "https://wooyun.x10sec.org" },
+                { name: "渗透测试论坛", url: "https://www.hetianlab.com" },
+                { name: "XDA Developers", url: "https://forum.xda-developers.com" },
+                { name: "Reddit ReverseEngineering", url: "https://www.reddit.com/r/ReverseEngineering" },
+                { name: "CrackWatch", url: "https://www.reddit.com/r/CrackWatch" }
+            ]
+        },
+        {
+            title: "💎 软件资源区",
+            sites: [  
+                { name: "GETMODS", url: "https://getmodsapk.com/" },
+                { name: "APKdone", url: "https://apkdone.com/" },
+                { name: "LITEAPKS", url: "https://liteapks.com/" },
+                { name: "APKMODY", url: "https://apkmody.com/" },
+                { name: "423Down", url: "https://www.423down.com" },
+                { name: "果核剥壳", url: "https://www.ghxi.com" },
+                { name: "大眼仔旭", url: "https://www.dayanzai.me" },
+                { name: "ZD423", url: "https://www.zdfans.com" },         
+                { name: "软件缘", url: "https://www.appcgn.com" },
+                { name: "小众软件", url: "https://www.appinn.com" },         
+                { name: "Rutor", url: "http://rutor.info" },
+                { name: "RuTracker", url: "https://rutracker.org" }
+            ]
+        },
+        {
+            title: "🤖 AI工具",
+            sites: [
+                { name: "ChatGPT", url: "https://chat.openai.com" },
+                { name: "deepseek", url: "https://www.deepseek.com/" },
+                { name: "Claude", url: "https://claude.ai" },
+                { name: "文心一言", url: "https://yiyan.baidu.com" },
+                { name: "豆包", url: "https://www.doubao.com/chat/" },
+                { name: "讯飞星火", url: "https://xinghuo.xfyun.cn" },
+                { name: "智谱清言", url: "https://chatglm.cn" },
+                { name: "Midjourney", url: "https://www.midjourney.com" },
+                { name: "Stable Diffusion", url: "https://stability.ai" },
+                { name: "Notion AI", url: "https://www.notion.so" }
+            ]
+        },
+        {
+            title: "🎬 影视区",
+            sites: [
+                { name: "网飞猫", url: "https://www.ncat21.com/" },
+                { name: "毒舌电影", url: "https://www.ncat21.com/" },
+                { name: "诺影导航", url: "https://nuoin.com/" },
+                { name: "哔哩哔哩", url: "https://www.bilibili.com" },
+                { name: "YouTube", url: "https://www.youtube.com" },
+                { name: "Netflix", url: "https://www.netflix.com" },
+                { name: "低端影视", url: "https://ddys.tv" },
+                { name: "NT动漫", url: "https://ntdm8.com/" },
+                { name: "AGE动漫", url: "https://m.agedm.io/#/" },
+                { name: "樱花动漫", url: "https://www.yhdm.io" },
+                { name: "樱花动漫2", url: "https://www.295yhw.com/" },
+                { name: "腾讯视频", url: "https://v.qq.com" },
+                { name: "爱奇艺", url: "https://www.iqiyi.com" },
+                { name: "芒果TV", url: "https://www.mgtv.com" },
+                { name: "1905电影网", url: "https://www.1905.com" }                     
+            ]
+        },
+        {
+            title: "🛠️ 工具区",
+            sites: [
+                { name: "ProcessOn", url: "https://www.processon.com" },
+                { name: "SmallPDF", url: "https://smallpdf.com" },
+                { name: "iLovePDF", url: "https://www.ilovepdf.com" },
+                { name: "TinyPNG", url: "https://tinypng.com" },
+                { name: "RemoveBG", url: "https://www.remove.bg" },
+                { name: "Canva", url: "https://www.canva.com" },
+                { name: "草料二维码", url: "https://cli.im" },
+                { name: "石墨文档", url: "https://shimo.im" },
+                { name: "腾讯文档", url: "https://docs.qq.com" },
+                { name: "讯飞听见", url: "https://www.iflyrec.com" },
+                { name: "格式工厂在线版", url: "https://www.pcgeshi.com" },
+                { name: "Figma", url: "https://www.figma.com" },
+                { name: "Excalidraw", url: "https://excalidraw.com" },
+                { name: "Photopea", url: "https://www.photopea.com" }
+            ]
+        },
+        {
+            title: "📚 学习资源",
+            sites: [
+                { name: "知乎", url: "https://www.zhihu.com" },
+                { name: "豆瓣", url: "https://www.douban.com" },
+                { name: "慕课网", url: "https://www.imooc.com" },
+                { name: "B站学习区", url: "https://www.bilibili.com" },
+                { name: "Coursera", url: "https://www.coursera.org" },
+                { name: "网易云课堂", url: "https://study.163.com" },
+                { name: "腾讯课堂", url: "https://ke.qq.com" },
+                { name: "可汗学院", url: "https://www.khanacademy.org" },
+                { name: "中国大学MOOC", url: "https://www.icourse163.org" },
+                { name: "知乎大学", url: "https://www.zhihu.com/university" },
+                { name: "豆包文库", url: "https://www.docin.com" },
+                { name: "Library Genesis", url: "http://libgen.is" },
+                { name: "Z-Library", url: "https://z-lib.is" },
+                { name: "Sci-Hub", url: "https://sci-hub.se" }
+            ]
+        },
+        {
+            title: "🛒 生活购物",
+            sites: [
+                { name: "淘宝", url: "https://www.taobao.com" },
+                { name: "京东", url: "https://www.jd.com" },
+                { name: "拼多多", url: "https://www.pinduoduo.com" },
+                { name: "美团", url: "https://www.meituan.com" },
+                { name: "饿了么", url: "https://www.ele.me" },
+                { name: "苏宁易购", url: "https://www.suning.com" },
+                { name: "唯品会", url: "https://www.vip.com" },          
+                { name: "闲鱼", url: "https://2.taobao.com" },
+                { name: "盒马鲜生", url: "https://www.hemaxiansheng.com" },
+                { name: "每日优鲜", url: "https://www.missfresh.cn" },
+                { name: "亚马逊", url: "https://www.amazon.cn" },
+                { name: "当当网", url: "https://www.dangdang.com" },
+                { name: "考拉海购", url: "https://www.kaola.com" }
+            ]
+        },
+        {
+            title: "📰 新闻资讯",
+            sites: [
+                { name: "微博", url: "https://weibo.com" },
+                { name: "今日头条", url: "https://www.toutiao.com" },
+                { name: "澎湃新闻", url: "https://www.thepaper.cn" },
+                { name: "虎嗅", url: "https://www.huxiu.com" },
+                { name: "36氪", url: "https://www.36kr.com" },
+                { name: "人民日报网", url: "https://www.people.com.cn" },
+                { name: "新华网", url: "https://www.xinhuanet.com" },
+                { name: "央视新闻", url: "https://news.cctv.com" },
+                { name: "财新网", url: "https://www.caixin.com" },
+                { name: "第一财经", url: "https://www.yicai.com" },
+                { name: "界面新闻", url: "https://www.jiemian.com" },
+                { name: "华尔街见闻", url: "https://wallstreetcn.com" },
+                { name: "雪球", url: "https://xueqiu.com" }
+            ]
+        },
+        {
+            title: "🎵 音乐娱乐",
+            sites: [
+                { name: "网易云音乐", url: "https://music.163.com" },
+                { name: "QQ音乐", url: "https://y.qq.com" },
+                { name: "酷狗音乐", url: "https://www.kugou.com" },
+                { name: "Spotify", url: "https://open.spotify.com" },
+                { name: "喜马拉雅", url: "https://www.ximalaya.com" },
+                { name: "酷我音乐", url: "https://www.kuwo.cn" },
+                { name: "咪咕音乐", url: "https://music.migu.cn" },
+                { name: "荔枝FM", url: "https://www.lizhi.fm" },
+                { name: "蜻蜓FM", url: "https://www.qingting.fm" },
+                { name: "网易云音乐播客", url: "https://music.163.com/podcast" },
+                { name: "Bandcamp（独立音乐）", url: "https://bandcamp.com" },
+                { name: "SoundCloud", url: "https://soundcloud.com" },
+                { name: "Audius", url: "https://audius.co" }
+            ]
+        },
+        {
+            title: "💻 技术社区",
+            sites: [
+                { name: "V2EX", url: "https://www.v2ex.com" },
+                { name: "掘金", url: "https://juejin.cn" },
+                { name: "SegmentFault", url: "https://segmentfault.com" },
+                { name: "CSDN", url: "https://www.csdn.net" },
+                { name: "开源中国", url: "https://www.oschina.net" },
+                { name: "GitHub", url: "https://github.com" },
+                { name: "GitLab", url: "https://about.gitlab.com" },
+                { name: "Stack Overflow", url: "https://stackoverflow.com" },
+                { name: "华为开发者联盟", url: "https://developer.huawei.com" },
+                { name: "小米开发者平台", url: "https://dev.mi.com" },
+                { name: "阿里开发者社区", url: "https://developer.aliyun.com" },
+                { name: "腾讯云开发者社区", url: "https://cloud.tencent.com/developer" },
+                { name: "字节跳动技术团队", url: "https://techblog.bytedance.com" }
+            ]
+        },
+        {
+            title: "🎮 游戏区",
+            sites: [
+                { name: "Steam", url: "https://store.steampowered.com" },
+                { name: "Epic Games", url: "https://www.epicgames.com" },
+                { name: "GOG", url: "https://www.gog.com" },
+                { name: "3DMGAME", url: "https://www.3dmgame.com" },
+                { name: "游民星空", url: "https://www.gamersky.com" },
+                { name: "游侠网", url: "https://www.ali213.net" },
+                { name: "NGA玩家社区", url: "https://bbs.nga.cn" },
+                { name: "TapTap", url: "https://www.taptap.cn" },
+                { name: "好游快爆", url: "https://www.3839.com" },
+                { name: "itch.io", url: "https://itch.io" },
+                { name: "GameJolt", url: "https://gamejolt.com" }
+            ]
+        },
+        {
+            title: "🔐 网络安全",
+            sites: [
+                { name: "FreeBuf", url: "https://www.freebuf.com" },
+                { name: "安全客", url: "https://www.anquanke.com" },
+                { name: "SecWiki", url: "https://www.sec-wiki.com" },
+                { name: "HackerOne", url: "https://www.hackerone.com" },
+                { name: "Bugcrowd", url: "https://www.bugcrowd.com" },
+                { name: "Exploit Database", url: "https://www.exploit-db.com" },
+                { name: "Metasploit", url: "https://www.metasploit.com" },
+                { name: "Kali Linux", url: "https://www.kali.org" },
+                { name: "OWASP", url: "https://owasp.org" },
+                { name: "SANS Institute", url: "https://www.sans.org" }
+            ]
+        },
+        {
+            title: "📱 应用下载",
+            sites: [
+                { name: "Google Play", url: "https://play.google.com" },
+                { name: "APKPure", url: "https://apkpure.com" },
+                { name: "APKMirror", url: "https://www.apkmirror.com" },
+                { name: "F-Droid", url: "https://f-droid.org" },
+                { name: "Aptoide", url: "https://www.aptoide.com" },
+                { name: "豌豆荚", url: "https://www.wandoujia.com" },
+                { name: "应用宝", url: "https://sj.qq.com" },
+                { name: "小米应用商店", url: "https://app.mi.com" },
+                { name: "华为应用市场", url: "https://appgallery.huawei.com" },
+                { name: "酷安", url: "https://www.coolapk.com" }
+            ]
+        },
+        {
+            title: "🌐 开发者工具",
+            sites: [
+                { name: "CodePen", url: "https://codepen.io" },
+                { name: "JSFiddle", url: "https://jsfiddle.net" },
+                { name: "Replit", url: "https://replit.com" },
+                { name: "Glitch", url: "https://glitch.com" },
+                { name: "CodeSandbox", url: "https://codesandbox.io" },
+                { name: "Postman", url: "https://www.postman.com" },
+                { name: "Swagger", url: "https://swagger.io" },
+                { name: "JSON Formatter", url: "https://jsonformatter.org" },
+                { name: "RegExr", url: "https://regexr.com" },
+                { name: "DevDocs", url: "https://devdocs.io" }
+            ]
+        },
+        {
+            title: "🎨 设计资源",
+            sites: [
+                { name: "Dribbble", url: "https://dribbble.com" },
+                { name: "Behance", url: "https://www.behance.net" },
+                { name: "UI中国", url: "https://www.ui.cn" },
+                { name: "站酷", url: "https://www.zcool.com.cn" },
+                { name: "花瓣网", url: "https://huaban.com" },
+                { name: "Pinterest", url: "https://www.pinterest.com" },
+                { name: "Unsplash", url: "https://unsplash.com" },
+                { name: "Pexels", url: "https://www.pexels.com" },
+                { name: "Iconfont", url: "https://www.iconfont.cn" },
+                { name: "Flaticon", url: "https://www.flaticon.com" }
+            ]
+        },
+        {
+            title: "📊 数据资源",
+            sites: [
+                { name: "Kaggle", url: "https://www.kaggle.com" },
+                { name: "天池大数据", url: "https://tianchi.aliyun.com" },
+                { name: "和鲸社区", url: "https://www.kesci.com" },
+                { name: "Data.gov", url: "https://www.data.gov" },
+                { name: "Google Dataset", url: "https://datasetsearch.research.google.com" },
+                { name: "UCI数据集", url: "https://archive.ics.uci.edu" },
+                { name: "国家统计局", url: "https://www.stats.gov.cn" },
+                { name: "世界银行数据", url: "https://data.worldbank.org" },
+                { name: "GitHub数据集", url: "https://github.com/awesomedata/awesome-public-datasets" }
+            ]
+        }
+    ];
+
         websiteCategories.forEach(category => {
             const categoryElement = document.createElement("div");
             categoryElement.style.cssText = `
-                background: rgba(255, 255, 255, 0.9);
+                background-color: #E0E5EC;
                 border-radius: 12px;
                 padding: 16px;
-                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-                border: 1px solid rgba(0, 0, 0, 0.06);
-                transition: transform 0.2s ease;
+                box-shadow: 8px 8px 16px #bebebe,
+                            -8px -8px 16px #ffffff;
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
                 break-inside: avoid;
             `;
-            categoryElement.addEventListener('mouseenter', () => {
-                categoryElement.style.transform = 'translateY(-2px)';
-                categoryElement.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.12)';
-            });
-            categoryElement.addEventListener('mouseleave', () => {
-                categoryElement.style.transform = 'translateY(0)';
-                categoryElement.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.08)';
-            });
+
+            // 分类标题容器（包含文字和箭头）
+            const titleContainer = document.createElement("div");
+            titleContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: pointer;
+                user-select: none;
+                margin-bottom: 0;
+            `;
+
             const categoryTitle = document.createElement("h4");
             categoryTitle.textContent = category.title;
             categoryTitle.style.cssText = `
-                margin: 0 0 12px 0;
+                margin: 0;
                 color: #2c3e50;
                 font-size: 14px;
                 font-weight: 600;
-                border-bottom: 1px solid #ecf0f1;
-                padding-bottom: 8px;
                 word-break: break-word;
+                flex: 1;
             `;
+
+            // 箭头符号（折叠状态显示▶，展开显示▼）
+            const arrowSpan = document.createElement("span");
+            arrowSpan.textContent = '▶'; // 默认折叠
+            arrowSpan.style.cssText = `
+                font-size: 14px;
+                margin-left: 8px;
+                transition: transform 0.2s;
+                color: #4b4b4b;
+            `;
+
+            titleContainer.appendChild(categoryTitle);
+            titleContainer.appendChild(arrowSpan);
+
+            // 站点容器（默认隐藏，即折叠状态）
             const sitesContainer = document.createElement("div");
             sitesContainer.style.cssText = `
-                display: flex;
+                display: none; /* 默认折叠 */
                 flex-wrap: wrap;
                 gap: 6px;
+                margin-top: 12px;
             `;
+
             category.sites.forEach(site => {
                 const siteLink = document.createElement("a");
                 siteLink.textContent = site.name;
@@ -4227,15 +4240,16 @@ const searchOverlay = {
                 siteLink.style.cssText = `
                     display: inline-block;
                     padding: 6px 10px;
-                    background: linear-gradient(145deg, #f8f9fa, #ffffff);
-                    border: 1px solid #e9ecef;
+                    background-color: #E0E5EC;
+                    border: none;
                     border-radius: 6px;
                     text-decoration: none;
-                    color: #495057;
+                    color: #4b4b4b;
                     font-size: 12px;
                     transition: all 0.2s ease;
                     cursor: pointer;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+                    box-shadow: 4px 4px 8px #bebebe,
+                               -4px -4px 8px #ffffff;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
@@ -4243,29 +4257,37 @@ const searchOverlay = {
                     flex-shrink: 0;
                 `;
                 siteLink.addEventListener('mouseenter', () => {
-                    siteLink.style.background = 'linear-gradient(145deg, #3498db, #2980b9)';
-                    siteLink.style.color = 'white';
+                    siteLink.style.boxShadow = '6px 6px 10px #bebebe, -6px -6px 10px #ffffff';
                     siteLink.style.transform = 'translateY(-1px)';
-                    siteLink.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.15)';
-                    siteLink.style.borderColor = '#2980b9';
                 });
                 siteLink.addEventListener('mouseleave', () => {
-                    siteLink.style.background = 'linear-gradient(145deg, #f8f9fa, #ffffff)';
-                    siteLink.style.color = '#495057';
+                    siteLink.style.boxShadow = '4px 4px 8px #bebebe, -4px -4px 8px #ffffff';
                     siteLink.style.transform = 'translateY(0)';
-                    siteLink.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.08)';
-                    siteLink.style.borderColor = '#e9ecef';
                 });
                 siteLink.addEventListener('touchstart', () => {
-                    siteLink.style.background = 'linear-gradient(145deg, #3498db, #2980b9)';
-                    siteLink.style.color = 'white';
+                    siteLink.style.boxShadow = '2px 2px 5px #bebebe, -2px -2px 5px #ffffff';
                 }, { passive: true });
                 sitesContainer.appendChild(siteLink);
             });
-            categoryElement.appendChild(categoryTitle);
+
+            // 点击标题切换折叠状态
+            titleContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isExpanded = sitesContainer.style.display === 'flex';
+                if (isExpanded) {
+                    sitesContainer.style.display = 'none';
+                    arrowSpan.textContent = '▶';
+                } else {
+                    sitesContainer.style.display = 'flex';
+                    arrowSpan.textContent = '▼';
+                }
+            });
+
+            categoryElement.appendChild(titleContainer);
             categoryElement.appendChild(sitesContainer);
             categoriesContainer.appendChild(categoryElement);
         });
+
         navigationSection.appendChild(categoriesContainer);
         searchContainer.appendChild(closeBtn);
         searchContainer.appendChild(title);
@@ -4273,6 +4295,8 @@ const searchOverlay = {
         searchContainer.appendChild(navigationSection);
         scrollContainer.appendChild(searchContainer);
         overlay.appendChild(scrollContainer);
+
+        // 事件绑定
         searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.performOverlaySearch();
@@ -4286,6 +4310,7 @@ const searchOverlay = {
         searchContainer.addEventListener('click', (e) => {
             e.stopPropagation();
         });
+
         document.body.appendChild(overlay);
         return overlay;
     },
