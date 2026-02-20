@@ -3788,8 +3788,8 @@ const searchOverlay = {
             cursor: pointer;
             padding: 0;
             border-radius: 50%;
-            width: 36px;
-            height: 36px;
+            width: 15px;
+            height: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
