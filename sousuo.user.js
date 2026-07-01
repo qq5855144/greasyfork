@@ -642,8 +642,6 @@
                 padding: 8px;
                 border-radius: 18px;
                 background: rgba(22, 24, 35, 0.84);
-                box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
-                backdrop-filter: blur(14px);
                 pointer-events: auto;
                 min-height: 56px;
             }
@@ -700,7 +698,6 @@
                 background: rgba(255, 255, 255, 0.1);
                 color: #fff;
                 white-space: nowrap;
-                transition: transform 0.15s ease, background 0.15s ease;
             }
 
             .${SCRIPT_ID}-engine-button:hover,
@@ -716,12 +713,11 @@
             .${SCRIPT_ID}-chip:hover,
             .${SCRIPT_ID}-chip:focus-visible {
                 outline: none;
-                transform: translateY(-1px);
             }
 
             .${SCRIPT_ID}-engine-button.is-active {
                 background: rgba(255, 255, 255, 0.18);
-                box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.12);
             }
 
             .${SCRIPT_ID}-engine-icon {
@@ -773,8 +769,6 @@
                 padding: 12px;
                 border-radius: 18px;
                 background: rgba(18, 20, 30, 0.94);
-                box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
-                backdrop-filter: blur(14px);
             }
 
             .${SCRIPT_ID}-menu[hidden],
@@ -804,7 +798,6 @@
                 position: fixed;
                 inset: 0;
                 background: rgba(9, 12, 20, 0.54);
-                backdrop-filter: blur(4px);
             }
 
             .${SCRIPT_ID}-quick-search,
@@ -828,7 +821,7 @@
                 overflow: auto;
                 border-radius: 24px;
                 background: #ffffff;
-                box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+                border: 1px solid #d7dfeb;
                 color: #0f172a;
                 pointer-events: auto;
             }
@@ -894,7 +887,6 @@
             .${SCRIPT_ID}-number-input:focus {
                 outline: none;
                 border-color: #4f46e5;
-                box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
             }
 
             .${SCRIPT_ID}-overlay-grid,
@@ -920,7 +912,7 @@
             .${SCRIPT_ID}-stat {
                 padding: 16px;
                 border-radius: 18px;
-                background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+                background: #f8fbff;
                 border: 1px solid #dbe5ff;
             }
 
@@ -1159,7 +1151,6 @@
                 border-radius: 14px;
                 background: rgba(16, 24, 40, 0.92);
                 color: #fff;
-                box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
                 pointer-events: auto;
             }
 
