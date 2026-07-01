@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航(移动端优化)(重构版)
 // @namespace    http://tampermonkey.net/
-// @version      v2.0.0
+// @version      v2.1.0
 // @author       晚风知我意
 // @match        *://*/*searchstring=*
 // @match        *://*/*searchquery=*
@@ -48,7 +48,7 @@
 // @icon         https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/shousuo.svg
 // @run-at       document-end
 // @license      MIT
-// @description  聚合搜索导航重构版：底部搜索引擎栏、快捷搜索、管理面板、拖拽排序、自定义引擎、页面识别、偏移设置、数据迁移与稳定性修复
+// @description  聚合搜索导航增强版：底部搜索引擎栏、分组引擎、快捷搜索、管理面板、拖拽排序、智能排序、配置导入导出、图标 URL/SVG、自定义引擎、页面识别、偏移设置与数据迁移
 // ==/UserScript==
 
 (function () {
@@ -91,6 +91,12 @@
         'Bilibili', 'ApkPure', 'Quark', 'Zhihu'
     ];
 
+    const DEFAULT_GROUP_ORDER = ['通用', '问答', '视频', '应用', '未分组'];
+    const SORT_MODES = Object.freeze({
+        MANUAL: 'manual',
+        SMART: 'smart'
+    });
+
     const DEFAULT_ENGINES = Object.freeze([
         {
             id: 'Bing',
@@ -98,6 +104,7 @@
             searchUrl: 'https://www.bing.com/search?q={keyword}',
             queryKeys: ['q'],
             hostPatterns: ['bing.com'],
+            group: '通用',
             color: '#008373',
             iconText: 'Bi'
         },
@@ -107,6 +114,7 @@
             searchUrl: 'https://www.google.com/search?q={keyword}',
             queryKeys: ['q'],
             hostPatterns: ['google.'],
+            group: '通用',
             color: '#4285f4',
             iconText: 'G'
         },
@@ -116,6 +124,7 @@
             searchUrl: 'https://www.baidu.com/s?wd={keyword}',
             queryKeys: ['wd', 'word'],
             hostPatterns: ['baidu.com'],
+            group: '通用',
             color: '#2932e1',
             iconText: '百'
         },
@@ -125,6 +134,7 @@
             searchUrl: 'https://metaso.cn/?s=itab1&q={keyword}',
             queryKeys: ['q'],
             hostPatterns: ['metaso.cn'],
+            group: '通用',
             color: '#6b46ff',
             iconText: '密'
         },
@@ -134,6 +144,7 @@
             searchUrl: 'https://yandex.com/search/?text={keyword}',
             queryKeys: ['text'],
             hostPatterns: ['yandex.com', 'yandex.ru'],
+            group: '通用',
             color: '#ff0000',
             iconText: 'Y'
         },
@@ -143,6 +154,7 @@
             searchUrl: 'https://m.bilibili.com/search?keyword={keyword}',
             queryKeys: ['keyword'],
             hostPatterns: ['bilibili.com'],
+            group: '视频',
             color: '#fb7299',
             iconText: 'B站'
         },
@@ -152,6 +164,7 @@
             searchUrl: 'https://apkpure.com/search?q={keyword}',
             queryKeys: ['q'],
             hostPatterns: ['apkpure.com'],
+            group: '应用',
             color: '#24c466',
             iconText: 'Ap'
         },
@@ -161,6 +174,7 @@
             searchUrl: 'https://quark.sm.cn/s?q={keyword}',
             queryKeys: ['q'],
             hostPatterns: ['quark.sm.cn', 'quark.cn'],
+            group: '通用',
             color: '#ffb300',
             iconText: '夸'
         },
@@ -170,6 +184,7 @@
             searchUrl: 'https://www.zhihu.com/search?type=content&q={keyword}',
             queryKeys: ['q'],
             hostPatterns: ['zhihu.com'],
+            group: '问答',
             color: '#1677ff',
             iconText: '知'
         }
@@ -186,7 +201,8 @@
             menu: null,
             quickSearch: null,
             panel: null,
-            toast: null
+            toast: null,
+            importInput: null
         },
         flags: {
             menuOpen: false,
@@ -205,8 +221,11 @@
         return {
             id: '',
             name: '',
+            group: '未分组',
             searchUrl: '',
             queryKeys: 'q',
+            iconType: 'text',
+            iconValue: '',
             iconText: '',
             color: '#4455ee'
         };
@@ -279,6 +298,26 @@
         return keys.length ? Array.from(new Set(keys)) : ['q'];
     }
 
+    function normalizeGroupName(input, fallback) {
+        const group = String(input || fallback || '').trim();
+        return group || '未分组';
+    }
+
+    function normalizeIconType(iconType, iconValue) {
+        const type = String(iconType || '').trim().toLowerCase();
+        if (type === 'image' && String(iconValue || '').trim()) {
+            return 'image';
+        }
+        if (type === 'svg' && String(iconValue || '').trim()) {
+            return 'svg';
+        }
+        return 'text';
+    }
+
+    function isInlineSvg(value) {
+        return /^\s*<svg[\s\S]*<\/svg>\s*$/i.test(String(value || ''));
+    }
+
     function ensureSearchPlaceholder(url, queryKeys) {
         const raw = String(url || '').trim();
         if (!raw) {
@@ -308,7 +347,10 @@
         const hostPatterns = Array.isArray(engine.hostPatterns)
             ? engine.hostPatterns.map((item) => String(item).trim()).filter(Boolean)
             : [];
+        const group = normalizeGroupName(engine.group, '未分组');
         const color = String(engine.color || '').trim() || pickColor(id);
+        const iconValue = String(engine.iconValue || engine.iconUrl || engine.svgCode || '').trim();
+        const iconType = normalizeIconType(engine.iconType, iconValue);
         const iconText = String(engine.iconText || '').trim() || inferIconText(name, id);
         return {
             id,
@@ -316,7 +358,10 @@
             searchUrl,
             queryKeys: normalizedQueryKeys,
             hostPatterns,
+            group,
             color,
+            iconType,
+            iconValue,
             iconText,
             builtin
         };
@@ -341,8 +386,9 @@
 
     function normalizeConfig(rawConfig) {
         const base = {
-            version: 2,
+            version: 3,
             barOffset: 0,
+            sortMode: SORT_MODES.MANUAL,
             order: [],
             hiddenIds: [],
             customEngines: []
@@ -383,11 +429,13 @@
             : [];
 
         const barOffset = Number.isFinite(Number(source.barOffset)) ? Number(source.barOffset) : 0;
+        const sortMode = source.sortMode === SORT_MODES.SMART ? SORT_MODES.SMART : SORT_MODES.MANUAL;
 
         return {
             ...base,
-            version: 2,
+            version: 3,
             barOffset: Math.max(0, Math.min(240, Math.round(barOffset))),
+            sortMode,
             order,
             hiddenIds,
             customEngines: normalizedCustomEngines
@@ -441,8 +489,9 @@
         const hiddenIds = allIds.filter((id) => !activeIds.includes(id));
 
         return normalizeConfig({
-            version: 2,
+            version: 3,
             barOffset: Number(legacyOffsetValue || 0),
+            sortMode: SORT_MODES.MANUAL,
             order,
             hiddenIds,
             customEngines: legacyCustomEngines
@@ -493,6 +542,58 @@
 
     function getEnabledEngineCount(config = state.config) {
         return getVisibleEngines(config).length;
+    }
+
+    function getGroupOrderValue(group) {
+        const index = DEFAULT_GROUP_ORDER.indexOf(group);
+        return index === -1 ? DEFAULT_GROUP_ORDER.length + hashString(group) : index;
+    }
+
+    function getDisplayEngines(config = state.config) {
+        const normalized = normalizeConfig(config);
+        const visible = getVisibleEngines(normalized);
+        if (normalized.sortMode !== SORT_MODES.SMART) {
+            return visible;
+        }
+
+        const manualIndexMap = new Map();
+        visible.forEach((engine, index) => {
+            manualIndexMap.set(engine.id, index);
+        });
+
+        return [...visible].sort((a, b) => {
+            const activeDiff = Number(isActiveEngine(b)) - Number(isActiveEngine(a));
+            if (activeDiff) {
+                return activeDiff;
+            }
+
+            const usageDiff = (state.usageCounts[b.id] || 0) - (state.usageCounts[a.id] || 0);
+            if (usageDiff) {
+                return usageDiff;
+            }
+
+            const groupDiff = getGroupOrderValue(a.group) - getGroupOrderValue(b.group);
+            if (groupDiff) {
+                return groupDiff;
+            }
+
+            return (manualIndexMap.get(a.id) || 0) - (manualIndexMap.get(b.id) || 0);
+        });
+    }
+
+    function groupEngines(engines) {
+        const grouped = [];
+        const groupMap = new Map();
+        engines.forEach((engine) => {
+            const group = normalizeGroupName(engine.group, '未分组');
+            if (!groupMap.has(group)) {
+                const entry = { group, items: [] };
+                groupMap.set(group, entry);
+                grouped.push(entry);
+            }
+            groupMap.get(group).items.push(engine);
+        });
+        return grouped.sort((a, b) => getGroupOrderValue(a.group) - getGroupOrderValue(b.group));
     }
 
     function getCustomEngineById(id, config = state.panel.draftConfig || state.config) {
@@ -634,6 +735,20 @@
                 font-size: 11px;
                 font-weight: 700;
                 flex: 0 0 auto;
+                overflow: hidden;
+            }
+
+            .${SCRIPT_ID}-engine-icon img,
+            .${SCRIPT_ID}-engine-icon svg {
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
+
+            .${SCRIPT_ID}-engine-icon.is-image,
+            .${SCRIPT_ID}-engine-icon.is-svg {
+                background: #ffffff;
+                padding: 0;
             }
 
             .${SCRIPT_ID}-engine-name {
@@ -843,6 +958,29 @@
                 gap: 10px;
             }
 
+            .${SCRIPT_ID}-group-divider,
+            .${SCRIPT_ID}-section-label {
+                display: inline-flex;
+                align-items: center;
+                padding: 6px 10px;
+                border-radius: 999px;
+                font-size: 12px;
+                line-height: 1;
+                white-space: nowrap;
+            }
+
+            .${SCRIPT_ID}-group-divider {
+                color: rgba(255, 255, 255, 0.78);
+                background: rgba(255, 255, 255, 0.08);
+                flex: 0 0 auto;
+            }
+
+            .${SCRIPT_ID}-section-label {
+                margin-bottom: 12px;
+                color: #24317d;
+                background: #eef2ff;
+            }
+
             .${SCRIPT_ID}-panel-button,
             .${SCRIPT_ID}-chip {
                 padding: 10px 14px;
@@ -862,6 +1000,12 @@
             }
 
             .${SCRIPT_ID}-panel-list {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .${SCRIPT_ID}-panel-group {
                 display: flex;
                 flex-direction: column;
                 gap: 10px;
@@ -945,6 +1089,7 @@
             .${SCRIPT_ID}-item-actions {
                 display: flex;
                 gap: 8px;
+                flex-wrap: wrap;
             }
 
             .${SCRIPT_ID}-item-actions button {
@@ -972,6 +1117,11 @@
             .${SCRIPT_ID}-field label {
                 font-size: 13px;
                 color: #334155;
+            }
+
+            .${SCRIPT_ID}-field textarea {
+                min-height: 96px;
+                resize: vertical;
             }
 
             .${SCRIPT_ID}-preview {
@@ -1111,6 +1261,13 @@
         state.ui.quickSearch = quickSearch;
         state.ui.panel = panel;
         state.ui.toast = toast;
+        const importInput = document.createElement('input');
+        importInput.type = 'file';
+        importInput.accept = '.json,application/json';
+        importInput.hidden = true;
+        importInput.addEventListener('change', handleImportFileSelection);
+        root.appendChild(importInput);
+        state.ui.importInput = importInput;
 
         bindGlobalUiEvents();
     }
@@ -1133,6 +1290,12 @@
     function recordUsage(engineId) {
         state.usageCounts[engineId] = (state.usageCounts[engineId] || 0) + 1;
         saveUsageCounts();
+        if (normalizeConfig(state.config).sortMode === SORT_MODES.SMART) {
+            renderBar();
+            if (state.flags.quickSearchOpen) {
+                renderQuickSearch();
+            }
+        }
     }
 
     function isTextInput(target) {
@@ -1239,16 +1402,38 @@
     }
 
     function makeEngineBadge(engine) {
-        const badge = createEl('span', `${SCRIPT_ID}-engine-icon`, engine.iconText);
+        const badge = createEl('span', `${SCRIPT_ID}-engine-icon`);
+        const fallbackText = engine.iconText || inferIconText(engine.name, engine.id);
         badge.style.background = engine.color;
         badge.title = engine.name;
+        if (engine.iconType === 'image' && engine.iconValue) {
+            badge.classList.add('is-image');
+            const img = document.createElement('img');
+            img.alt = engine.name;
+            img.src = engine.iconValue;
+            img.referrerPolicy = 'no-referrer';
+            img.addEventListener('error', () => {
+                badge.classList.remove('is-image');
+                badge.style.background = engine.color;
+                badge.textContent = fallbackText;
+            }, { once: true });
+            badge.appendChild(img);
+            return badge;
+        }
+        if (engine.iconType === 'svg' && isInlineSvg(engine.iconValue)) {
+            badge.classList.add('is-svg');
+            badge.style.background = '#ffffff';
+            badge.innerHTML = engine.iconValue;
+            return badge;
+        }
+        badge.textContent = fallbackText;
         return badge;
     }
 
     function renderBar() {
         ensureRoot();
         const bar = state.ui.bar;
-        const visibleEngines = getVisibleEngines();
+        const visibleEngines = getDisplayEngines();
         bar.hidden = !shouldDisplayBar();
         if (bar.hidden) {
             hideMenu();
@@ -1278,16 +1463,20 @@
         });
 
         const scroll = createEl('div', `${SCRIPT_ID}-scroll`);
-        visibleEngines.forEach((engine) => {
-            const button = createEl('button', `${SCRIPT_ID}-engine-button${isActiveEngine(engine) ? ' is-active' : ''}`);
-            button.type = 'button';
-            button.title = `${engine.name}${state.currentQuery ? `：搜索“${state.currentQuery}”` : ''}`;
-            button.appendChild(makeEngineBadge(engine));
-            button.appendChild(createEl('span', `${SCRIPT_ID}-engine-name`, engine.name));
-            button.addEventListener('click', () => {
-                openSearch(engine, state.currentQuery);
+        groupEngines(visibleEngines).forEach((section) => {
+            const divider = createEl('span', `${SCRIPT_ID}-group-divider`, section.group);
+            scroll.appendChild(divider);
+            section.items.forEach((engine) => {
+                const button = createEl('button', `${SCRIPT_ID}-engine-button${isActiveEngine(engine) ? ' is-active' : ''}`);
+                button.type = 'button';
+                button.title = `${engine.group} / ${engine.name}${state.currentQuery ? `：搜索“${state.currentQuery}”` : ''}`;
+                button.appendChild(makeEngineBadge(engine));
+                button.appendChild(createEl('span', `${SCRIPT_ID}-engine-name`, engine.name));
+                button.addEventListener('click', () => {
+                    openSearch(engine, state.currentQuery);
+                });
+                scroll.appendChild(button);
             });
-            scroll.appendChild(button);
         });
 
         bar.appendChild(menuButton);
@@ -1368,7 +1557,7 @@
     function renderQuickSearch() {
         ensureRoot();
         const panel = state.ui.quickSearch;
-        const visibleEngines = getVisibleEngines();
+        const visibleEngines = getDisplayEngines();
         const currentQuery = syncCurrentQuery();
 
         panel.innerHTML = `
@@ -1393,25 +1582,33 @@
         `;
 
         const grid = panel.querySelector(`#${SCRIPT_ID}-quick-grid`);
-        visibleEngines.forEach((engine) => {
-            const button = createEl('button', `${SCRIPT_ID}-overlay-button`);
-            button.type = 'button';
-            button.appendChild(makeEngineBadge(engine));
-            const info = createEl('div');
-            info.appendChild(createEl('div', `${SCRIPT_ID}-engine-name`, engine.name));
-            info.appendChild(createEl('div', `${SCRIPT_ID}-overlay-meta`, `已使用 ${state.usageCounts[engine.id] || 0} 次`));
-            button.appendChild(info);
-            button.addEventListener('click', () => {
-                const input = document.getElementById(`${SCRIPT_ID}-quick-input`);
-                const keyword = input ? input.value.trim() : syncCurrentQuery();
-                if (!keyword) {
-                    showToast('请先输入关键词', 'error');
-                    return;
-                }
-                openSearch(engine, keyword);
-                hideQuickSearch();
+        groupEngines(visibleEngines).forEach((section) => {
+            const sectionWrap = createEl('div');
+            sectionWrap.style.gridColumn = '1 / -1';
+            sectionWrap.appendChild(createEl('div', `${SCRIPT_ID}-section-label`, `${section.group} (${section.items.length})`));
+            const sectionGrid = createEl('div', `${SCRIPT_ID}-overlay-grid`);
+            section.items.forEach((engine) => {
+                const button = createEl('button', `${SCRIPT_ID}-overlay-button`);
+                button.type = 'button';
+                button.appendChild(makeEngineBadge(engine));
+                const info = createEl('div');
+                info.appendChild(createEl('div', `${SCRIPT_ID}-engine-name`, engine.name));
+                info.appendChild(createEl('div', `${SCRIPT_ID}-overlay-meta`, `已使用 ${state.usageCounts[engine.id] || 0} 次`));
+                button.appendChild(info);
+                button.addEventListener('click', () => {
+                    const input = document.getElementById(`${SCRIPT_ID}-quick-input`);
+                    const keyword = input ? input.value.trim() : syncCurrentQuery();
+                    if (!keyword) {
+                        showToast('请先输入关键词', 'error');
+                        return;
+                    }
+                    openSearch(engine, keyword);
+                    hideQuickSearch();
+                });
+                sectionGrid.appendChild(button);
             });
-            grid.appendChild(button);
+            sectionWrap.appendChild(sectionGrid);
+            grid.appendChild(sectionWrap);
         });
 
         const quickInput = panel.querySelector(`#${SCRIPT_ID}-quick-input`);
@@ -1479,64 +1676,72 @@
         const hiddenSet = new Set(normalized.hiddenIds);
         const ordered = getOrderedEngines(normalized);
 
-        ordered.forEach((engine) => {
-            const item = createEl('div', `${SCRIPT_ID}-panel-item${hiddenSet.has(engine.id) ? ' is-hidden' : ''}`);
-            item.draggable = true;
-            item.dataset.engineId = engine.id;
+        groupEngines(ordered).forEach((section) => {
+            const groupWrap = createEl('div', `${SCRIPT_ID}-panel-group`);
+            groupWrap.appendChild(createEl('div', `${SCRIPT_ID}-section-label`, `${section.group}`));
 
-            const dragHandle = createEl('div', `${SCRIPT_ID}-drag-handle`, '⋮⋮');
-            dragHandle.title = '拖拽排序';
+            section.items.forEach((engine) => {
+                const item = createEl('div', `${SCRIPT_ID}-panel-item${hiddenSet.has(engine.id) ? ' is-hidden' : ''}`);
+                item.draggable = true;
+                item.dataset.engineId = engine.id;
 
-            const toggle = createEl('input', `${SCRIPT_ID}-toggle`);
-            toggle.type = 'checkbox';
-            toggle.checked = !hiddenSet.has(engine.id);
-            toggle.title = '启用/隐藏';
-            toggle.addEventListener('change', () => {
-                toggleEngineVisible(engine.id, toggle.checked);
+                const dragHandle = createEl('div', `${SCRIPT_ID}-drag-handle`, '⋮⋮');
+                dragHandle.title = '拖拽排序';
+
+                const toggle = createEl('input', `${SCRIPT_ID}-toggle`);
+                toggle.type = 'checkbox';
+                toggle.checked = !hiddenSet.has(engine.id);
+                toggle.title = '启用/隐藏';
+                toggle.addEventListener('change', () => {
+                    toggleEngineVisible(engine.id, toggle.checked);
+                });
+
+                const main = createEl('div', `${SCRIPT_ID}-item-main`);
+                const titleRow = createEl('div', `${SCRIPT_ID}-item-title`);
+                titleRow.appendChild(makeEngineBadge(engine));
+                const strong = createEl('strong', null, engine.name);
+                strong.title = engine.name;
+                titleRow.appendChild(strong);
+                titleRow.appendChild(createEl('span', `${SCRIPT_ID}-tag`, engine.builtin ? '内置' : '自定义'));
+                titleRow.appendChild(createEl('span', `${SCRIPT_ID}-tag`, engine.iconType === 'text' ? '文字图标' : engine.iconType === 'image' ? '图片图标' : 'SVG图标'));
+                main.appendChild(titleRow);
+                const metaUrl = createEl('div', `${SCRIPT_ID}-item-url`, engine.searchUrl);
+                metaUrl.title = engine.searchUrl;
+                main.appendChild(metaUrl);
+
+                const actions = createEl('div', `${SCRIPT_ID}-item-actions`);
+                if (!engine.builtin) {
+                    const editButton = createEl('button', null, '编辑');
+                    editButton.type = 'button';
+                    editButton.addEventListener('click', () => {
+                        loadCustomEngineToForm(engine.id);
+                    });
+                    actions.appendChild(editButton);
+                }
+
+                const usageButton = createEl('button', null, `使用 ${state.usageCounts[engine.id] || 0}`);
+                usageButton.type = 'button';
+                usageButton.disabled = true;
+                usageButton.style.cursor = 'default';
+                actions.appendChild(usageButton);
+
+                if (!engine.builtin) {
+                    const removeButton = createEl('button', null, '删除');
+                    removeButton.type = 'button';
+                    removeButton.addEventListener('click', () => {
+                        deleteCustomEngine(engine.id);
+                    });
+                    actions.appendChild(removeButton);
+                }
+
+                item.appendChild(dragHandle);
+                item.appendChild(toggle);
+                item.appendChild(main);
+                item.appendChild(actions);
+                groupWrap.appendChild(item);
             });
 
-            const main = createEl('div', `${SCRIPT_ID}-item-main`);
-            const titleRow = createEl('div', `${SCRIPT_ID}-item-title`);
-            titleRow.appendChild(makeEngineBadge(engine));
-            const strong = createEl('strong', null, engine.name);
-            strong.title = engine.name;
-            titleRow.appendChild(strong);
-            titleRow.appendChild(createEl('span', `${SCRIPT_ID}-tag`, engine.builtin ? '内置' : '自定义'));
-            main.appendChild(titleRow);
-            const metaUrl = createEl('div', `${SCRIPT_ID}-item-url`, engine.searchUrl);
-            metaUrl.title = engine.searchUrl;
-            main.appendChild(metaUrl);
-
-            const actions = createEl('div', `${SCRIPT_ID}-item-actions`);
-            if (!engine.builtin) {
-                const editButton = createEl('button', null, '编辑');
-                editButton.type = 'button';
-                editButton.addEventListener('click', () => {
-                    loadCustomEngineToForm(engine.id);
-                });
-                actions.appendChild(editButton);
-            }
-
-            const usageButton = createEl('button', null, `使用 ${state.usageCounts[engine.id] || 0}`);
-            usageButton.type = 'button';
-            usageButton.disabled = true;
-            usageButton.style.cursor = 'default';
-            actions.appendChild(usageButton);
-
-            if (!engine.builtin) {
-                const removeButton = createEl('button', null, '删除');
-                removeButton.type = 'button';
-                removeButton.addEventListener('click', () => {
-                    deleteCustomEngine(engine.id);
-                });
-                actions.appendChild(removeButton);
-            }
-
-            item.appendChild(dragHandle);
-            item.appendChild(toggle);
-            item.appendChild(main);
-            item.appendChild(actions);
-            list.appendChild(item);
+            list.appendChild(groupWrap);
         });
 
         bindDragSorting(list);
@@ -1548,8 +1753,11 @@
         return normalizeEngine({
             id: draft.id || draft.name || 'preview',
             name: draft.name || '新引擎',
+            group: draft.group || '未分组',
             searchUrl: draft.searchUrl || 'https://example.com/search?q={keyword}',
             queryKeys: splitQueryKeys(draft.queryKeys),
+            iconType: draft.iconType,
+            iconValue: draft.iconValue,
             color: draft.color,
             iconText: draft.iconText
         }, { builtin: false });
@@ -1574,6 +1782,9 @@
 
         const draft = state.panel.formDraft;
         const previewEngine = buildPreviewEngineFromFormDraft();
+        const iconValueElement = draft.iconType === 'svg'
+            ? `<textarea id="${SCRIPT_ID}-field-icon-value" class="${SCRIPT_ID}-text-input" placeholder="粘贴完整 SVG 代码">${escapeHtml(draft.iconValue)}</textarea>`
+            : `<input id="${SCRIPT_ID}-field-icon-value" class="${SCRIPT_ID}-text-input" type="text" value="${escapeHtml(draft.iconValue)}" placeholder="${draft.iconType === 'image' ? 'https://example.com/icon.png' : '当使用文字图标时可留空'}">`;
 
         container.innerHTML = `
             <div class="${SCRIPT_ID}-form-grid">
@@ -1586,12 +1797,28 @@
                     <input id="${SCRIPT_ID}-field-id" class="${SCRIPT_ID}-text-input" type="text" value="${escapeHtml(draft.id)}" placeholder="建议唯一，例如 duckduckgo">
                 </div>
                 <div class="${SCRIPT_ID}-field">
+                    <label for="${SCRIPT_ID}-field-group">分组</label>
+                    <input id="${SCRIPT_ID}-field-group" class="${SCRIPT_ID}-text-input" type="text" value="${escapeHtml(draft.group)}" placeholder="例如：通用 / 视频 / 工具">
+                </div>
+                <div class="${SCRIPT_ID}-field">
                     <label for="${SCRIPT_ID}-field-url">搜索链接模板</label>
                     <input id="${SCRIPT_ID}-field-url" class="${SCRIPT_ID}-text-input" type="text" value="${escapeHtml(draft.searchUrl)}" placeholder="必须包含 {keyword}">
                 </div>
                 <div class="${SCRIPT_ID}-field">
                     <label for="${SCRIPT_ID}-field-keys">关键词参数</label>
                     <input id="${SCRIPT_ID}-field-keys" class="${SCRIPT_ID}-text-input" type="text" value="${escapeHtml(draft.queryKeys)}" placeholder="例如：q,query">
+                </div>
+                <div class="${SCRIPT_ID}-field">
+                    <label for="${SCRIPT_ID}-field-icon-type">图标类型</label>
+                    <select id="${SCRIPT_ID}-field-icon-type" class="${SCRIPT_ID}-text-input">
+                        <option value="text"${draft.iconType === 'text' ? ' selected' : ''}>文字图标</option>
+                        <option value="image"${draft.iconType === 'image' ? ' selected' : ''}>图片 URL</option>
+                        <option value="svg"${draft.iconType === 'svg' ? ' selected' : ''}>内联 SVG</option>
+                    </select>
+                </div>
+                <div class="${SCRIPT_ID}-field">
+                    <label for="${SCRIPT_ID}-field-icon-value">图标内容</label>
+                    ${iconValueElement}
                 </div>
                 <div class="${SCRIPT_ID}-field">
                     <label for="${SCRIPT_ID}-field-icon">图标文本</label>
@@ -1616,14 +1843,29 @@
         [
             ['name', `${SCRIPT_ID}-field-name`],
             ['id', `${SCRIPT_ID}-field-id`],
+            ['group', `${SCRIPT_ID}-field-group`],
             ['searchUrl', `${SCRIPT_ID}-field-url`],
             ['queryKeys', `${SCRIPT_ID}-field-keys`],
+            ['iconType', `${SCRIPT_ID}-field-icon-type`],
+            ['iconValue', `${SCRIPT_ID}-field-icon-value`],
             ['iconText', `${SCRIPT_ID}-field-icon`],
             ['color', `${SCRIPT_ID}-field-color`]
         ].forEach(([key, elementId]) => {
             const input = document.getElementById(elementId);
             input.addEventListener('input', () => {
                 state.panel.formDraft[key] = input.value;
+                if (key === 'iconType') {
+                    renderPanelForm();
+                    return;
+                }
+                refreshPanelFormPreview();
+            });
+            input.addEventListener('change', () => {
+                state.panel.formDraft[key] = input.value;
+                if (key === 'iconType') {
+                    renderPanelForm();
+                    return;
+                }
                 refreshPanelFormPreview();
             });
         });
@@ -1637,13 +1879,18 @@
     }
 
     function makePreviewHtml(engine) {
-        return `
-            <span class="${SCRIPT_ID}-engine-icon" style="background:${escapeHtml(engine.color)}">${escapeHtml(engine.iconText)}</span>
-            <div>
-                <div><strong>${escapeHtml(engine.name)}</strong></div>
-                <div class="${SCRIPT_ID}-muted">${escapeHtml(engine.searchUrl)}</div>
-            </div>
-        `;
+        const temp = document.createElement('div');
+        temp.appendChild(makeEngineBadge(engine));
+        const info = document.createElement('div');
+        const title = document.createElement('div');
+        const strong = document.createElement('strong');
+        strong.textContent = `${engine.group} / ${engine.name}`;
+        title.appendChild(strong);
+        info.appendChild(title);
+        const url = createEl('div', `${SCRIPT_ID}-muted`, engine.searchUrl);
+        info.appendChild(url);
+        temp.appendChild(info);
+        return temp.innerHTML;
     }
 
     function updatePanelStats() {
@@ -1695,7 +1942,11 @@
                 <div class="${SCRIPT_ID}-section">
                     <div class="${SCRIPT_ID}-toolbar">
                         <button type="button" class="${SCRIPT_ID}-panel-button" id="${SCRIPT_ID}-panel-extract">识别当前站点</button>
+                        <button type="button" class="${SCRIPT_ID}-panel-button" id="${SCRIPT_ID}-panel-export">导出配置</button>
+                        <button type="button" class="${SCRIPT_ID}-panel-button" id="${SCRIPT_ID}-panel-import">导入配置</button>
                         <button type="button" class="${SCRIPT_ID}-panel-button" id="${SCRIPT_ID}-panel-reset">恢复默认</button>
+                        <button type="button" class="${SCRIPT_ID}-panel-button${config.sortMode === SORT_MODES.MANUAL ? ' is-primary' : ''}" id="${SCRIPT_ID}-panel-manual-sort">手动排序</button>
+                        <button type="button" class="${SCRIPT_ID}-panel-button${config.sortMode === SORT_MODES.SMART ? ' is-primary' : ''}" id="${SCRIPT_ID}-panel-smart-sort">智能排序</button>
                         <button type="button" class="${SCRIPT_ID}-panel-button is-primary" id="${SCRIPT_ID}-panel-save">保存全部配置</button>
                         <span class="${SCRIPT_ID}-muted" id="${SCRIPT_ID}-dirty-text">${state.panel.dirty ? '有未保存更改' : '当前已保存'}</span>
                     </div>
@@ -1717,7 +1968,7 @@
                             <div class="${SCRIPT_ID}-header" style="margin-bottom:12px;">
                                 <div>
                                     <h3 class="${SCRIPT_ID}-title" style="font-size:18px;">引擎列表</h3>
-                                    <p class="${SCRIPT_ID}-subtitle">拖拽排序，勾选表示在底部栏显示。</p>
+                                    <p class="${SCRIPT_ID}-subtitle">拖拽排序，勾选表示在底部栏显示；智能排序会按使用频率自动提升常用引擎。</p>
                                 </div>
                             </div>
                             <div class="${SCRIPT_ID}-panel-list" id="${SCRIPT_ID}-panel-list"></div>
@@ -1753,7 +2004,19 @@
         offsetNumber.addEventListener('input', () => syncOffsetInputs(offsetNumber.value));
 
         document.getElementById(`${SCRIPT_ID}-panel-extract`).addEventListener('click', populateFormFromCurrentPage);
+        document.getElementById(`${SCRIPT_ID}-panel-export`).addEventListener('click', exportConfigToFile);
+        document.getElementById(`${SCRIPT_ID}-panel-import`).addEventListener('click', triggerConfigImport);
         document.getElementById(`${SCRIPT_ID}-panel-reset`).addEventListener('click', restoreDraftToDefault);
+        document.getElementById(`${SCRIPT_ID}-panel-manual-sort`).addEventListener('click', () => {
+            state.panel.draftConfig.sortMode = SORT_MODES.MANUAL;
+            markPanelDirty(true);
+            renderPanel();
+        });
+        document.getElementById(`${SCRIPT_ID}-panel-smart-sort`).addEventListener('click', () => {
+            state.panel.draftConfig.sortMode = SORT_MODES.SMART;
+            markPanelDirty(true);
+            renderPanel();
+        });
         document.getElementById(`${SCRIPT_ID}-panel-save`).addEventListener('click', savePanelConfig);
     }
 
@@ -1811,8 +2074,11 @@
         state.panel.formDraft = {
             id: engine.id,
             name: engine.name,
+            group: engine.group,
             searchUrl: engine.searchUrl,
             queryKeys: engine.queryKeys.join(','),
+            iconType: engine.iconType,
+            iconValue: engine.iconValue,
             iconText: engine.iconText,
             color: engine.color
         };
@@ -1823,9 +2089,12 @@
         const form = state.panel.formDraft;
         const name = String(form.name || '').trim();
         const id = normalizeId(form.id || form.name, form.searchUrl || form.name);
+        const group = normalizeGroupName(form.group, '未分组');
         const queryKeys = splitQueryKeys(form.queryKeys);
         const searchUrl = ensureSearchPlaceholder(form.searchUrl, queryKeys);
         const color = String(form.color || '').trim() || pickColor(id);
+        const iconType = normalizeIconType(form.iconType, form.iconValue);
+        const iconValue = String(form.iconValue || '').trim();
         const iconText = String(form.iconText || '').trim() || inferIconText(name, id);
 
         if (!name) {
@@ -1849,9 +2118,12 @@
         const normalized = normalizeEngine({
             id,
             name,
+            group,
             searchUrl,
             queryKeys,
             hostPatterns,
+            iconType,
+            iconValue,
             color,
             iconText
         }, { builtin: false });
@@ -1883,8 +2155,11 @@
         state.panel.formDraft = {
             id: normalized.id,
             name: normalized.name,
+            group: normalized.group,
             searchUrl: normalized.searchUrl,
             queryKeys: normalized.queryKeys.join(','),
+            iconType: normalized.iconType,
+            iconValue: normalized.iconValue,
             iconText: normalized.iconText,
             color: normalized.color
         };
@@ -1922,8 +2197,9 @@
             return;
         }
         state.panel.draftConfig = normalizeConfig({
-            version: 2,
+            version: 3,
             barOffset: 0,
+            sortMode: SORT_MODES.MANUAL,
             order: [...DEFAULT_ENGINE_ORDER],
             hiddenIds: [],
             customEngines: []
@@ -1946,6 +2222,65 @@
         renderBar();
         renderQuickSearch();
         showToast('配置已保存');
+    }
+
+    function exportConfigToFile() {
+        const sourceConfig = normalizeConfig(state.panel.draftConfig || state.config);
+        const payload = {
+            schema: 'sousuo-config-export',
+            version: 3,
+            exportedAt: new Date().toISOString(),
+            config: sourceConfig,
+            usageCounts: state.usageCounts
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `sousuo-config-${Date.now()}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        showToast('配置文件已导出');
+    }
+
+    function triggerConfigImport() {
+        if (!state.ui.importInput) {
+            showToast('导入控件不可用', 'error');
+            return;
+        }
+        state.ui.importInput.value = '';
+        state.ui.importInput.click();
+    }
+
+    function applyImportedConfigPayload(payload) {
+        const importedConfig = payload && payload.config ? payload.config : payload;
+        state.panel.draftConfig = normalizeConfig(importedConfig);
+        if (payload && payload.usageCounts && typeof payload.usageCounts === 'object') {
+            state.usageCounts = payload.usageCounts;
+            saveUsageCounts();
+        }
+        state.panel.editingEngineId = null;
+        state.panel.formDraft = createEmptyFormDraft();
+        markPanelDirty(true);
+        renderPanel();
+        showToast('配置已导入到草稿区，请确认后保存');
+    }
+
+    async function handleImportFileSelection(event) {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || !input.files || !input.files[0]) {
+            return;
+        }
+        try {
+            const text = await input.files[0].text();
+            const payload = JSON.parse(text);
+            applyImportedConfigPayload(payload);
+        } catch (error) {
+            console.error(`[${SCRIPT_ID}] 导入配置失败`, error);
+            showToast('导入失败，请检查 JSON 格式', 'error');
+        } finally {
+            input.value = '';
+        }
     }
 
     function bindDragSorting(listElement) {
@@ -2015,9 +2350,12 @@
             return {
                 name: deriveSiteName(),
                 id: normalizeId(deriveSiteName(), window.location.hostname),
+                group: '通用',
                 searchUrl: ensureSearchPlaceholder(baseUrl, [name]),
                 queryKeys: [name],
                 hostPatterns: [window.location.hostname.replace(/^www\./, '')],
+                iconType: 'text',
+                iconValue: '',
                 color: pickColor(window.location.hostname),
                 iconText: inferIconText(deriveSiteName(), window.location.hostname)
             };
@@ -2036,9 +2374,12 @@
             return {
                 name: deriveSiteName(),
                 id: normalizeId(deriveSiteName(), window.location.hostname),
+                group: '通用',
                 searchUrl: ensureSearchPlaceholder(cleanUrl.toString(), [key]),
                 queryKeys: [key],
                 hostPatterns: [window.location.hostname.replace(/^www\./, '')],
+                iconType: 'text',
+                iconValue: '',
                 color: pickColor(window.location.hostname),
                 iconText: inferIconText(deriveSiteName(), window.location.hostname)
             };
@@ -2056,8 +2397,11 @@
         state.panel.formDraft = {
             id: detected.id,
             name: detected.name,
+            group: detected.group,
             searchUrl: detected.searchUrl,
             queryKeys: detected.queryKeys.join(','),
+            iconType: detected.iconType,
+            iconValue: detected.iconValue,
             iconText: detected.iconText,
             color: detected.color
         };
