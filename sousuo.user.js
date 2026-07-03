@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v1.40
+// @version      v2.0.0
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -14,8 +14,8 @@
 // @connect      api.github.com
 // @icon         https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/shousuo.svg
 // @run-at       document-body
-// @license     MIT
-// @description * 搜索引擎快捷工具 + GitHub搜索结果增强 * 核心功能：页面底部搜索引擎快捷栏、GitHub搜索结果显示部署网站和发布版本标签、拖拽排序、自定义引擎管理、快捷搜索
+// @license      MIT
+// @description  搜索引擎快捷工具 + GitHub搜索结果增强。核心功能：页面底部搜索引擎快捷栏、GitHub搜索结果显示部署网站和发布版本标签、拖拽排序、自定义引擎管理、快捷搜索、智能排序、无障碍访问
 // ==/UserScript==
 
 // ===== GitHub 功能模块 =====
@@ -138,17 +138,29 @@ const githubEnhancer = {
 
     makeRequest(url) {
         return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Request timeout'));
+            }, 15000);
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: url,
+                timeout: 15000,
                 onload: (response) => {
+                    clearTimeout(timeout);
                     if (response.status === 200) {
                         resolve(response.responseText);
                     } else {
                         reject(new Error(`HTTP ${response.status}`));
                     }
                 },
-                onerror: reject
+                onerror: (err) => {
+                    clearTimeout(timeout);
+                    reject(err);
+                },
+                ontimeout: () => {
+                    clearTimeout(timeout);
+                    reject(new Error('Request timeout'));
+                }
             });
         });
     },
@@ -230,25 +242,6 @@ const githubEnhancer = {
                 } catch (e) {
                     continue;
                 }
-            }
-
-            try {
-                const settingsHtml = await this.makeRequest(`https://github.com/${repoOwner}/${repoName}/settings/pages`);
-                
-                if (settingsHtml.includes('is published') || 
-                    settingsHtml.includes('is enrolled') ||
-                    settingsHtml.includes('CNAME') ||
-                    settingsHtml.includes('github-pages')) {
-                    
-                    const urlMatch = settingsHtml.match(/(https?:\/\/[^\s"']+\.github\.io[^\s"']*)/);
-                    if (urlMatch) {
-                        return urlMatch[0];
-                    }
-                    
-                    return `https://${repoOwner}.github.io/${repoName}`;
-                }
-            } catch (e) {
-                // 忽略错误
             }
 
             try {
@@ -353,9 +346,9 @@ const githubEnhancer = {
 
     async checkReleases(repoOwner, repoName) {
         try {
-            const releasesData = await this.makeRequest(`https://api.github.com/repos/${repoOwner}/${repoName}/releases`);
+            const releasesData = await this.makeRequest(`https://api.github.com/repos/${repoOwner}/${repoName}/releases?per_page=1`);
             const releases = JSON.parse(releasesData);
-            return releases.length > 0;
+            return Array.isArray(releases) && releases.length > 0;
         } catch (e) {
             return false;
         }
@@ -444,7 +437,7 @@ const githubEnhancer = {
         const match = href.match(/\/([^\/]+)\/([^\/]+)$/);
         if (!match) return;
 
-        const [_, repoOwner, repoName] = match;
+        const [, repoOwner, repoName] = match;
         const repoId = `${repoOwner}/${repoName}`;
 
         if (this.processedRepos.has(repoId) || repoItem.dataset.tagsProcessed) {
@@ -545,35 +538,32 @@ const githubEnhancer = {
     },
 
     initGitHubObserver() {
+        let debounceTimer = null;
         const observer = new MutationObserver((mutations) => {
             let shouldProcess = false;
             
-            mutations.forEach((mutation) => {
-                if (mutation.addedNodes.length > 0) {
-                    mutation.addedNodes.forEach((node) => {
-                        if (node.nodeType === 1) {
-                            if (node.querySelector && (
-                                node.querySelector('.fXzjPH') ||
-                                node.querySelector('[data-testid="repository-card"]') ||
-                                node.querySelector('a[href*="/"][href*="/"]')
-                            )) {
-                                shouldProcess = true;
-                            }
-                            
-                            if (node.matches && (
-                                node.matches('.fXzjPH') ||
-                                node.matches('[data-testid="repository-card"]') ||
-                                (node.querySelector && node.querySelector('a[href*="/"][href*="/"]'))
-                            )) {
-                                shouldProcess = true;
-                            }
-                        }
-                    });
+            for (const mutation of mutations) {
+                if (mutation.addedNodes.length === 0) continue;
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType !== 1) continue;
+                    if ((node.querySelector && (
+                        node.querySelector('.fXzjPH') ||
+                        node.querySelector('[data-testid="repository-card"]') ||
+                        node.querySelector('a[href*="/"][href*="/"]')
+                    )) || (node.matches && (
+                        node.matches('.fXzjPH') ||
+                        node.matches('[data-testid="repository-card"]')
+                    ))) {
+                        shouldProcess = true;
+                        break;
+                    }
                 }
-            });
+                if (shouldProcess) break;
+            }
             
             if (shouldProcess) {
-                setTimeout(() => this.processVisibleRepos(), 500);
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => this.processVisibleRepos(), 500);
             }
         });
 
@@ -586,8 +576,7 @@ const githubEnhancer = {
     }
 };
 
-            const punkDeafultMark = "Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
-            const defaultSearchEngines = [{
+const defaultSearchEngines = [{
                     name: "谷歌",
                     searchUrl: "https://www.google.com/search?q={keyword}",
                     searchkeyName: ["q"],
@@ -2886,6 +2875,25 @@ const DEFAULT_CONFIG = {
     ENGINE_BAR_OFFSET_DEFAULT: 0
 };
 
+// ===== 应用状态 =====
+const appState = {
+    userSearchEngines: GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, []),
+    searchUrlMap: [...defaultSearchEngines, ...GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, [])],
+    lastScrollTop: 0,
+    punkJetBoxVisible: true,
+    currentInput: sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '',
+    scriptLoaded: false,
+    containerAdded: false,
+    hasUnsavedChanges: false,
+    scrollTimeout: null,
+    isScrolling: false,
+    hideTimeout: null,
+    touchStartY: null,
+    hamburgerMenuOpen: false,
+    searchOverlayVisible: false,
+    isInteractingWithEngineBar: false
+};
+
 // ===== 可访问性模块 =====
 const accessibility = {
     initKeyboardNavigation() {
@@ -2975,7 +2983,9 @@ const accessibility = {
     init() {
         this.initKeyboardNavigation();
         setTimeout(() => this.enhanceAriaLabels(), 1000);
-        const observer = new MutationObserver(() => this.enhanceAriaLabels());
+        const observer = new MutationObserver(() => {
+            debounceUtils.debounce('aria_enhance', () => this.enhanceAriaLabels(), 500);
+        });
         observer.observe(document.body, { childList: true, subtree: true });
     }
 };
@@ -3119,14 +3129,20 @@ const utils = {
             saveBtn.style.pointerEvents = "auto";
             saveBtn.style.background = "#e67e22";
             saveBtn.innerHTML = this.createInlineSVG('save') + ' 保存更改';
-            const handleHover = function(isEnter) {
-                this.style.transform = isEnter ? "translateY(-2px)" : "translateY(0)";
-                this.style.boxShadow = isEnter ? "0 4px 8px rgba(0,0,0,0.2)" : "none";
-            };
-            saveBtn.removeEventListener("mouseenter", () => {});
-            saveBtn.removeEventListener("mouseleave", () => {});
-            saveBtn.addEventListener("mouseenter", () => handleHover.call(saveBtn, true));
-            saveBtn.addEventListener("mouseleave", () => handleHover.call(saveBtn, false));
+            if (!saveBtn._hoverHandlers) {
+                const handleHover = function(isEnter) {
+                    this.style.transform = isEnter ? "translateY(-2px)" : "translateY(0)";
+                    this.style.boxShadow = isEnter ? "0 4px 8px rgba(0,0,0,0.2)" : "none";
+                };
+                saveBtn._hoverHandlers = {
+                    enter: () => handleHover.call(saveBtn, true),
+                    leave: () => handleHover.call(saveBtn, false)
+                };
+            }
+            saveBtn.removeEventListener("mouseenter", saveBtn._hoverHandlers.enter);
+            saveBtn.removeEventListener("mouseleave", saveBtn._hoverHandlers.leave);
+            saveBtn.addEventListener("mouseenter", saveBtn._hoverHandlers.enter);
+            saveBtn.addEventListener("mouseleave", saveBtn._hoverHandlers.leave);
         }
     },
 
@@ -3335,7 +3351,9 @@ const domHandler = {
         };
         document.querySelectorAll(DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR).forEach(setupInputMonitoring);
         const observer = new MutationObserver(() => {
-            document.querySelectorAll(`${DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR}:not([data-monitored])`).forEach(setupInputMonitoring);
+            debounceUtils.debounce('input_monitor_setup', () => {
+                document.querySelectorAll(`${DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR}:not([data-monitored])`).forEach(setupInputMonitoring);
+            }, 500);
         });
         observer.observe(document.body, { childList: true, subtree: true });
     },
@@ -3696,14 +3714,6 @@ const domHandler = {
 
     hideHamburgerMenu() {
         hamburgerMenu.hideHamburgerMenu();
-    },
-
-    showHamburgerMenu() {
-        hamburgerMenu.showHamburgerMenu();
-    },
-
-    toggleHamburgerMenu() {
-        hamburgerMenu.toggleHamburgerMenu();
     }
 };
 
@@ -4556,13 +4566,17 @@ const hamburgerMenu = {
         });
         const hamburgerMenuEl = document.getElementById(CLASS_NAMES.HAMBURGER_MENU);
         hamburgerMenuEl.appendChild(contextMenu);
-        document.addEventListener('click', (e) => this.handleClickOutsideContextMenu(e));
+        this._outsideClickHandler = (e) => this.handleClickOutsideContextMenu(e);
+        document.addEventListener('click', this._outsideClickHandler);
     },
     
     removeSortContextMenu() {
         const contextMenu = document.getElementById('sort-context-menu');
         if (contextMenu) contextMenu.remove();
-        document.removeEventListener('click', (e) => this.handleClickOutsideContextMenu(e));
+        if (this._outsideClickHandler) {
+            document.removeEventListener('click', this._outsideClickHandler);
+            this._outsideClickHandler = null;
+        }
     },
     
     handleClickOutsideContextMenu(e) {
@@ -4835,14 +4849,15 @@ const managementPanel = {
     },
 
     generateEngineInfo(domain, keyParams, searchUrl) {
-        const cleanDomain = domain.replace('www.', '');
+        const cleanDomain = domain.replace(/^www\./, '');
         const name = cleanDomain.split('.')[0].charAt(0).toUpperCase() + cleanDomain.split('.')[0].slice(1);
         const mark = cleanDomain.replace(/\./g, '_');
+        const escapedDomain = cleanDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         return {
             name: name,
             searchUrl: searchUrl,
             searchkeyName: keyParams,
-            matchUrl: `.*${cleanDomain}.*`,
+            matchUrl: new RegExp(`.*${escapedDomain}.*`),
             mark: mark
         };
     },
@@ -4951,11 +4966,13 @@ const managementPanel = {
             alert("标识已存在，请使用其他标识");
             return;
         }
+        const hostname = new URL(url).hostname;
+        const escapedHostname = hostname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const newEngine = {
             name,
             searchUrl: url,
             searchkeyName: keys,
-            matchUrl: new RegExp(`.*${new URL(url).hostname}.*`),
+            matchUrl: new RegExp(`.*${escapedHostname}.*`),
             mark,
             svgCode: "",
             custom: true
@@ -5541,497 +5558,7 @@ const managementPanel = {
 
         // 隐藏汉堡菜单
         hamburgerMenu.hideHamburgerMenu();
-    },
-
-/**
- * 创建管理面板DOM结构（核心配置界面）
- */
-createManagementPanel() {
-    let panel = document.getElementById(CLASS_NAMES.MANAGEMENT_PANEL);
-    if (panel) return panel;
-    // 1. 面板主容器
-    panel = document.createElement("div");
-    panel.id = CLASS_NAMES.MANAGEMENT_PANEL;
-    panel.style.cssText = `
-position: fixed;
-top: 50%;
-left: 50%;
-transform: translate(-50%, -50%);
-width: 90%;
-max-width: 800px;
-height: 90vh;
-max-height: 90vh;
-background-color: #ffffff;
-border-radius: 15px;
-box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-padding: 0;
-z-index: 10000;
-display: none;
-overflow: hidden;
-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-display: flex;
-flex-direction: column;
-box-sizing: border-box;
-`;
-    // 2. 面板头部
-    const header = document.createElement("div");
-    header.style.cssText = `
-height: 15vh;
-min-height: 80px;
-max-height: 120px;
-background-color: #2c3e50;
-color: white;
-padding: 20px;
-border-radius: 15px 15px 0 0;
-position: relative;
-box-sizing: border-box;
-flex-shrink: 0;
-`;
-    const title = document.createElement("h2");
-    title.innerHTML = utils.createInlineSVG('cog', 'white') + ' 搜索引擎管理中心';
-    title.style.cssText = `
-margin: 0;
-font-size: 1.5em;
-font-weight: 300;
-display: flex;
-align-items: center;
-gap: 10px;
-`;
-    const subtitle = document.createElement("p");
-    subtitle.textContent = "管理您的搜索快捷方式";
-    subtitle.style.cssText = `
-margin: 5px 0 0 0;
-opacity: 0.8;
-font-size: 0.9em;
-`;
-    // 未保存更改指示器
-    const unsavedIndicator = document.createElement("div");
-    unsavedIndicator.id = "unsaved-indicator";
-    unsavedIndicator.innerHTML = utils.createInlineSVG('circle', '#e74c3c') + ' 有未保存的更改';
-    unsavedIndicator.style.cssText = `
-position: absolute;
-top: 15px;
-right: 20px;
-color: #e74c3c;
-font-size: 0.8em;
-display: none;
-align-items: center;
-gap: 5px;
-`;
-    header.appendChild(title);
-    header.appendChild(subtitle);
-    header.appendChild(unsavedIndicator);
-    panel.appendChild(header);
-    // 3. 面板内容区
-    const content = document.createElement("div");
-    content.style.cssText = `
-height: 65vh;
-min-height: 300px;
-position: relative;
-overflow: hidden;
-padding: 0;
-box-sizing: border-box;
-display: flex;
-flex-direction: column;
-flex-shrink: 0;
-`;
-    // 3.1 快捷操作栏
-    const quickActions = document.createElement("div");
-    quickActions.style.cssText = `
-padding: 20px;
-display: flex;
-gap: 10px;
-flex-wrap: wrap;
-justify-content: space-between;
-background-color: #ffffff;
-border-bottom: 1px solid #ecf0f1;
-box-sizing: border-box;
-flex-shrink: 0;
-`;
-    // 左侧操作组
-    const leftActionGroup = document.createElement("div");
-    leftActionGroup.style.cssText = `
-display: flex;
-gap: 10px;
-flex-wrap: wrap;
-`;
-    const extractBtn = this.createActionButton(utils.createInlineSVG('globe') + ' 自动添加', "#3498db", "自动识别当前页面的搜索引擎");
-    const addBtn = this.createActionButton(utils.createInlineSVG('plus') + ' 手动添加', "#27ae60", "手动添加新的搜索引擎");
-    leftActionGroup.appendChild(extractBtn);
-    leftActionGroup.appendChild(addBtn);
-    // 右侧操作组
-    const rightActionGroup = document.createElement("div");
-    rightActionGroup.style.cssText = `
-display: flex;
-gap: 10px;
-flex-wrap: wrap;
-`;
-    const saveBtn = document.createElement("button");
-    saveBtn.id = "panel-save-btn";
-    saveBtn.innerHTML = utils.createInlineSVG('save') + ' 保存设置';
-    saveBtn.title = "保存当前设置";
-    saveBtn.style.cssText = `
-padding: 10px 20px;
-background: #95a5a6;
-color: white;
-border: none;
-border-radius: 8px;
-cursor: pointer;
-font-size: 14px;
-font-weight: 600;
-display: flex;
-align-items: center;
-gap: 5px;
-transition: all 0.3s ease;
-opacity: 0.7;
-pointer-events: none;
-min-width: 120px;
-justify-content: center;
-`;
-    const resetBtn = this.createActionButton(utils.createInlineSVG('undo') + ' 恢复默认', "#e74c3c", "恢复默认搜索引擎设置");
-    rightActionGroup.appendChild(saveBtn);
-    rightActionGroup.appendChild(resetBtn);
-    quickActions.appendChild(leftActionGroup);
-    quickActions.appendChild(rightActionGroup);
-    content.appendChild(quickActions);
-    // 3.2 引擎列表区
-    const listSection = document.createElement("div");
-    listSection.style.cssText = `
-flex: 1;
-overflow: hidden;
-padding: 0 20px;
-box-sizing: border-box;
-display: flex;
-flex-direction: column;
-overflow: auto;
-`;
-    const listTitle = document.createElement("h3");
-    listTitle.innerHTML = utils.createInlineSVG('list') + ' 已配置的搜索引擎';
-    listTitle.style.cssText = `
-color: #2c3e50;
-margin: 15px 0;
-font-weight: 500;
-flex-shrink: 0;
-display: flex;
-align-items: center;
-gap: 10px;
-`;
-    const engineList = document.createElement("div");
-    engineList.id = "engine-management-list";
-    engineList.style.cssText = `
-flex: 1;
-overflow-y: auto;
-overflow-x: hidden;
-display: grid;
-gap: 10px;
-grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-padding-bottom: 10px;
-box-sizing: border-box;
-`;
-    listSection.appendChild(listTitle);
-    listSection.appendChild(engineList);
-    // 3.3 添加引擎表单
-    const formSection = document.createElement("div");
-    formSection.id = "add-engine-form";
-    formSection.style.cssText = `
-display: none;
-background-color: #f8f9fa;
-padding: 20px;
-border-radius: 10px;
-margin: 10px 0;
-box-sizing: border-box;
-flex-shrink: 0;
-`;
-    const formTitle = document.createElement("h3");
-    formTitle.innerHTML = utils.createInlineSVG('magic') + ' 添加新搜索引擎';
-    formTitle.style.cssText = `
-color: #2c3e50;
-margin-bottom: 15px;
-display: flex;
-align-items: center;
-gap: 10px;
-`;
-    formSection.appendChild(formTitle);
-    // 表单字段容器
-    const form = document.createElement("div");
-    form.style.cssText = `
-display: grid;
-gap: 15px;
-grid-template-columns: 1fr 1fr;
-`;
-    // 表单字段配置
-    const fields = [{
-            label: "引擎名称",
-            placeholder: "例如: Google",
-            type: "text",
-            id: "engine-name",
-            required: true
-        },
-        {
-            label: "唯一标识",
-            placeholder: "例如: google",
-            type: "text",
-            id: "engine-mark",
-            required: true
-        },
-        {
-            label: "搜索URL",
-            placeholder: "使用 {keyword} 作为占位符",
-            type: "text",
-            id: "engine-url",
-            required: true,
-            fullWidth: true
-        },
-        {
-            label: "关键词参数",
-            placeholder: "例如: q,query,search",
-            type: "text",
-            id: "engine-keys",
-            required: true,
-            fullWidth: true
-        }
-    ];
-    // 创建表单字段
-    fields.forEach(field => {
-        const container = document.createElement("div");
-        if (field.fullWidth) {
-            container.style.gridColumn = "1 / -1";
-        }
-        const label = document.createElement("label");
-        label.textContent = field.label;
-        label.style.cssText = `
-display: block;
-margin-bottom: 5px;
-font-weight: 500;
-color: #34495e;
-`;
-        const input = document.createElement("input");
-        input.type = field.type;
-        input.placeholder = field.placeholder;
-        input.id = field.id;
-        input.required = field.required;
-        input.style.cssText = `
-width: 100%;
-padding: 10px;
-border: 1px solid #ddd;
-border-radius: 5px;
-font-size: 14px;
-`;
-        container.appendChild(label);
-        container.appendChild(input);
-        form.appendChild(container);
-    });
-    // 图标设置区域
-    const iconContainer = document.createElement("div");
-    iconContainer.style.gridColumn = "1 / -1";
-    const iconTitle = document.createElement("h4");
-    iconTitle.innerHTML = utils.createInlineSVG('palette') + ' 图标设置';
-    iconTitle.style.cssText = `
-margin-bottom: 10px;
-color: #34495e;
-display: flex;
-align-items: center;
-gap: 10px;
-`;
-    iconContainer.appendChild(iconTitle);
-    // 图标设置网格
-    const iconGrid = document.createElement("div");
-    iconGrid.style.cssText = `
-display: grid;
-grid-template-columns: 1fr 2fr 1fr;
-gap: 10px;
-align-items: end;
-`;
-    // 图标类型选择
-    const typeGroup = document.createElement("div");
-    const typeLabel = document.createElement("label");
-    typeLabel.textContent = "图标类型";
-    typeLabel.style.cssText = `
-display: block;
-margin-bottom: 5px;
-font-weight: 500;
-`;
-    typeGroup.appendChild(typeLabel);
-    const iconTypeSelect = document.createElement("select");
-    iconTypeSelect.id = "icon-type";
-    iconTypeSelect.style.cssText = `
-width: 100%;
-padding: 10px;
-border: 1px solid #ddd;
-border-radius: 5px;
-`;
-    ["svg", "image", "text", "emoji"].forEach(type => {
-        const option = document.createElement("option");
-        option.value = type;
-        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-        iconTypeSelect.appendChild(option);
-    });
-    typeGroup.appendChild(iconTypeSelect);
-    // 图标内容输入
-    const inputGroup = document.createElement("div");
-    const inputLabel = document.createElement("label");
-    inputLabel.textContent = "图标内容";
-    inputLabel.style.cssText = `
-display: block;
-margin-bottom: 5px;
-font-weight: 500;
-`;
-    inputGroup.appendChild(inputLabel);
-    const iconInput = document.createElement("input");
-    iconInput.type = "text";
-    iconInput.id = "icon-input";
-    iconInput.placeholder = "SVG代码、图片URL、文字或表情符号";
-    iconInput.style.cssText = `
-width: 100%;
-padding: 10px;
-border: 1px solid #ddd;
-border-radius: 5px;
-`;
-    inputGroup.appendChild(iconInput);
-    // 预览按钮
-    const previewGroup = document.createElement("div");
-    const previewButton = document.createElement("button");
-    previewButton.innerHTML = utils.createInlineSVG('eye') + ' 预览图标';
-    previewButton.style.cssText = `
-width: 100%;
-padding: 10px;
-background-color: #3498db;
-color: white;
-border: none;
-border-radius: 5px;
-cursor: pointer;
-display: flex;
-align-items: center;
-justify-content: center;
-gap: 5px;
-`;
-    previewButton.id = "preview-icon";
-    previewGroup.appendChild(previewButton);
-    // 组装图标设置网格
-    iconGrid.appendChild(typeGroup);
-    iconGrid.appendChild(inputGroup);
-    iconGrid.appendChild(previewGroup);
-    iconContainer.appendChild(iconGrid);
-    // 图标预览区域
-    const previewContainer = document.createElement("div");
-    previewContainer.style.gridColumn = "1 / -1";
-    previewContainer.style.cssText = `
-margin-top: 15px;
-text-align: center;
-`;
-    const previewLabel = document.createElement("label");
-    previewLabel.textContent = "图标预览 (推荐比例 8:5)";
-    previewLabel.style.cssText = `
-display: block;
-margin-bottom: 10px;
-font-weight: 500;
-`;
-    const iconPreview = document.createElement("div");
-    iconPreview.id = "icon-preview";
-    iconPreview.style.cssText = `
-width: 88px;
-height: 55px;
-border: 2px dashed #bdc3c7;
-border-radius: 8px;
-margin: 0 auto;
-display: flex;
-justify-content: center;
-align-items: center;
-overflow: hidden;
-background: #ecf0f1;
-`;
-    previewContainer.appendChild(previewLabel);
-    previewContainer.appendChild(iconPreview);
-    iconContainer.appendChild(previewContainer);
-    form.appendChild(iconContainer);
-    // 表单操作按钮
-    const formActions = document.createElement("div");
-    formActions.style.cssText = `
-grid-column: 1 / -1;
-display: flex;
-gap: 10px;
-margin-top: 20px;
-`;
-    const saveFormBtn = this.createActionButton(utils.createInlineSVG('save') + ' 保存引擎', "#27ae60", "");
-    const cancelFormBtn = this.createActionButton(utils.createInlineSVG('times') + ' 取消', "#95a5a6", "");
-    formActions.appendChild(saveFormBtn);
-    formActions.appendChild(cancelFormBtn);
-    formSection.appendChild(form);
-    formSection.appendChild(formActions);
-    listSection.appendChild(formSection);
-    content.appendChild(listSection);
-    panel.appendChild(content);
-    // 4. 面板底部
-    const footer = document.createElement("div");
-    footer.style.cssText = `
-height: 20vh;
-min-height: 60px;
-max-height: 90px;
-background-color: #ecf0f1;
-padding: 15px 20px;
-border-top: 1px solid #bdc3c7;
-display: flex;
-justify-content: space-between;
-align-items: center;
-box-sizing: border-box;
-flex-shrink: 0;
-border-radius: 0 0 15px 15px;
-`;
-    const selectedCount = document.createElement("span");
-    selectedCount.id = "selected-count";
-    selectedCount.innerHTML = utils.createInlineSVG('check-circle') + ' 已选择 0 个引擎';
-    selectedCount.style.cssText = `
-color: #7f8c8d;
-font-size: 0.9em;
-display: flex;
-align-items: center;
-gap: 5px;
-`;
-    const footerActions = document.createElement("div");
-    footerActions.style.cssText = `
-display: flex;
-gap: 10px;
-`;
-    const closeBtn = this.createActionButton(utils.createInlineSVG('times') + ' 关闭', "#95a5a6", "");
-    footerActions.appendChild(closeBtn);
-    footer.appendChild(selectedCount);
-    footer.appendChild(footerActions);
-    panel.appendChild(footer);
-    // 5. 绑定事件
-    extractBtn.addEventListener("click", () => this.extractFromCurrentPage());
-    addBtn.addEventListener("click", () => this.showAddForm(true));
-    resetBtn.addEventListener("click", () => this.resetToDefault());
-    previewButton.addEventListener("click", () => this.previewIcon());
-    saveFormBtn.addEventListener("click", () => this.saveNewEngine());
-    cancelFormBtn.addEventListener("click", () => this.showAddForm(false));
-    saveBtn.addEventListener("click", () => this.saveEngineSettings());
-    closeBtn.addEventListener("click", () => this.closeManagementPanel());
-    // 点击面板背景关闭
-    panel.addEventListener("click", (e) => {
-        if (e.target === panel) {
-            this.closeManagementPanel();
-        }
-    });
-    document.body.appendChild(panel);
-    return panel;
-},
-/**
- * 显示管理面板
- */
-showManagementPanel() {
-    const panel = this.createManagementPanel();
-    // 重置未保存状态
-    appState.hasUnsavedChanges = false;
-    utils.clearUnsavedChanges();
-    // 刷新引擎列表
-    this.refreshEngineList();
-    // 显示面板
-    panel.style.display = "block";
-    // 应用焦点陷阱
-    accessibility.trapFocus(panel);
-    // 隐藏汉堡菜单
-    hamburgerMenu.hideHamburgerMenu();
-}
+    }
 };
 // ===== 应用初始化模块 =====
 /**
@@ -6059,17 +5586,12 @@ const appInitializer = {
         // 2. 清除所有定时器和防抖器
         utils.clearAllTimeouts();
         debounceUtils.clearAll();
-        // 3. 移除全局事件监听器
-        const events = ['scroll', 'wheel', 'touchstart', 'touchmove', 'touchend'];
-        events.forEach(event => {
-            window.removeEventListener(event, () => {});
-        });
-        // 4. 重置应用状态
+        // 3. 重置应用状态
         appState.scriptLoaded = false;
         appState.containerAdded = false;
         appState.hamburgerMenuOpen = false;
         appState.searchOverlayVisible = false;
-        // 5. 重新初始化
+        // 4. 重新初始化
         this.init();
     },
     /**
@@ -6160,26 +5682,6 @@ init() {
             }
         }, DEFAULT_CONFIG.CHECK_SCOPE_INTERVAL);
     }
-};
-
-// ===== 应用启动入口 =====
-// 初始化应用状态
-const appState = {
-    userSearchEngines: GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, []),
-    searchUrlMap: [...defaultSearchEngines, ...GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, [])],
-    lastScrollTop: 0,
-    punkJetBoxVisible: true,
-    currentInput: sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '',
-    scriptLoaded: false,
-    containerAdded: false,
-    hasUnsavedChanges: false,
-    scrollTimeout: null,
-    isScrolling: false,
-    hideTimeout: null,
-    touchStartY: null,
-    hamburgerMenuOpen: false,
-    searchOverlayVisible: false,
-    isInteractingWithEngineBar: false
 };
 
 // 启动应用
