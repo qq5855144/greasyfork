@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.11
+// @version      v2.1.12
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -4029,10 +4029,11 @@ const searchOverlay = {
         const searchContainer = document.createElement("div");
         searchContainer.className = 'pk-search-card';
 
-        // Close button
+        // Close button — explicit black fill to guarantee visibility on any host page
         const closeBtn = document.createElement("button");
         closeBtn.className = 'pk-close-btn';
-        closeBtn.innerHTML = utils.createInlineSVG('times');
+        closeBtn.innerHTML = utils.createInlineSVG('times', '#000');
+        closeBtn.style.color = '#000';
         closeBtn.setAttribute('aria-label', '关闭搜索');
         closeBtn.addEventListener('click', () => this.hideSearchOverlay());
 
