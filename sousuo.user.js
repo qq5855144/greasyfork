@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.0
+// @version      v2.1.1
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -3306,53 +3306,56 @@ const domHandler = {
                 background: rgba(15,23,42,.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
-            .pk-overlay-scroll { width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; display: flex; align-items: flex-start; justify-content: center; padding: 5vh 16px; box-sizing: border-box; }
+            .pk-overlay-scroll { width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; display: flex; align-items: flex-start; justify-content: center; padding: 4vh 16px; box-sizing: border-box; }
             .pk-search-card {
-                width: 100%; max-width: 860px; background: var(--pk-surface);
-                border-radius: var(--pk-radius-xl); padding: 32px 28px; box-shadow: var(--pk-shadow-xl);
+                width: 100%; max-width: 820px; background: var(--pk-surface);
+                border-radius: var(--pk-radius-xl); padding: 24px 28px 20px; box-shadow: var(--pk-shadow-xl);
                 border: 1px solid var(--pk-border); position: relative; box-sizing: border-box;
                 animation: scaleIn .35s cubic-bezier(.16,1,.3,1);
             }
-            @media (max-width: 768px) { .pk-search-card { padding: 24px 18px; border-radius: var(--pk-radius-lg); max-width: 94%; } .pk-overlay-scroll { padding: 3vh 10px; } }
+            @media (max-width: 768px) { .pk-search-card { padding: 20px 16px 16px; border-radius: var(--pk-radius-lg); max-width: 94%; } .pk-overlay-scroll { padding: 2vh 10px; } }
             .pk-close-btn {
-                position: absolute; top: 16px; right: 16px; width: 36px; height: 36px;
+                position: absolute; top: 14px; right: 14px; width: 32px; height: 32px;
                 border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
                 background: var(--pk-surface-alt); color: var(--pk-text-secondary); z-index: 2;
                 transition: all .25s cubic-bezier(.4,0,.2,1); box-shadow: var(--pk-shadow-sm);
             }
             .pk-close-btn:hover { background: var(--pk-danger); color: #fff; transform: scale(1.1) rotate(90deg); box-shadow: 0 8px 20px rgba(239,68,68,.3); }
             .pk-panel-title {
-                margin: 0 0 24px 0; color: var(--pk-text); text-align: center;
-                font-size: clamp(20px, 4vw, 28px); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+                margin: 0 0 16px 0; color: var(--pk-text); text-align: center;
+                font-size: clamp(18px, 3.5vw, 24px); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
             }
             .pk-panel-title svg { flex-shrink: 0; }
             .pk-search-input {
-                width: 100%; padding: 18px 24px; box-sizing: border-box; background: var(--pk-surface-alt);
-                border-radius: var(--pk-radius-lg); font-size: 18px; color: var(--pk-text); outline: none;
-                border: 2px solid transparent; margin-bottom: 24px; -webkit-appearance: none; font-weight: 500; transition: all .3s ease;
+                width: 100%; padding: 11px 18px; box-sizing: border-box; background: var(--pk-surface-alt);
+                border-radius: var(--pk-radius); font-size: 15px; color: var(--pk-text); outline: none;
+                border: 2px solid transparent; margin-bottom: 14px; -webkit-appearance: none; font-weight: 500; transition: all .3s ease;
                 box-shadow: var(--pk-shadow-sm);
             }
-            .pk-search-input:focus { border-color: var(--pk-primary); box-shadow: 0 0 0 4px rgba(99,102,241,.12), var(--pk-shadow); }
+            .pk-search-input:focus { border-color: var(--pk-primary); box-shadow: 0 0 0 3px rgba(99,102,241,.12), var(--pk-shadow); }
             .pk-search-input::placeholder { color: var(--pk-text-muted); }
-            @media (max-width: 768px) { .pk-search-input { font-size: 16px; padding: 16px 20px; } }
-            .pk-quick-engines { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; justify-content: center; }
+            @media (max-width: 768px) { .pk-search-input { font-size: 15px; padding: 10px 16px; } }
+            .pk-quick-engines { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; justify-content: center; }
             .pk-quick-engine-btn {
-                padding: 8px 16px; border: 1px solid var(--pk-border); border-radius: 20px;
-                background: var(--pk-surface-alt); color: var(--pk-text-secondary); font-size: 13px; font-weight: 500;
-                cursor: pointer; transition: all .25s ease; display: inline-flex; align-items: center; gap: 6px;
+                padding: 6px 14px; border: 1px solid var(--pk-border); border-radius: 18px;
+                background: var(--pk-surface-alt); color: var(--pk-text-secondary); font-size: 12px; font-weight: 500;
+                cursor: pointer; transition: all .25s ease; display: inline-flex; align-items: center; gap: 5px;
             }
             .pk-quick-engine-btn:hover { background: var(--pk-primary); color: #fff; border-color: var(--pk-primary); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,.25); }
-            .pk-quick-engine-btn svg { width: 16px; height: 16px; }
-            .pk-nav-section { margin-top: 8px; }
+            .pk-quick-engine-btn svg { width: 14px; height: 14px; }
+            .pk-nav-section { margin-top: 4px; }
             .pk-nav-title {
-                color: var(--pk-text); margin-bottom: 16px; font-size: clamp(16px, 3.5vw, 20px); font-weight: 700;
+                color: var(--pk-text); margin-bottom: 12px; font-size: clamp(15px, 3vw, 18px); font-weight: 700;
                 display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center; flex-wrap: wrap;
-                padding-bottom: 12px; border-bottom: 2px solid var(--pk-gradient); border-image: var(--pk-gradient) 1;
+                padding-bottom: 10px; border-bottom: 2px solid var(--pk-gradient); border-image: var(--pk-gradient) 1;
             }
-            .pk-nav-filter { width: 100%; max-width: 400px; margin: 0 auto 20px; display: block; }
-            .pk-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 12px; }
-            @media (max-width: 480px) { .pk-categories { grid-template-columns: 1fr; gap: 12px; } }
-            @media (max-width: 768px) { .pk-categories { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; } }
+            .pk-nav-filter {
+                width: 100%; max-width: 360px; margin: 0 auto 16px; display: block;
+                padding: 9px 16px; font-size: 13px; border-radius: var(--pk-radius); margin-bottom: 16px;
+            }
+            .pk-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 8px; }
+            @media (max-width: 480px) { .pk-categories { grid-template-columns: 1fr; gap: 10px; } }
+            @media (max-width: 768px) { .pk-categories { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; } }
             .pk-category {
                 background: var(--pk-surface-alt); border-radius: var(--pk-radius); padding: 16px;
                 border: 1px solid var(--pk-border); transition: all .3s ease; break-inside: avoid;
@@ -3912,9 +3915,6 @@ const searchOverlay = {
         navFilter.type = "text";
         navFilter.placeholder = "搜索网站名称...";
         navFilter.className = 'pk-search-input pk-nav-filter';
-        navFilter.style.fontSize = '14px';
-        navFilter.style.padding = '10px 16px';
-        navFilter.style.marginBottom = '16px';
         navFilter.setAttribute('aria-label', '筛选网站');
 
         const categoriesContainer = document.createElement("div");
@@ -5112,6 +5112,7 @@ const managementPanel = {
         engineList.id = "engine-management-list";
         engineList.className = 'pk-engine-list';
         listSection.appendChild(listTitle);
+        listSection.appendChild(engineList);
 
         // --- Add Form ---
         const formSection = document.createElement("div");
