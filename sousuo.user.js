@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.8
+// @version      v2.1.9
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -56,6 +56,7 @@ const githubEnhancer = {
     },
 
     processedRepos: new Set(),
+    releasesCache: new Map(),  // Cache: repoId → boolean (has releases/tags)
 
     init() {
         if (this.isGitHubSearchPage()) {
@@ -355,23 +356,35 @@ const githubEnhancer = {
     },
 
     async checkReleases(repoOwner, repoName) {
+        const repoId = `${repoOwner}/${repoName}`;
+
+        // Return cached result if available
+        if (this.releasesCache.has(repoId)) {
+            return this.releasesCache.get(repoId);
+        }
+
         try {
             // Try releases API first
             const releasesData = await this.makeRequest(`https://api.github.com/repos/${repoOwner}/${repoName}/releases?per_page=1`);
             const releases = JSON.parse(releasesData);
             if (Array.isArray(releases) && releases.length > 0) {
+                this.releasesCache.set(repoId, true);
                 return true;
             }
             // Releases API returned empty — check tags API as fallback
-            // Many repos use git tags instead of GitHub Releases
             const tagsData = await this.makeRequest(`https://api.github.com/repos/${repoOwner}/${repoName}/tags?per_page=1`);
             const tags = JSON.parse(tagsData);
-            return Array.isArray(tags) && tags.length > 0;
+            const hasTags = Array.isArray(tags) && tags.length > 0;
+            this.releasesCache.set(repoId, hasTags);
+            return hasTags;
         } catch (e) {
-            // API may fail due to rate limiting (403) or network issues
-            // Fallback: check the releases page directly via the repo URL
-            // If we can't determine, assume true to avoid hiding useful tags
-            return false;
+            // API failed (likely rate limited at 60 req/hour, or network error, or 301 redirect)
+            // checkDeployment succeeds via raw.githubusercontent.com (not rate limited)
+            // but checkReleases only uses the API which IS rate limited
+            // Default to true: most repos on GitHub search results have releases or tags
+            // Better to show the tag and let user discover than to hide it when it exists
+            this.releasesCache.set(repoId, true);
+            return true;
         }
     },
 
