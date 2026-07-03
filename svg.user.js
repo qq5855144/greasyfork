@@ -1,18 +1,14 @@
 // ==UserScript==
 // @name         网页图片采集器 Pro
 // @namespace    http://tampermonkey.net/
-// @version      v2.2
+// @version      v2.3
 // @description  支持动态加载、智能去重、大图预览的网页图片下载工具 | 七彩毛玻璃UI
 // @author       YourName
 // @match        *://*/*
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
-// @grant        GM_setClipboard
-// @grant        GM_notification
 // @grant        GM_download
-// @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
-// @require      https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js
 // @icon         https://cdn-icons-png.flaticon.com/512/2107/2107957.png
 // @license      MIT
 // ==/UserScript==
@@ -1698,6 +1694,21 @@
 
     // ==================== 下载模块 ====================
     const Downloader = {
+        // 内联 saveAs 实现，替代 FileSaver.js
+        _saveAs(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+        },
+
         downloadImage(imgItem, originalName, originalFormat) {
             const baseName = originalName || imgItem.name;
             const completedFileName = Utils.completeImageSuffix(baseName, originalFormat);
@@ -1705,7 +1716,7 @@
                 try {
                     const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>${imgItem.svgContent}`;
                     const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
-                    saveAs(blob, completedFileName);
+                    this._saveAs(blob, completedFileName);
                     Notification.show(`下载成功: ${completedFileName}`, 'success');
                     return;
                 } catch (svgErr) {
@@ -1728,47 +1739,45 @@
         },
 
         async downloadMultipleImages(selectedItems) {
-            const zip = new JSZip();
-            let downloadedCount = 0;
+            let successCount = 0;
             const totalCount = selectedItems.length;
-            for (const imgItem of selectedItems) {
+            Notification.show(`开始批量下载 ${totalCount} 张图片...`, 'info');
+
+            for (let i = 0; i < selectedItems.length; i++) {
+                const imgItem = selectedItems[i];
                 try {
                     const baseName = imgItem.originalName || imgItem.name;
                     const originalFormat = imgItem.originalFormat || '';
                     const completedFileName = Utils.completeImageSuffix(baseName, originalFormat);
+
                     if (completedFileName.endsWith('.svg') && imgItem.svgContent) {
                         const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>${imgItem.svgContent}`;
-                        zip.file(completedFileName, svgContent);
-                        downloadedCount++;
-                        continue;
+                        const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+                        this._saveAs(blob, completedFileName);
+                        successCount++;
+                    } else {
+                        await new Promise((resolve, reject) => {
+                            GM_download({
+                                url: imgItem.url,
+                                name: completedFileName,
+                                onload: () => { successCount++; resolve(); },
+                                onerror: (e) => { console.error('下载失败:', completedFileName, e); resolve(); }
+                            });
+                        });
                     }
-                    const response = await fetch(imgItem.url);
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const blob = await response.blob();
-                    zip.file(completedFileName, blob);
-                    downloadedCount++;
+                    // 批量下载间隔，避免浏览器阻止
+                    if (i < selectedItems.length - 1) {
+                        await new Promise(r => setTimeout(r, 300));
+                    }
                 } catch (error) {
-                    const errBaseName = imgItem.originalName || imgItem.name;
-                    const errFileName = Utils.completeImageSuffix(`${errBaseName}_加载失败`, 'txt');
-                    zip.file(errFileName, `图片加载失败: ${imgItem.url}\n错误原因: ${error.message}`);
-                    console.error(`下载失败 ${errBaseName}:`, error);
+                    console.error(`下载失败 ${imgItem.name}:`, error);
                 }
             }
-            if (downloadedCount === 0) { alert('所有图片下载失败'); return; }
-            try {
-                const content = await zip.generateAsync({
-                    type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 }
-                });
-                const zipFileName = `网页图片_${location.hostname}_${new Date().toISOString().slice(0, 10)}.zip`;
-                saveAs(content, zipFileName);
-                Notification.show(`批量下载成功: ${zipFileName}（共${downloadedCount}/${totalCount}个）`, 'success');
-                if (downloadedCount < totalCount) {
-                    alert(`部分图片下载失败，成功下载 ${downloadedCount}/${totalCount} 个资源`);
-                }
-            } catch (error) {
-                console.error('创建ZIP失败:', error);
-                Notification.show('创建ZIP文件失败', 'error');
-                alert('创建ZIP文件失败');
+
+            if (successCount > 0) {
+                Notification.show(`批量下载完成: ${successCount}/${totalCount} 张`, 'success');
+            } else {
+                Notification.show('所有图片下载失败', 'error');
             }
         }
     };
