@@ -12,7 +12,7 @@
 // @connect      github.com
 // @connect      raw.githubusercontent.com
 // @connect      api.github.com
-// @icon         https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/shousuo.svg
+// @icon         https://raw.githubusercontent.com/qq5855144/greasyfork/main/shousuo.svg
 // @run-at       document-body
 // @license      MIT
 // @description  搜索引擎快捷工具 + GitHub搜索结果增强。核心功能：页面底部搜索引擎快捷栏、GitHub搜索结果显示部署网站和发布版本标签、拖拽排序、自定义引擎管理、快捷搜索、智能排序、无障碍访问
