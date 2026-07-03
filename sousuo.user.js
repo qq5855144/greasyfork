@@ -1,56 +1,590 @@
 // ==UserScript==
-// @name         聚合搜索引擎切换导航(移动端优化)(自用)
+// @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v1.39
+// @version      v1.40
 // @author       晚风知我意
-// @match        *://*/*searchstring=*
-// @match        *://*/*searchquery=*
-// @match        *://*/*searchword=*
-// @match        *://*/*searchterm=*
-// @match        *://*/*searchtext=*
-// @match        *://*/*searchkey=*
-// @match        *://*/*keywords=*
-// @match        *://*/*searchfor=*
-// @match        *://*/*findword=*
-// @match        *://*/*findtext=*
-// @match        *://*/*findkey=*
-// @match        *://*/*keyword=*
-// @match        *://*/*question=*
-// @match        *://*/*subject=*
-// @match        *://*/*lookfor=*
-// @match        *://*/*lookup=*
-// @match        *://*/*request=*
-// @match        *://*/*pattern=*
-// @match        *://*/*search=*
-// @match        *://*/*string=*
-// @match        *://*/*phrase=*
-// @match        *://*/*query=*
-// @match        *://*/*terms=*
-// @match        *://*/*value=*
-// @match        *://*/*title=*
-// @match        *://*/*topic=*
-// @match        *://*/*seek=*
-// @match        *://*/*word=*
-// @match        *://*/*text=*
-// @match        *://*/*find=*
-// @match        *://*/*ask=*
-// @match        *://*/*name=*
-// @match        *://*/*web=*
-// @match        *://*/*key=*
-// @match        *://*/*wd=*
-// @match        *://*/*kw=*
-// @match        *://*/*q=*
-// @match        *://*/*p=*
-// @match        *://*/*s=*
+// @match        *://*/*
 // @grant        unsafeWindow
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_xmlhttpRequest
+// @connect      github.com
+// @connect      raw.githubusercontent.com
+// @connect      api.github.com
 // @icon         https://hub.gitmirror.com/https://raw.githubusercontent.com/qq5855144/greasyfork/main/shousuo.svg
 // @run-at       document-body
 // @license     MIT
-// @description * 搜索引擎快捷工具 * 核心功能：页面底部搜索引擎快捷栏、拖拽排序、自定义引擎管理、快捷搜索 、增加底部搜索引擎栏偏移设置(确保任何浏览器内搜索引擎导航栏都能够聚焦在输入法键盘上方)
+// @description * 搜索引擎快捷工具 + GitHub搜索结果增强 * 核心功能：页面底部搜索引擎快捷栏、GitHub搜索结果显示部署网站和发布版本标签、拖拽排序、自定义引擎管理、快捷搜索
 // ==/UserScript==
+
+// ===== GitHub 功能模块 =====
+const githubEnhancer = {
+    CONFIG: {
+        checkInterval: 1000,
+        maxRetries: 3,
+        deploymentKeywords: {
+            'github.io': true,
+            'vercel.app': true,
+            'netlify.app': true,
+            'herokuapp.com': true,
+            'firebaseapp.com': true,
+            'pages.dev': true,
+            'railway.app': true,
+            'render.com': true,
+            'surge.sh': true,
+            'gitlab.io': true
+        },
+        excludedExtensions: [
+            '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico',
+            '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+            '.zip', '.rar', '.7z', '.tar', '.gz',
+            '.md', '.txt', '.json', '.xml', '.yml', '.yaml',
+            '.js', '.ts', '.jsx', '.tsx', '.css', '.scss', '.less',
+            '.java', '.py', '.rb', '.php', '.go', '.rs', '.cpp', '.c', '.h',
+            '.html', '.htm', '.vue', '.svelte',
+            '.csv', '.tsv', '.sql', '.db',
+            '.woff', '.woff2', '.ttf', '.eot',
+            '.mp4', '.avi', '.mov', '.mp3', '.wav', '.flac',
+            '.log', '.lock', '.env', '.gitignore', '.dockerfile'
+        ]
+    },
+
+    ICONS: {
+        deployment: `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"><path fill="#059669" d="M16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2m-5.15 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56M14.34 14H9.66c-.1-.66-.16-1.32-.16-2s.06-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2M12 19.96c-.83-1.2-1.5-2.53-1.91-3.96h3.82c-.41 1.43-1.08 2.76-1.91 3.96M8 8H5.08A7.92 7.92 0 0 1 9.4 4.44C8.8 5.55 8.35 6.75 8 8m-2.92 8H8c.35 1.25.8 2.45 1.4 3.56A8 8 0 0 1 5.08 16m-.82-2C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2M12 4.03c.83 1.2 1.5 2.54 1.91 3.97h-3.82c.41-1.43 1.08-2.77 1.91-3.97M18.92 8h-2.95a15.7 15.7 0 0 0-1.38-3.56c1.84.63 3.37 1.9 4.33 3.56M12 2C6.47 2 2 6.5 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2"/></svg>`,
+        releases: `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"><path fill="#0284c7" d="m5.12 5l.81-1h12l.94 1M12 17.5L6.5 12H10v-2h4v2h3.5zm8.54-12.27l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.5-.17-.93-.46-1.27"/></svg>`
+    },
+
+    processedRepos: new Set(),
+
+    init() {
+        if (this.isGitHubSearchPage()) {
+            this.injectGitHubStyles();
+            this.startGitHubProcessing();
+            this.initGitHubObserver();
+        }
+    },
+
+    isGitHubSearchPage() {
+        return window.location.hostname === 'github.com' && 
+               (window.location.pathname === '/search' || 
+                window.location.pathname.includes('/search'));
+    },
+
+    injectGitHubStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            .github-search-tag {
+                display: inline-flex;
+                align-items: center;
+                padding: 2px 8px;
+                margin: 2px 4px 2px 0;
+                font-size: 11px;
+                font-weight: 500;
+                border-radius: 12px;
+                text-decoration: none;
+                transition: all 0.2s ease;
+                cursor: pointer;
+                line-height: 1.4;
+                white-space: nowrap;
+                background-color: #DDF4FF !important;
+                border: none !important;
+            }
+            
+            .github-search-tag-deployment {
+                color: #0284c7 !important;
+            }
+            
+            .github-search-tag-releases {
+                color: #0284c7 !important;
+            }
+            
+            .github-search-tag:hover {
+                opacity: 0.9;
+                transform: translateY(-1px);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                text-decoration: none !important;
+                background-color: #DDF4FF !important;
+            }
+            
+            .github-tags-container {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                margin-top: 4px;
+                gap: 4px;
+                animation: fadeInUp 0.3s ease-out;
+            }
+            
+            @keyframes fadeInUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(8px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .github-search-tag svg {
+                display: block;
+                width: 12px;
+                height: 12px;
+            }
+        `;
+        document.head.appendChild(style);
+    },
+
+    makeRequest(url) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: url,
+                onload: (response) => {
+                    if (response.status === 200) {
+                        resolve(response.responseText);
+                    } else {
+                        reject(new Error(`HTTP ${response.status}`));
+                    }
+                },
+                onerror: reject
+            });
+        });
+    },
+
+    isValidWebsiteUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            
+            if (!['http:', 'https:'].includes(urlObj.protocol)) {
+                return false;
+            }
+            
+            const pathname = urlObj.pathname.toLowerCase();
+            const lastSegment = pathname.split('/').pop() || '';
+            
+            for (const ext of this.CONFIG.excludedExtensions) {
+                if (lastSegment.endsWith(ext)) {
+                    return false;
+                }
+            }
+            
+            const filePatterns = [
+                /\/[^/]+\.[a-z0-9]{2,5}$/i,
+                /\/blob\//,
+                /\/raw\//,
+                /\/releases\/download\//,
+                /\/archive\//,
+            ];
+            
+            for (const pattern of filePatterns) {
+                if (pattern.test(url)) {
+                    return false;
+                }
+            }
+            
+            const domain = urlObj.hostname;
+            for (const keyword in this.CONFIG.deploymentKeywords) {
+                if (domain.includes(keyword)) {
+                    return true;
+                }
+            }
+            
+            if (domain.includes('github.com') || domain.includes('github.io')) {
+                return false;
+            }
+            
+            return true;
+            
+        } catch (e) {
+            return false;
+        }
+    },
+
+    async checkGitHubPages(repoOwner, repoName) {
+        try {
+            const possibleUrls = [
+                `https://${repoOwner}.github.io`,
+                `https://${repoOwner}.github.io/${repoName}`,
+                `https://${repoName}.${repoOwner}.github.io`
+            ];
+
+            for (const url of possibleUrls) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        GM_xmlhttpRequest({
+                            method: 'HEAD',
+                            url: url,
+                            onload: (response) => {
+                                if (response.status < 400) {
+                                    resolve(url);
+                                } else {
+                                    reject(new Error(`HTTP ${response.status}`));
+                                }
+                            },
+                            onerror: reject
+                        });
+                    });
+                    return url;
+                } catch (e) {
+                    continue;
+                }
+            }
+
+            try {
+                const settingsHtml = await this.makeRequest(`https://github.com/${repoOwner}/${repoName}/settings/pages`);
+                
+                if (settingsHtml.includes('is published') || 
+                    settingsHtml.includes('is enrolled') ||
+                    settingsHtml.includes('CNAME') ||
+                    settingsHtml.includes('github-pages')) {
+                    
+                    const urlMatch = settingsHtml.match(/(https?:\/\/[^\s"']+\.github\.io[^\s"']*)/);
+                    if (urlMatch) {
+                        return urlMatch[0];
+                    }
+                    
+                    return `https://${repoOwner}.github.io/${repoName}`;
+                }
+            } catch (e) {
+                // 忽略错误
+            }
+
+            try {
+                const repoInfo = await this.makeRequest(`https://api.github.com/repos/${repoOwner}/${repoName}`);
+                const repoData = JSON.parse(repoInfo);
+                
+                if (repoData.has_pages) {
+                    return `https://${repoOwner}.github.io/${repoName}`;
+                }
+                
+            } catch (e) {
+                // 忽略错误
+            }
+
+        } catch (error) {
+            // 忽略错误
+        }
+        return null;
+    },
+
+    async checkDeployment(repoOwner, repoName) {
+        try {
+            const githubPagesUrl = await this.checkGitHubPages(repoOwner, repoName);
+            if (githubPagesUrl) {
+                return githubPagesUrl;
+            }
+
+            try {
+                const readmeUrls = [
+                    `https://raw.githubusercontent.com/${repoOwner}/${repoName}/main/README.md`,
+                    `https://raw.githubusercontent.com/${repoOwner}/${repoName}/master/README.md`,
+                    `https://raw.githubusercontent.com/${repoOwner}/${repoName}/HEAD/README.md`
+                ];
+
+                for (const readmeUrl of readmeUrls) {
+                    try {
+                        const readmeText = await this.makeRequest(readmeUrl);
+                        
+                        const urlRegex = /(?:https?:\/\/)(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s\)\]>]*)?/g;
+                        const urls = readmeText.match(urlRegex) || [];
+                        
+                        const validDeploymentUrls = [];
+                        
+                        for (const url of urls) {
+                            if (!this.isValidWebsiteUrl(url)) {
+                                continue;
+                            }
+                            
+                            const isKnownPlatform = Object.keys(this.CONFIG.deploymentKeywords).some(keyword => 
+                                url.includes(keyword)
+                            );
+                            
+                            if (isKnownPlatform) {
+                                validDeploymentUrls.push(url);
+                            }
+                        }
+                        
+                        if (validDeploymentUrls.length > 0) {
+                            return validDeploymentUrls[0];
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+            } catch (e) {
+                // 忽略错误
+            }
+
+            try {
+                const packageJsonUrls = [
+                    `https://raw.githubusercontent.com/${repoOwner}/${repoName}/main/package.json`,
+                    `https://raw.githubusercontent.com/${repoOwner}/${repoName}/master/package.json`
+                ];
+
+                for (const packageUrl of packageJsonUrls) {
+                    try {
+                        const packageText = await this.makeRequest(packageUrl);
+                        const packageData = JSON.parse(packageText);
+                        
+                        if (packageData.homepage && 
+                            typeof packageData.homepage === 'string' &&
+                            packageData.homepage.startsWith('http')) {
+                            
+                            const homepage = packageData.homepage;
+                            if (this.isValidWebsiteUrl(homepage)) {
+                                return homepage;
+                            }
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+            } catch (e) {
+                // 忽略错误
+            }
+
+        } catch (error) {
+            // 忽略错误
+        }
+        return null;
+    },
+
+    async checkReleases(repoOwner, repoName) {
+        try {
+            const releasesData = await this.makeRequest(`https://api.github.com/repos/${repoOwner}/${repoName}/releases`);
+            const releases = JSON.parse(releasesData);
+            return releases.length > 0;
+        } catch (e) {
+            return false;
+        }
+    },
+
+    createTag(text, href, type) {
+        const tag = document.createElement('a');
+        tag.className = `github-search-tag github-search-tag-${type}`;
+        
+        const iconSpan = document.createElement('span');
+        iconSpan.innerHTML = type === 'deployment' ? this.ICONS.deployment : this.ICONS.releases;
+        iconSpan.style.cssText = 'display: inline-flex; align-items: center; margin-right: 4px;';
+        
+        const textSpan = document.createElement('span');
+        textSpan.textContent = text;
+        
+        tag.appendChild(iconSpan);
+        tag.appendChild(textSpan);
+        
+        tag.href = href;
+        tag.target = '_blank';
+        tag.rel = 'noopener noreferrer';
+        
+        return tag;
+    },
+
+    findBestPosition(repoItem) {
+        const positions = [
+            () => {
+                const description = repoItem.querySelector('[class*="description"], .jsbtiO');
+                if (description) {
+                    const container = document.createElement('div');
+                    container.className = 'github-tags-container';
+                    description.parentNode.insertBefore(container, description.nextSibling);
+                    return container;
+                }
+                return null;
+            },
+            () => {
+                const metadata = repoItem.querySelector('[class*="metadata"], .dmuROe, .gbntE');
+                if (metadata) {
+                    const container = document.createElement('div');
+                    container.className = 'github-tags-container';
+                    metadata.appendChild(container);
+                    return container;
+                }
+                return null;
+            },
+            () => {
+                const container = document.createElement('div');
+                container.className = 'github-tags-container';
+                repoItem.appendChild(container);
+                return container;
+            },
+            () => {
+                const repoLink = repoItem.querySelector('a[href*="/"][href*="/"]:first-child');
+                if (repoLink && repoLink.parentNode) {
+                    const container = document.createElement('div');
+                    container.className = 'github-tags-container';
+                    repoLink.parentNode.insertBefore(container, repoLink.nextSibling);
+                    return container;
+                }
+                return null;
+            }
+        ];
+
+        for (const positionFinder of positions) {
+            try {
+                const container = positionFinder();
+                if (container) {
+                    return container;
+                }
+            } catch (e) {
+                continue;
+            }
+        }
+
+        return null;
+    },
+
+    async processRepo(repoItem) {
+        const repoLink = repoItem.querySelector('a[href*="/"][href*="/"]');
+        if (!repoLink) return;
+
+        const href = repoLink.getAttribute('href');
+        const match = href.match(/\/([^\/]+)\/([^\/]+)$/);
+        if (!match) return;
+
+        const [_, repoOwner, repoName] = match;
+        const repoId = `${repoOwner}/${repoName}`;
+
+        if (this.processedRepos.has(repoId) || repoItem.dataset.tagsProcessed) {
+            return;
+        }
+
+        this.processedRepos.add(repoId);
+        repoItem.dataset.tagsProcessed = 'true';
+
+        const tagsContainer = this.findBestPosition(repoItem);
+        if (!tagsContainer) return;
+
+        const loadingTag = document.createElement('span');
+        loadingTag.innerHTML = '<span style="display:inline-flex;align-items:center;margin-right:4px;">⏳</span>检查中...';
+        loadingTag.style.cssText = 'font-size: 11px; color: #6a737d; margin-left: 8px; display: inline-flex; align-items: center;';
+        tagsContainer.appendChild(loadingTag);
+
+        try {
+            const [deploymentUrl, hasReleases] = await Promise.all([
+                this.checkDeployment(repoOwner, repoName),
+                this.checkReleases(repoOwner, repoName)
+            ]);
+
+            tagsContainer.removeChild(loadingTag);
+
+            if (deploymentUrl) {
+                const deploymentTag = this.createTag('访问网站', deploymentUrl, 'deployment');
+                tagsContainer.appendChild(deploymentTag);
+            }
+
+            if (hasReleases) {
+                const releasesUrl = `https://github.com/${repoOwner}/${repoName}/releases`;
+                const releasesTag = this.createTag('查看版本', releasesUrl, 'releases');
+                tagsContainer.appendChild(releasesTag);
+            }
+
+            if (tagsContainer.children.length === 0) {
+                tagsContainer.remove();
+            }
+
+        } catch (error) {
+            if (loadingTag.parentNode === tagsContainer) {
+                tagsContainer.removeChild(loadingTag);
+            }
+        }
+    },
+
+    findRepoItems() {
+        const selectors = [
+            '.fXzjPH',
+            '[data-testid="repository-card"]',
+            '.Box-row',
+            '.repo-list-item'
+        ];
+
+        for (const selector of selectors) {
+            const items = document.querySelectorAll(selector);
+            if (items.length > 0) {
+                return Array.from(items);
+            }
+        }
+
+        const repoLinks = document.querySelectorAll('a[href*="/"][href*="/"]');
+        return Array.from(repoLinks)
+            .filter(link => {
+                const href = link.getAttribute('href');
+                return href.match(/^\/[^\/]+\/[^\/]+$/);
+            })
+            .map(link => link.closest('div, article, li, .Box, .fXzjPH') || link.parentElement)
+            .filter(item => item && item.querySelector('a[href*="/"][href*="/"]'));
+    },
+
+    processVisibleRepos() {
+        const repoItems = this.findRepoItems();
+        repoItems.forEach(repoItem => {
+            if (!repoItem.dataset.tagsProcessed) {
+                this.processRepo(repoItem);
+            }
+        });
+    },
+
+    startGitHubProcessing() {
+        let processedCount = 0;
+        
+        const interval = setInterval(() => {
+            const currentCount = this.findRepoItems().length;
+            
+            if (currentCount > 0) {
+                this.processVisibleRepos();
+                processedCount++;
+                
+                if (processedCount >= this.CONFIG.maxRetries || 
+                    this.findRepoItems().every(item => item.dataset.tagsProcessed)) {
+                    clearInterval(interval);
+                }
+            }
+        }, this.CONFIG.checkInterval);
+    },
+
+    initGitHubObserver() {
+        const observer = new MutationObserver((mutations) => {
+            let shouldProcess = false;
+            
+            mutations.forEach((mutation) => {
+                if (mutation.addedNodes.length > 0) {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1) {
+                            if (node.querySelector && (
+                                node.querySelector('.fXzjPH') ||
+                                node.querySelector('[data-testid="repository-card"]') ||
+                                node.querySelector('a[href*="/"][href*="/"]')
+                            )) {
+                                shouldProcess = true;
+                            }
+                            
+                            if (node.matches && (
+                                node.matches('.fXzjPH') ||
+                                node.matches('[data-testid="repository-card"]') ||
+                                (node.querySelector && node.querySelector('a[href*="/"][href*="/"]'))
+                            )) {
+                                shouldProcess = true;
+                            }
+                        }
+                    });
+                }
+            });
+            
+            if (shouldProcess) {
+                setTimeout(() => this.processVisibleRepos(), 500);
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        return observer;
+    }
+};
 
             const punkDeafultMark = "Bing-Google-Baidu-MetaSo-YandexSearch-Bilibili-ApkPure-Quark-Zhihu";
             const defaultSearchEngines = [{
@@ -2316,26 +2850,7 @@ OjAwKoHVVwAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNC0xMi0yN1QxMjoyOToxMSswMDowMH2U
                     svgCode: `
       <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="-5 -5 34 34"><path fill="#dc2626" d="M15.198 6.818H8.786v10.48h6.412v-3.342h-3.98v-1.262H13.8V11.42h-2.584v-1.261h3.981zM11.972.06A12.003 12.003 0 0 0 0 12.064a12 12 0 0 0 10.083 11.848c.068-1.277.196-2.723.434-3.652v-.014c0-.005 0-.007-.01-.012c0-.005-.01-.007-.012-.009c0-.002-.01-.002-.014-.002h-.356c-2.307 0-5.943-.333-6.916-3.45c-1.458-4.642 2.025-6.314 3.484-4.97c0 .004.012.008.019.008q.013.001.02-.005q.014-.007.015-.016v-.021c-.322-.945-2.148-6.867 2.64-8.496c4.08-1.369 8.07 1.491 7.461 5.265v.017c0 .007.01.012.012.014c0 .002.012.005.016.005c0 0 .012-.002.016-.005c.298-.246 1.603-1.186 2.919-.148c1.247.982.844 3.73-1.627 5.003q-.013.003-.02.014v.023c0 .01.01.014.015.02q.014.006.023.001c1.596-.239 4.316 1.193 2.11 4.375c-1.447 2.1-4.71 2.365-6.168 2.365h-1.071s-.01 0-.012.002c0 .002-.01.005-.012.007c0 .002 0 .005-.01.009v.012c-.021.751.331 2.304.693 3.688A12 12 0 0 0 24 12.063A12.003 12.003 0 0 0 11.997.06h-.03z"/></svg>
     `
-                },
-                
-                {
-"name": "MissAV",
-"searchUrl": "https://www.missav2.icu/cn/search/{keyword}",
-"searchkeyName": ["keyword"],
-"matchUrl": /missav2\.icu\/cn\/search\//g,
-"mark": "MissAV",
-"svgCode": '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 24 24"><path fill="none" stroke="#db2777" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1.5 17q-1-5.5 0-10Q1.9 4.8 4 4.5q8-1 16 0q2.1.3 2.5 2.5q1 4.5 0 10q-.4 2.2-2.5 2.5q-8 1-16 0q-2.1-.3-2.5-2.5m8-8.5v7l6-3.5Z"/></svg>'
-},
-
-{
-"name": "DramaFace",
-"searchUrl": "https://www.dramaface.com/search.php?q={keyword}",
-"searchkeyName": ["q"],
-"matchUrl": /dramaface\.com\/search\.php\?q=/g,
-"mark": "DramaFace",
-"svgCode": '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="-6 -6 36 36"><path fill="#db2777" d="M1.25 0C.557 0 0 .557 0 1.25v21.5C0 23.442.557 24 1.25 24h21.5c.692 0 1.25-.558 1.25-1.25V1.25C24 .557 23.442 0 22.75 0h-2.734c1.667 1.037 1.521 11.428 1.68 18.734c.023 1.1.616 3.805.616 3.805s-1.702.913-3.15 1.373c-.652-2.478-.633-3.488-.633-3.488l-.181-10.67l-.4-4.62c-2.156 3.08-3.445 6.123-3.987 8.007c-1.442.915-1.92 1.09-2.957 1.384c-1.056-.552-3.91-3.216-4.961-3.921c2.096 6.826 2.238 9.642 2.238 9.642s-2.231 1.759-2.797 1.606c-.232-.064-.495-.275-.507-.516c-.183-3.672-.76-5.902-1.508-8.773C2.576 9.13.32 4.07.32 4.07c.948-.641 1.52-.883 2.836-1.265L11.61 11S16.073 3.616 17.104.906c0 0 2.244-.748 2.71-.906z"/></svg> '
-},
-               
+                },                          
             ];
                                  
          // ===== 常量定义区 =====
@@ -2369,24 +2884,6 @@ const DEFAULT_CONFIG = {
     BAIDU_INPUT_DELAY: 500,
     DRAG_SORT_DELAY: 500,
     ENGINE_BAR_OFFSET_DEFAULT: 0
-};
-
-const appState = {
-    userSearchEngines: GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, []),
-    searchUrlMap: [...defaultSearchEngines, ...GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, [])],
-    lastScrollTop: 0,
-    punkJetBoxVisible: true,
-    currentInput: sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '',
-    scriptLoaded: false,
-    containerAdded: false,
-    hasUnsavedChanges: false,
-    scrollTimeout: null,
-    isScrolling: false,
-    hideTimeout: null,
-    touchStartY: null,
-    hamburgerMenuOpen: false,
-    searchOverlayVisible: false,
-    isInteractingWithEngineBar: false
 };
 
 // ===== 可访问性模块 =====
@@ -5589,37 +6086,49 @@ const appInitializer = {
             }, DEFAULT_CONFIG.BAIDU_INPUT_DELAY);
         }
     },
-    /**
-     * 初始化应用（核心入口函数）
-     */
-    init() {
-        try {
-            // 前置校验：避免重复初始化或无效作用域初始化
-            if (appState.containerAdded || appState.scriptLoaded || !utils.isValidScope()) {
-                return;
-            }
-            // 1. 初始化默认存储配置（若未设置过）
+/**
+ * 初始化应用
+ */
+init() {
+    try {
+        // 前置校验
+        if (appState.containerAdded || appState.scriptLoaded) {
+            return;
+        }
+
+        // 初始化搜索引擎功能
+        if (utils.isValidScope()) {
+            // 1. 初始化默认存储配置
             if (!GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH)) {
                 GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK);
             }
+
             // 2. 从sessionStorage恢复当前输入内容
             appState.currentInput = sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '';
+
             // 3. 执行初始化流程
-            domHandler.monitorInputFields(); // 监控输入框
-            domHandler.addSearchBox(); // 添加搜索框
-            domHandler.injectStyle(); // 注入样式
-            accessibility.init(); // 初始化可访问性功能
-            this.handleBaiduSpecialCase(); // 百度特殊处理
+            domHandler.monitorInputFields();
+            domHandler.addSearchBox();
+            domHandler.injectStyle();
+            accessibility.init();
+            this.handleBaiduSpecialCase();
+
             // 4. 更新初始化状态
             appState.scriptLoaded = true;
+
             // 应用引擎排序
             setTimeout(() => {
                 hamburgerMenu.applyEngineSort();
             }, 500);
-        } catch (error) {
-            console.error("应用初始化失败:", error.message);
         }
-    },
+
+        // 初始化 GitHub 增强功能
+        githubEnhancer.init();
+
+    } catch (error) {
+        console.error("应用初始化失败:", error.message);
+    }
+},
     /**
      * 初始化页面事件监听（ visibilitychange、pageshow 等）
      */
@@ -5653,277 +6162,25 @@ const appInitializer = {
     }
 };
 
-// 特效
-(function() {
-    var existing = document.getElementById('colorful_bubbles_canvas_overlay');
-    if (existing) existing.remove();
-
-    var canvas = document.createElement("canvas");
-    var ctx = canvas.getContext("2d");
-    var width = window.innerWidth;
-    var height = window.innerHeight;
-    var bubbles = [];
-    var bubbleCount = 40;
-
-    canvas.id = "colorful_bubbles_canvas_overlay";
-    canvas.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999;pointer-events:none;";
-    document.body.appendChild(canvas);
-
-    function resize() {
-        width = window.innerWidth;
-        height = window.innerHeight;
-        canvas.width = width;
-        canvas.height = height;
-    }
-    window.addEventListener("resize", resize);
-    resize();
-
-    function getRandomColor() {
-        var colors = [
-            "70,130,180",   // 钢蓝色
-            "100,149,237",  // 矢车菊蓝
-            "123,104,238",  // 中紫罗兰色
-            "106,90,205",   // 暗板岩蓝
-            "72,61,139",    // 暗紫蓝色
-            "47,79,79",     // 暗石板灰
-            "60,179,113",   // 中海绿色
-            "32,178,170",   // 浅海绿色
-            "34,139,34",    // 森林绿
-            "85,107,47",    // 暗橄榄绿
-            "139,69,19",    // 鞍褐色
-            "160,82,45",    // 赭色
-            "178,34,34",    // 火砖红
-            "128,0,0",      // 栗色
-            "153,50,204"    // 暗兰花紫
-        ];
-        return colors[Math.floor(Math.random() * colors.length)];
-    }
-
-    function createBubble(initial) {
-        var r = Math.random() * 15 + 8;
-        var x, y;
-        
-        if (initial) {
-            x = Math.random() * width;
-            y = Math.random() * height;
-        } else {
-            x = Math.random() * width;
-            y = height + r;
-        }
-
-        var color = getRandomColor();
-        var opacity = 0.25 + Math.random() * 0.3;
-
-        return {
-            x: x,
-            y: y,
-            r: r,
-            speed: r * 0.1 + Math.random() * 0.3,
-            swing: Math.random() * Math.PI * 2,
-            swingSpeed: 0.01 + Math.random() * 0.02,
-            swingRange: Math.random() * 3 + 1,
-            wobble: Math.random() * Math.PI * 2,
-            wobbleSpeed: 0.03 + Math.random() * 0.04,
-            wobbleRange: 0.1 + Math.random() * 0.1,
-            opacity: opacity,
-            color: color,
-            shimmer: Math.random() > 0.3,
-            shimmerPhase: Math.random() * Math.PI * 2,
-            life: 0,
-            maxLife: 8000 + Math.random() * 4000
-        };
-    }
-
-    // 气泡绘制
-    function drawRealBubble(ctx, bubble) {
-        ctx.save();
-        ctx.translate(bubble.x, bubble.y);
-        
-        var wobbleX = 1 + Math.cos(bubble.wobble) * bubble.wobbleRange;
-        var wobbleY = 1 + Math.sin(bubble.wobble * 1.3) * bubble.wobbleRange;
-        
-        var currentOpacity = bubble.opacity;
-        if (bubble.shimmer) {
-            bubble.shimmerPhase += 0.08;
-            currentOpacity = bubble.opacity * (0.7 + 0.3 * Math.sin(bubble.shimmerPhase));
-        }
-        
-        // 主气泡渐变
-        var mainGradient = ctx.createRadialGradient(
-            0, 0, 0,
-            0, 0, bubble.r
-        );
-        mainGradient.addColorStop(0, `rgba(${bubble.color}, ${currentOpacity * 0.9})`);
-        mainGradient.addColorStop(0.3, `rgba(${bubble.color}, ${currentOpacity * 0.7})`);
-        mainGradient.addColorStop(0.6, `rgba(${bubble.color}, ${currentOpacity * 0.4})`);
-        mainGradient.addColorStop(0.9, `rgba(${bubble.color}, ${currentOpacity * 0.1})`);
-        mainGradient.addColorStop(1, `rgba(${bubble.color}, 0)`);
-        
-        // 边缘渐变
-        var edgeGradient = ctx.createRadialGradient(
-            0, 0, bubble.r * 0.7,
-            0, 0, bubble.r
-        );
-        edgeGradient.addColorStop(0, `rgba(255,255,255,0)`);
-        edgeGradient.addColorStop(0.8, `rgba(255,255,255,${currentOpacity * 0.1})`);
-        edgeGradient.addColorStop(1, `rgba(255,255,255,${currentOpacity * 0.15})`);
-        
-        // 主高光
-        var highlightGradient = ctx.createRadialGradient(
-            -bubble.r * 0.25, -bubble.r * 0.25, 0,
-            -bubble.r * 0.25, -bubble.r * 0.25, bubble.r * 0.6
-        );
-        highlightGradient.addColorStop(0, "rgba(255,255,255,0.95)");
-        highlightGradient.addColorStop(0.6, "rgba(255,255,255,0.3)");
-        highlightGradient.addColorStop(1, "rgba(255,255,255,0)");
-        
-        // 次要高光
-        var secondaryHighlight = ctx.createRadialGradient(
-            bubble.r * 0.15, bubble.r * 0.15, 0,
-            bubble.r * 0.15, bubble.r * 0.15, bubble.r * 0.3
-        );
-        secondaryHighlight.addColorStop(0, "rgba(255,255,255,0.6)");
-        secondaryHighlight.addColorStop(1, "rgba(255,255,255,0)");
-
-        // 绘制气泡主体
-        ctx.beginPath();
-        ctx.ellipse(0, 0, bubble.r * wobbleX, bubble.r * wobbleY, 0, 0, Math.PI * 2);
-        ctx.fillStyle = mainGradient;
-        ctx.fill();
-
-        // 边缘反光
-        ctx.beginPath();
-        ctx.ellipse(0, 0, bubble.r * wobbleX, bubble.r * wobbleY, 0, 0, Math.PI * 2);
-        ctx.fillStyle = edgeGradient;
-        ctx.fill();
-
-        // 主高光
-        ctx.beginPath();
-        ctx.ellipse(-bubble.r * 0.25, -bubble.r * 0.25, 
-                   bubble.r * 0.5 * wobbleX, bubble.r * 0.4 * wobbleY, 
-                   0, 0, Math.PI * 2);
-        ctx.fillStyle = highlightGradient;
-        ctx.fill();
-
-        // 次要高光
-        ctx.beginPath();
-        ctx.ellipse(bubble.r * 0.15, bubble.r * 0.15, 
-                   bubble.r * 0.25 * wobbleX, bubble.r * 0.2 * wobbleY, 
-                   0, 0, Math.PI * 2);
-        ctx.fillStyle = secondaryHighlight;
-        ctx.fill();
-
-        // 边缘线
-        if (bubble.r > 15) {
-            ctx.beginPath();
-            ctx.ellipse(0, 0, bubble.r * wobbleX, bubble.r * wobbleY, 0, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255,255,255,${currentOpacity * 0.08})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-        }
-        
-        ctx.restore();
-    }
-
-    // 简化版气泡 - 同样简化边框
-    function drawSimpleBubble(ctx, bubble) {
-        ctx.save();
-        ctx.translate(bubble.x, bubble.y);
-        
-        var currentOpacity = bubble.opacity;
-        if (bubble.shimmer) {
-            bubble.shimmerPhase += 0.08;
-            currentOpacity = bubble.opacity * (0.7 + 0.3 * Math.sin(bubble.shimmerPhase));
-        }
-        
-        // 主渐变
-        var mainGradient = ctx.createRadialGradient(
-            0, 0, 0,
-            0, 0, bubble.r
-        );
-        mainGradient.addColorStop(0, `rgba(${bubble.color}, ${currentOpacity * 0.8})`);
-        mainGradient.addColorStop(0.5, `rgba(${bubble.color}, ${currentOpacity * 0.5})`);
-        mainGradient.addColorStop(0.9, `rgba(${bubble.color}, ${currentOpacity * 0.1})`);
-        mainGradient.addColorStop(1, `rgba(${bubble.color}, 0)`);
-        
-        // 边缘反光
-        var edgeGradient = ctx.createRadialGradient(
-            0, 0, bubble.r * 0.6,
-            0, 0, bubble.r
-        );
-        edgeGradient.addColorStop(0, `rgba(255,255,255,0)`);
-        edgeGradient.addColorStop(1, `rgba(255,255,255,${currentOpacity * 0.08})`);
-        
-        // 高光
-        var highlightGradient = ctx.createRadialGradient(
-            -bubble.r * 0.2, -bubble.r * 0.2, 0,
-            -bubble.r * 0.2, -bubble.r * 0.2, bubble.r * 0.5
-        );
-        highlightGradient.addColorStop(0, "rgba(255,255,255,0.9)");
-        highlightGradient.addColorStop(0.8, "rgba(255,255,255,0.2)");
-        highlightGradient.addColorStop(1, "rgba(255,255,255,0)");
-
-        // 气泡主体
-        ctx.beginPath();
-        ctx.arc(0, 0, bubble.r, 0, Math.PI * 2);
-        ctx.fillStyle = mainGradient;
-        ctx.fill();
-
-        // 边缘反光
-        ctx.beginPath();
-        ctx.arc(0, 0, bubble.r, 0, Math.PI * 2);
-        ctx.fillStyle = edgeGradient;
-        ctx.fill();
-
-        // 高光
-        ctx.beginPath();
-        ctx.arc(-bubble.r * 0.2, -bubble.r * 0.2, bubble.r * 0.5, 0, Math.PI * 2);
-        ctx.fillStyle = highlightGradient;
-        ctx.fill();
-        
-        ctx.restore();
-    }
-
-    function init() {
-        for (var i = 0; i < bubbleCount; i++) {
-            bubbles.push(createBubble(true));
-        }
-        loop();
-    }
-
-    function loop() {
-        ctx.clearRect(0, 0, width, height);
-
-        for (var i = 0; i < bubbleCount; i++) {
-            var b = bubbles[i];
-
-            b.swing += b.swingSpeed;
-            b.wobble += b.wobbleSpeed;
-            b.y -= b.speed;
-            b.x += Math.cos(b.swing) * b.swingRange * 0.1;
-            b.life += 16;
-
-            if (b.r > 12) {
-                drawRealBubble(ctx, b);
-            } else {
-                drawSimpleBubble(ctx, b);
-            }
-
-            if (b.y < -b.r * 2 || b.life > b.maxLife || 
-                b.x < -b.r * 2 || b.x > width + b.r * 2) {
-                bubbles[i] = createBubble(false);
-            }
-        }
-        requestAnimationFrame(loop);
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-})();
-
 // ===== 应用启动入口 =====
-// 初始化页面事件监听并启动应用
+// 初始化应用状态
+const appState = {
+    userSearchEngines: GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, []),
+    searchUrlMap: [...defaultSearchEngines, ...GM_getValue(STORAGE_KEYS.USER_SEARCH_ENGINES, [])],
+    lastScrollTop: 0,
+    punkJetBoxVisible: true,
+    currentInput: sessionStorage.getItem(STORAGE_KEYS.CURRENT_INPUT) || '',
+    scriptLoaded: false,
+    containerAdded: false,
+    hasUnsavedChanges: false,
+    scrollTimeout: null,
+    isScrolling: false,
+    hideTimeout: null,
+    touchStartY: null,
+    hamburgerMenuOpen: false,
+    searchOverlayVisible: false,
+    isInteractingWithEngineBar: false
+};
+
+// 启动应用
 appInitializer.initPageEventListeners();
