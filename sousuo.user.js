@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.4
+// @version      v2.1.5
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -3183,10 +3183,14 @@ const utils = {
         const container = document.querySelector(`.${CLASS_NAMES.ENGINE_DISPLAY}`);
         if (!container) return;
         const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
-        const newOrder = Array.from(buttons)
+        // Get the marks of currently displayed engines in their DOM order
+        const displayedMarks = Array.from(buttons)
             .map(btn => btn.getAttribute('data-mark'))
-            .filter(mark => mark !== null)
-            .join('-');
+            .filter(mark => mark !== null);
+        // Merge with any marks not currently displayed (preserving their relative order at the end)
+        const currentOrder = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-');
+        const hiddenMarks = currentOrder.filter(mark => !displayedMarks.includes(mark));
+        const newOrder = [...displayedMarks, ...hiddenMarks].join('-');
         GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, newOrder);
     },
 
@@ -3650,6 +3654,9 @@ const domHandler = {
     enableDragAndSort() {
         const container = document.querySelector(`.${CLASS_NAMES.ENGINE_DISPLAY}`);
         if (!container) return;
+        // Prevent duplicate event binding when called multiple times (e.g. after sort mode switch)
+        if (container._dragSortBound) return;
+        container._dragSortBound = true;
         const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
         let draggingButton = null;
         let dropIndicator = null;
@@ -3709,6 +3716,8 @@ const domHandler = {
                 button.classList.add(CLASS_NAMES.DRAGGING);
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', button.getAttribute('url') || '');
+                // Haptic feedback when drag starts
+                if (navigator.vibrate) navigator.vibrate(10);
                 try {
                     const dragImg = button.cloneNode(true);
                     dragImg.style.cssText = 'position:fixed; top:-9999px; left:-9999px; opacity:0.85; transform:none; border:2px solid #6366f1; border-radius:8px;';
@@ -3753,7 +3762,7 @@ const domHandler = {
                 container.insertBefore(draggingButton, target.nextSibling);
             }
             if (navigator.vibrate) navigator.vibrate(15);
-            utils.markUnsavedChanges();
+            // Note: saveButtonOrder is called in dragend, no need to markUnsavedChanges here
             // Cleanup
             container.querySelectorAll(`.${CLASS_NAMES.DRAG_OVER}`).forEach(el => el.classList.remove(CLASS_NAMES.DRAG_OVER));
             const indicator = getDropIndicator();
@@ -4610,6 +4619,8 @@ const hamburgerMenu = {
                 buttons.find(btn => btn.getAttribute('data-mark') === mark)
             ).filter(btn => btn);
             sortedButtons.forEach(btn => engineDisplay.appendChild(btn));
+            // Re-enable draggable in case we switched back from smart mode
+            buttons.forEach(btn => { btn.draggable = true; });
             domHandler.enableDragAndSort();
         } else if (this.sortMode === 'smart') {
             const usageCounts = GM_getValue('engine_usage_counts', {});
@@ -4618,6 +4629,11 @@ const hamburgerMenu = {
                 const bMark = b.getAttribute('data-mark');
                 const aCount = usageCounts[aMark] || 0;
                 const bCount = usageCounts[bMark] || 0;
+                // Secondary sort: if same usage count, preserve original order
+                if (aCount === bCount) {
+                    const order = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-');
+                    return order.indexOf(aMark) - order.indexOf(bMark);
+                }
                 return bCount - aCount;
             });
             sortedButtons.forEach(btn => engineDisplay.appendChild(btn));
@@ -5086,15 +5102,23 @@ const managementPanel = {
 
     saveEngineSettings() {
         const checkboxes = document.querySelectorAll('#engine-management-list input[type="checkbox"]');
-        const activeMarks = [];
+        const checkedMarks = [];
+        const uncheckedMarks = [];
         checkboxes.forEach(checkbox => {
-            if (checkbox.checked) activeMarks.push(checkbox.dataset.mark);
+            if (checkbox.checked) checkedMarks.push(checkbox.dataset.mark);
+            else uncheckedMarks.push(checkbox.dataset.mark);
         });
-        if (activeMarks.length === 0) {
+        if (checkedMarks.length === 0) {
             alert("⚠️ 请至少选择一个搜索引擎");
             return;
         }
-        GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, activeMarks.join("-"));
+        // Preserve existing sort order: keep previously-saved marks first (in their saved order),
+        // then append newly-enabled marks that weren't in the saved list before
+        const savedOrder = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-');
+        const orderedActive = savedOrder.filter(mark => checkedMarks.includes(mark));
+        const newActive = checkedMarks.filter(mark => !savedOrder.includes(mark));
+        const finalOrder = [...orderedActive, ...newActive];
+        GM_setValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, finalOrder.join("-"));
         utils.clearUnsavedChanges();
         setTimeout(() => {
             this.closeManagementPanel();
