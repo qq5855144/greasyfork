@@ -1,14 +1,17 @@
 // ==UserScript==
 // @name         网页图片采集器 Pro
 // @namespace    http://tampermonkey.net/
-// @version      v2.4
-// @description  支持动态加载、智能去重、大图预览的网页图片下载工具 | 七彩毛玻璃UI
+// @version      v3.0
+// @description  支持动态加载、智能去重、大图预览、批量打包下载的网页图片下载工具 | 七彩毛玻璃UI
 // @author       YourName
 // @match        *://*/*
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_download
+// @grant        GM_xmlhttpRequest
+// @connect      *
+// @require      https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js
 // @icon         data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTAyNCAxMDI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik01MTIgOTU1LjM0MDhjLTI0My43MTIgMC00NDIuMDA5Ni0xOTguMjk3Ni00NDIuMDA5Ni00NDIuMDA5NlMyNjguMjg4IDcxLjI3MDQgNTEyIDcxLjI3MDRzNDQyLjAwOTYgMTk4LjI5NzYgNDQyLjAwOTYgNDQyLjAwOTYtMTk4LjI5NzYgNDQyLjA2MDgtNDQyLjAwOTYgNDQyLjA2MDh6IG0wLTgwMi4xNTA0Yy0xOTguNTUzNiAwLTM2MC4wODk2IDE2MS41MzYtMzYwLjA4OTYgMzYwLjA4OTZzMTYxLjUzNiAzNjAuMDg5NiAzNjAuMDg5NiAzNjAuMDg5NiAzNjAuMDg5Ni0xNjEuNTM2IDM2MC4wODk2LTM2MC4wODk2UzcxMC41NTM2IDE1My4xOTA0IDUxMiAxNTMuMTkwNHoiIGZpbGw9IiM0Mzg1RjUiLz48cGF0aCBkPSJNNTEyIDUxMy4zMzEybS0yMTMuNjA2NCAwYTIxMy42MDY0IDIxMy42MDY0IDAgMSAwIDQyNy4yMTI4IDAgMjEzLjYwNjQgMjEzLjYwNjQgMCAxIDAtNDI3LjIxMjggMFoiIGZpbGw9IiNEOUZGRUMiLz48cGF0aCBkPSJNNDg2LjYwNDggNjg2Ljc0NTZjLTExMi41ODg4IDAtMjA0LjE4NTYtOTEuNTk2OC0yMDQuMTg1Ni0yMDQuMjM2OCAwLTExMi41ODg4IDkxLjU5NjgtMjA0LjE4NTYgMjA0LjE4NTYtMjA0LjE4NTYgMTEyLjU4ODggMCAyMDQuMjM2OCA5MS41OTY4IDIwNC4yMzY4IDIwNC4xODU2LTAuMDUxMiAxMTIuNjQtOTEuNjQ4IDIwNC4yMzY4LTIwNC4yMzY4IDIwNC4yMzY4eiBtMC0zMzEuNjIyNGMtNzAuMjQ2NCAwLTEyNy4zODU2IDU3LjEzOTItMTI3LjM4NTYgMTI3LjM4NTZzNTcuMTM5MiAxMjcuNDM2OCAxMjcuMzg1NiAxMjcuNDM2OCAxMjcuNDM2OC01Ny4xMzkyIDEyNy40MzY4LTEyNy40MzY4LTU3LjE5MDQtMTI3LjM4NTYtMTI3LjQzNjgtMTI3LjM4NTZ6IiBmaWxsPSIjMzRBODUzIi8+PHBhdGggZD0iTTcwMy4yMzIgNzMzLjY0NDhhMzguMjk3NiAzOC4yOTc2IDAgMCAxLTI3LjU0NTYtMTEuNjIyNGwtODYuNDc2OC04OC45MzQ0Yy0xNC43OTY4LTE1LjIwNjQtMTQuNDM4NC0zOS41MjY0IDAuNzY4LTU0LjMyMzIgMTUuMjA2NC0xNC43OTY4IDM5LjUyNjQtMTQuNDM4NCA1NC4zMjMyIDAuNzY4bDg2LjQ3NjggODguOTM0NGMxNC43OTY4IDE1LjIwNjQgMTQuNDM4NCAzOS41MjY0LTAuNzY4IDU0LjMyMzJhMzguNTA3NTIgMzguNTA3NTIgMCAwIDEtMjYuNzc3NiAxMC44NTQ0eiIgZmlsbD0iIzM0QTg1MyIvPjwvc3ZnPg==
 // @license      MIT
 // ==/UserScript==
@@ -40,12 +43,21 @@
         maxBlobUrlCount: 100,
         blobCleanupNotification: true,
         previewZoom: {
-            maxWidth: '92vw',
-            maxHeight: '85vh',
-            background: 'rgba(0,0,0,0.85)',
+            maxWidth: '94vw',
+            maxHeight: '88vh',
+            background: 'rgba(0,0,0,0.88)',
             closeButtonSize: '40px',
-            headerHeight: '56px',
-            footerHeight: '64px'
+            headerHeight: '52px',
+            footerHeight: '60px',
+            sidePadding: '64px'
+        },
+        // 批量下载配置
+        batchDownload: {
+            useZip: true,              // 默认打包为 zip
+            zipFilenamePrefix: 'images',
+            concurrentDownloads: 6,    // 并发下载数
+            retryCount: 2,             // 失败重试次数
+            retryDelay: 800
         },
         deduplication: {
             enabled: true,
@@ -654,7 +666,7 @@
             -webkit-backdrop-filter: blur(6px);
         }
 
-        /* ===== 大图预览 - 毛玻璃设计 ===== */
+        /* ===== 大图预览 - 全新设计（毛玻璃 + 工具栏 + 信息栏） ===== */
         #imagePreviewModal {
             display: none;
             position: fixed;
@@ -666,8 +678,8 @@
             z-index: 100001;
             align-items: center;
             justify-content: center;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
         .preview-container {
             position: relative;
@@ -675,13 +687,13 @@
             height: ${CONFIG.previewZoom.maxHeight};
             display: flex;
             flex-direction: column;
-            background: rgba(255,255,255,0.78);
+            background: rgba(28,28,38,0.72);
             border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.4);
+            box-shadow: 0 24px 70px rgba(0,0,0,0.55);
+            backdrop-filter: blur(22px);
+            -webkit-backdrop-filter: blur(22px);
+            border: 1px solid rgba(255,255,255,0.18);
         }
         .preview-container::before {
             content: '';
@@ -700,30 +712,38 @@
             mask-composite: exclude;
             animation: rainbow-border-shift 6s ease infinite;
             pointer-events: none;
+            z-index: 0;
         }
         .preview-header {
             width: 100%;
             height: ${CONFIG.previewZoom.headerHeight};
-            padding: 0 18px;
+            padding: 0 16px;
             background: linear-gradient(
                 135deg,
-                rgba(255,107,107,0.5),
-                rgba(255,159,67,0.45),
-                rgba(84,160,255,0.45),
-                rgba(95,39,205,0.45)
+                rgba(255,107,107,0.55),
+                rgba(255,159,67,0.5),
+                rgba(84,160,255,0.5),
+                rgba(95,39,205,0.5)
             );
             background-size: 200% 200%;
             animation: rainbow-header-shift 8s ease infinite;
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255,255,255,0.3);
+            border-bottom: 1px solid rgba(255,255,255,0.22);
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-shrink: 0;
             box-sizing: border-box;
             position: relative;
-            z-index: 1;
+            z-index: 2;
+            gap: 10px;
+        }
+        .preview-title-wrap {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
         }
         .preview-title {
             font-weight: 600;
@@ -732,8 +752,16 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
-            max-width: calc(100% - 60px);
-            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+        }
+        .preview-subtitle {
+            color: rgba(255,255,255,0.82);
+            font-size: 10px;
+            margin-top: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.25);
         }
         .preview-close {
             background: rgba(255,255,255,0.15);
@@ -755,44 +783,112 @@
             pointer-events: none;
         }
         .preview-close:hover {
-            background: rgba(255,255,255,0.35);
+            background: rgba(255,90,90,0.55);
             transform: rotate(90deg) scale(1.1);
         }
+
+        /* 预览主画布 - 支持缩放/旋转/拖动 */
         .preview-content {
             flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: auto;
-            padding: 16px;
+            overflow: hidden;
+            padding: 16px ${CONFIG.previewZoom.sidePadding};
             box-sizing: border-box;
             min-height: 0;
             position: relative;
             z-index: 1;
+            background:
+                radial-gradient(circle at 50% 50%, rgba(255,255,255,0.04) 0%, transparent 70%),
+                rgba(0,0,0,0.25);
+        }
+        .preview-stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .preview-img-wrapper {
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: transform 0.18s ease-out;
+            transform-origin: center center;
+            will-change: transform;
+        }
+        .preview-img-wrapper.dragging {
+            cursor: grabbing;
+            transition: none;
         }
         .preview-image {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+            background: rgba(255,255,255,0.03);
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
         }
         .preview-svg {
             max-width: 100%;
             max-height: 100%;
-            border-radius: 10px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.92);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+            padding: 8px;
+            pointer-events: none;
         }
+        .preview-svg svg {
+            max-width: 100%;
+            max-height: 100%;
+            height: auto !important;
+            width: auto !important;
+        }
+
+        /* 缩放提示 */
+        .preview-zoom-indicator {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #fff;
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-size: 10px;
+            z-index: 4;
+            pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .preview-zoom-indicator.show {
+            opacity: 1;
+        }
+
+        /* 左右导航 - 重新设计，更显眼 */
         .preview-nav {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            width: 42px;
-            height: 42px;
+            width: 46px;
+            height: 46px;
             border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255,255,255,0.35);
+            background: rgba(255,255,255,0.18);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.32);
             color: #fff;
             cursor: pointer;
             display: flex;
@@ -800,13 +896,13 @@
             justify-content: center;
             transition: all 0.25s;
             z-index: 5;
-            font-size: 18px;
             pointer-events: auto;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.25);
         }
         .preview-nav:hover {
             background: rgba(255,255,255,0.35);
-            transform: translateY(-50%) scale(1.1);
-            box-shadow: 0 0 16px rgba(255,255,255,0.25);
+            transform: translateY(-50%) scale(1.12);
+            box-shadow: 0 0 18px rgba(255,255,255,0.3);
         }
         .preview-nav:active {
             transform: translateY(-50%) scale(0.95);
@@ -818,51 +914,122 @@
             right: 12px;
         }
         .preview-nav svg {
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             fill: #fff;
+            pointer-events: none;
         }
         .preview-nav.disabled {
-            opacity: 0.3;
+            opacity: 0.25;
             pointer-events: none;
             cursor: default;
         }
         .preview-counter {
             position: absolute;
-            bottom: 80px;
+            bottom: 14px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             color: #fff;
-            padding: 4px 12px;
-            border-radius: 12px;
+            padding: 4px 14px;
+            border-radius: 14px;
             font-size: 11px;
             z-index: 5;
             pointer-events: none;
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.22);
+            font-weight: 600;
         }
+
+        /* 工具栏：缩放、旋转、还原 */
+        .preview-toolbar {
+            position: absolute;
+            top: 50%;
+            right: 14px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 5;
+            pointer-events: auto;
+        }
+        .preview-tool-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.16);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.28);
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.22s;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.22);
+        }
+        .preview-tool-btn:hover {
+            background: rgba(255,255,255,0.32);
+            transform: scale(1.08);
+        }
+        .preview-tool-btn:active {
+            transform: scale(0.94);
+        }
+        .preview-tool-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: #fff;
+            stroke: #fff;
+            pointer-events: none;
+        }
+
         .preview-footer {
             width: 100%;
             height: ${CONFIG.previewZoom.footerHeight};
-            padding: 0 18px;
-            background: rgba(255,255,255,0.5);
+            padding: 0 14px;
+            background: rgba(255,255,255,0.08);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border-top: 1px solid rgba(255,255,255,0.4);
+            border-top: 1px solid rgba(255,255,255,0.18);
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
+            gap: 8px;
+            flex-wrap: nowrap;
             flex-shrink: 0;
             box-sizing: border-box;
             position: relative;
-            z-index: 1;
+            z-index: 2;
+        }
+        .preview-info-bar {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(255,255,255,0.85);
+            font-size: 10px;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .preview-info-bar .info-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 9px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 10px;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        .preview-info-bar .info-pill strong {
+            color: #fff;
+            font-weight: 700;
         }
         .preview-btn {
-            padding: 8px 18px;
+            padding: 7px 14px;
             border: 1px solid rgba(255,255,255,0.3);
             border-radius: 8px;
             cursor: pointer;
@@ -874,20 +1041,154 @@
             backdrop-filter: blur(6px);
             -webkit-backdrop-filter: blur(6px);
             text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+            flex-shrink: 0;
         }
         .preview-download {
-            background: linear-gradient(135deg, rgba(29,209,161,0.8), rgba(0,210,211,0.8));
+            background: linear-gradient(135deg, rgba(29,209,161,0.85), rgba(0,210,211,0.85));
         }
         .preview-download:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(29,209,161,0.35);
+            box-shadow: 0 4px 12px rgba(29,209,161,0.4);
         }
         .preview-copy {
-            background: linear-gradient(135deg, rgba(84,160,255,0.8), rgba(95,39,205,0.8));
+            background: linear-gradient(135deg, rgba(84,160,255,0.85), rgba(95,39,205,0.85));
         }
         .preview-copy:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(84,160,255,0.35);
+            box-shadow: 0 4px 12px rgba(84,160,255,0.4);
+        }
+
+        /* ===== 批量下载模式选择器 ===== */
+        .batch-mode-selector {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255,255,255,0.18);
+            border: 1px solid rgba(255,255,255,0.32);
+            border-radius: 10px;
+            padding: 2px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .batch-mode-btn {
+            padding: 5px 12px;
+            border: none;
+            background: transparent;
+            color: #fff;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .batch-mode-btn.active {
+            background: rgba(255,255,255,0.3);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+        }
+        .batch-mode-btn:hover:not(.active) {
+            background: rgba(255,255,255,0.12);
+        }
+
+        /* ===== 批量下载进度面板 ===== */
+        .batch-progress-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 100002;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .batch-progress-panel {
+            width: 360px;
+            max-width: 90vw;
+            background: rgba(28,28,38,0.92);
+            border: 1px solid rgba(255,255,255,0.22);
+            border-radius: 16px;
+            padding: 22px 22px 18px;
+            color: #fff;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            position: relative;
+        }
+        .batch-progress-panel::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 17px;
+            padding: 1px;
+            background: linear-gradient(135deg, #ff6b6b, #ff9f43, #54a0ff, #1dd1a1);
+            background-size: 200% 200%;
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            animation: rainbow-border-shift 6s ease infinite;
+            pointer-events: none;
+        }
+        .batch-progress-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin: 0 0 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .batch-progress-status {
+            font-size: 11px;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 14px;
+            min-height: 16px;
+        }
+        .batch-progress-bar-wrap {
+            height: 10px;
+            background: rgba(255,255,255,0.12);
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .batch-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ff6b6b, #ff9f43, #feca57, #1dd1a1);
+            background-size: 200% 100%;
+            animation: rainbow-header-shift 3s ease infinite;
+            transition: width 0.3s ease;
+            border-radius: 6px;
+        }
+        .batch-progress-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.85);
+        }
+        .batch-progress-stats .stat-ok { color: #1dd1a1; font-weight: 700; }
+        .batch-progress-stats .stat-fail { color: #ff6b6b; font-weight: 700; }
+        .batch-progress-cancel {
+            margin-top: 14px;
+            width: 100%;
+            padding: 8px;
+            background: rgba(255,107,107,0.3);
+            border: 1px solid rgba(255,107,107,0.5);
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .batch-progress-cancel:hover {
+            background: rgba(255,107,107,0.5);
+        }
+        .batch-progress-cancel:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         /* ===== 通知 - 毛玻璃 ===== */
@@ -1004,6 +1305,58 @@
 
     // ==================== 工具函数模块 ====================
     const Utils = {
+        // 占位图 SVG（data-uri，避免 inline base64 编码错误）
+        placeholderDataUri:
+            'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">' +
+                '<rect width="48" height="48" rx="8" fill="#f3f4f6"/>' +
+                '<path d="M14 30l8-8 6 6 6-8 4 4" stroke="#9ca3af" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
+                '<circle cx="18" cy="18" r="3" fill="#9ca3af"/>' +
+                '<rect x="6" y="6" width="36" height="36" rx="8" fill="none" stroke="#d1d5db" stroke-width="1.5" stroke-dasharray="3 3"/>' +
+                '</svg>'
+            ),
+
+        // 错误占位图（红色边框，提示加载失败）
+        errorDataUri:
+            'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">' +
+                '<rect width="48" height="48" rx="8" fill="#fef2f2"/>' +
+                '<circle cx="24" cy="24" r="14" fill="none" stroke="#ef4444" stroke-width="2"/>' +
+                '<path d="M18 18l12 12M30 18l-12 12" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/>' +
+                '</svg>'
+            ),
+
+        // 确保SVG字符串带 xmlns，可直接嵌入 HTML / 转为 Blob
+        ensureSvgNamespace(svgContent) {
+            if (!svgContent) return '';
+            const trimmed = svgContent.trim();
+            if (!/^<svg/i.test(trimmed)) return trimmed;
+            if (/xmlns\s*=/i.test(trimmed.slice(0, 200))) return trimmed;
+            return trimmed.replace(/^<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
+        },
+
+        // 安全转义属性值，避免 onerror/xss
+        escapeAttr(str) {
+            return String(str == null ? '' : str)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        },
+
+        // 安全文件名：去除非法字符、限制长度
+        sanitizeFilename(name, maxLength = 80) {
+            let safe = String(name || '').replace(/[\\/:*?"<>|\f\n\r\t]/g, '_').replace(/\s+/g, '_').trim();
+            if (!safe) safe = 'image';
+            if (safe.length > maxLength) {
+                const ext = (safe.match(/\.([^.]+)$/) || [])[1] || '';
+                const keep = ext ? maxLength - ext.length - 1 : maxLength;
+                safe = safe.slice(0, keep) + (ext ? '.' + ext : '');
+            }
+            return safe;
+        },
+
         truncateTo4Bytes(text) {
             if (!text || typeof text !== 'string') return '';
             let byteCount = 0;
@@ -1335,6 +1688,10 @@
                         <label for="selectAll">全选（共<span id="imageCount">0</span>张）</label>
                     </div>
                     <div class="action-buttons">
+                        <div class="batch-mode-selector" title="批量下载模式">
+                            <button class="batch-mode-btn active" id="batchModeZip" data-mode="zip">打包ZIP</button>
+                            <button class="batch-mode-btn" id="batchModeSingle" data-mode="single">逐个下载</button>
+                        </div>
                         <button class="action-btn download-btn" id="batchDownloadBtn">批量下载</button>
                         <button class="action-btn copy-btn" id="batchCopyBtn">复制链接</button>
                         <button class="action-btn filter-btn" id="invertSelectBtn">反选</button>
@@ -1358,22 +1715,49 @@
             modal.innerHTML = `
                 <div class="preview-container">
                     <div class="preview-header">
-                        <div class="preview-title" id="previewTitle">图片预览</div>
-                        <button class="preview-close">
+                        <div class="preview-title-wrap">
+                            <div class="preview-title" id="previewTitle">图片预览</div>
+                            <div class="preview-subtitle" id="previewSubtitle"></div>
+                        </div>
+                        <button class="preview-close" id="previewClose" title="关闭 (Esc)">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </div>
                     <div class="preview-content" id="previewContent">
-                        <div class="loading">加载中...</div>
-                        <button class="preview-nav prev" id="previewPrev" title="上一张">
+                        <div class="preview-stage" id="previewStage">
+                            <div class="preview-img-wrapper" id="previewImgWrapper">
+                                <div class="loading">加载中...</div>
+                            </div>
+                            <div class="preview-zoom-indicator" id="previewZoomIndicator">100%</div>
+                        </div>
+                        <button class="preview-nav prev" id="previewPrev" title="上一张 (←)">
                             <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </button>
-                        <button class="preview-nav next" id="previewNext" title="下一张">
+                        <button class="preview-nav next" id="previewNext" title="下一张 (→)">
                             <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </button>
+                        <div class="preview-toolbar">
+                            <button class="preview-tool-btn" id="previewZoomIn" title="放大 (+)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+                            </button>
+                            <button class="preview-tool-btn" id="previewZoomOut" title="缩小 (-)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+                            </button>
+                            <button class="preview-tool-btn" id="previewRotate" title="旋转 (R)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg>
+                            </button>
+                            <button class="preview-tool-btn" id="previewReset" title="还原 (0)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 3 3 9 9 9"/></svg>
+                            </button>
+                        </div>
                         <div class="preview-counter" id="previewCounter">1 / 1</div>
                     </div>
                     <div class="preview-footer">
+                        <div class="preview-info-bar" id="previewInfoBar">
+                            <span class="info-pill">格式: <strong id="previewInfoFormat">-</strong></span>
+                            <span class="info-pill">尺寸: <strong id="previewInfoSize">-</strong></span>
+                            <span class="info-pill">大小: <strong id="previewInfoFilesize">-</strong></span>
+                        </div>
                         <button class="preview-btn preview-download" id="previewDownload">下载图片</button>
                         <button class="preview-btn preview-copy" id="previewCopy">复制链接</button>
                     </div>
@@ -1381,6 +1765,31 @@
             `;
             document.body.appendChild(modal);
             return modal;
+        },
+
+        createBatchProgressOverlay() {
+            const overlay = document.createElement('div');
+            overlay.className = 'batch-progress-overlay';
+            overlay.id = 'batchProgressOverlay';
+            overlay.innerHTML = `
+                <div class="batch-progress-panel">
+                    <h3 class="batch-progress-title">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#1dd1a1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        批量下载进度
+                    </h3>
+                    <div class="batch-progress-status" id="batchProgressStatus">正在准备...</div>
+                    <div class="batch-progress-bar-wrap">
+                        <div class="batch-progress-bar" id="batchProgressBar"></div>
+                    </div>
+                    <div class="batch-progress-stats">
+                        <span>进度: <span id="batchProgressCurrent">0</span> / <span id="batchProgressTotal">0</span></span>
+                        <span><span class="stat-ok" id="batchProgressOk">0</span> 成功 / <span class="stat-fail" id="batchProgressFail">0</span> 失败</span>
+                    </div>
+                    <button class="batch-progress-cancel" id="batchProgressCancel">取消下载</button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            return overlay;
         },
 
         createOverlay() {
@@ -1694,6 +2103,9 @@
 
     // ==================== 下载模块 ====================
     const Downloader = {
+        // 取消标志
+        _cancelFlag: false,
+
         // 内联 saveAs 实现，替代 FileSaver.js
         _saveAs(blob, filename) {
             const url = URL.createObjectURL(blob);
@@ -1706,15 +2118,59 @@
             setTimeout(() => {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-            }, 100);
+            }, 200);
+        },
+
+        // 通过 GM_xmlhttpRequest 获取 Blob（跨域友好），失败回退到 fetch
+        _fetchBlob(url) {
+            return new Promise((resolve, reject) => {
+                if (typeof GM_xmlhttpRequest !== 'undefined' && !url.startsWith('blob:') && !url.startsWith('data:')) {
+                    GM_xmlhttpRequest({
+                        method: 'GET',
+                        url: url,
+                        responseType: 'blob',
+                        onload: (resp) => {
+                            if (resp.status >= 200 && resp.status < 300) {
+                                resolve(resp.response instanceof Blob ? resp.response : new Blob([resp.response]));
+                            } else {
+                                reject(new Error('HTTP ' + resp.status));
+                            }
+                        },
+                        onerror: () => reject(new Error('GM_xmlhttpRequest 网络错误')),
+                        ontimeout: () => reject(new Error('请求超时'))
+                    });
+                } else {
+                    fetch(url)
+                        .then(r => r.ok ? r.blob() : Promise.reject(new Error('HTTP ' + r.status)))
+                        .then(resolve)
+                        .catch(reject);
+                }
+            });
+        },
+
+        // 带重试的 blob 获取
+        async _fetchBlobWithRetry(url) {
+            const maxRetry = CONFIG.batchDownload.retryCount;
+            let lastErr;
+            for (let i = 0; i <= maxRetry; i++) {
+                try {
+                    return await this._fetchBlob(url);
+                } catch (e) {
+                    lastErr = e;
+                    if (i < maxRetry) {
+                        await new Promise(r => setTimeout(r, CONFIG.batchDownload.retryDelay * (i + 1)));
+                    }
+                }
+            }
+            throw lastErr;
         },
 
         downloadImage(imgItem, originalName, originalFormat) {
             const baseName = originalName || imgItem.name;
-            const completedFileName = Utils.completeImageSuffix(baseName, originalFormat);
+            const completedFileName = Utils.sanitizeFilename(Utils.completeImageSuffix(baseName, originalFormat));
             if (completedFileName.endsWith('.svg') && imgItem.svgContent) {
                 try {
-                    const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>${imgItem.svgContent}`;
+                    const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>${Utils.ensureSvgNamespace(imgItem.svgContent)}`;
                     const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
                     this._saveAs(blob, completedFileName);
                     Notification.show(`下载成功: ${completedFileName}`, 'success');
@@ -1726,55 +2182,207 @@
             const mimeType = completedFileName.endsWith('.svg')
                 ? 'image/svg+xml'
                 : `image/${completedFileName.split('.').pop().toLowerCase()}`;
-            GM_download({
-                url: imgItem.url,
-                name: completedFileName,
-                mimetype: mimeType,
-                onload: () => Notification.show(`下载成功: ${completedFileName}`, 'success'),
-                onerror: (e) => {
-                    console.error('下载失败:', e);
-                    Notification.show(`下载失败: ${completedFileName}`, 'error');
-                }
-            });
+            if (typeof GM_download !== 'undefined' && !imgItem.url.startsWith('blob:') && !imgItem.url.startsWith('data:')) {
+                GM_download({
+                    url: imgItem.url,
+                    name: completedFileName,
+                    mimetype: mimeType,
+                    onload: () => Notification.show(`下载成功: ${completedFileName}`, 'success'),
+                    onerror: (e) => {
+                        console.error('GM_download 失败，回退到 fetch:', e);
+                        // 回退方案：fetch + saveAs
+                        this._fetchBlobWithRetry(imgItem.url)
+                            .then(blob => {
+                                this._saveAs(blob, completedFileName);
+                                Notification.show(`下载成功: ${completedFileName}`, 'success');
+                            })
+                            .catch(() => Notification.show(`下载失败: ${completedFileName}`, 'error'));
+                    }
+                });
+            } else {
+                this._fetchBlobWithRetry(imgItem.url)
+                    .then(blob => {
+                        this._saveAs(blob, completedFileName);
+                        Notification.show(`下载成功: ${completedFileName}`, 'success');
+                    })
+                    .catch(() => Notification.show(`下载失败: ${completedFileName}`, 'error'));
+            }
         },
 
+        // 取得用于 zip 内的文件名（处理重名冲突）
+        _resolveUniqueName(usedSet, baseName) {
+            let candidate = Utils.sanitizeFilename(baseName);
+            if (!usedSet.has(candidate)) {
+                usedSet.add(candidate);
+                return candidate;
+            }
+            const dotIdx = candidate.lastIndexOf('.');
+            const stem = dotIdx > 0 ? candidate.slice(0, dotIdx) : candidate;
+            const ext = dotIdx > 0 ? candidate.slice(dotIdx) : '';
+            let n = 1;
+            while (usedSet.has(`${stem}_${n}${ext}`)) n++;
+            const final = `${stem}_${n}${ext}`;
+            usedSet.add(final);
+            return final;
+        },
+
+        // 单项转 Blob（统一入口，给 zip 用）
+        async _itemToBlob(imgItem) {
+            const baseName = imgItem.originalName || imgItem.name;
+            const completedFileName = Utils.completeImageSuffix(baseName, imgItem.originalFormat);
+            if (completedFileName.endsWith('.svg') && imgItem.svgContent) {
+                const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>${Utils.ensureSvgNamespace(imgItem.svgContent)}`;
+                return new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+            }
+            return await this._fetchBlobWithRetry(imgItem.url);
+        },
+
+        // 显示进度面板
+        _showProgress(total) {
+            const overlay = document.getElementById('batchProgressOverlay');
+            document.getElementById('batchProgressBar').style.width = '0%';
+            document.getElementById('batchProgressCurrent').textContent = '0';
+            document.getElementById('batchProgressTotal').textContent = String(total);
+            document.getElementById('batchProgressOk').textContent = '0';
+            document.getElementById('batchProgressFail').textContent = '0';
+            document.getElementById('batchProgressStatus').textContent = '正在准备...';
+            const cancelBtn = document.getElementById('batchProgressCancel');
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = '取消下载';
+            overlay.style.display = 'flex';
+        },
+
+        _hideProgress() {
+            const overlay = document.getElementById('batchProgressOverlay');
+            overlay.style.display = 'none';
+        },
+
+        _updateProgress(done, total, ok, fail, statusText) {
+            const pct = total > 0 ? (done / total * 100) : 0;
+            document.getElementById('batchProgressBar').style.width = pct + '%';
+            document.getElementById('batchProgressCurrent').textContent = String(done);
+            document.getElementById('batchProgressOk').textContent = String(ok);
+            document.getElementById('batchProgressFail').textContent = String(fail);
+            if (statusText) document.getElementById('batchProgressStatus').textContent = statusText;
+        },
+
+        // 并发批量下载，使用 jszip 打包为单个 zip
         async downloadMultipleImages(selectedItems) {
-            let successCount = 0;
             const totalCount = selectedItems.length;
-            Notification.show(`开始批量下载 ${totalCount} 张图片...`, 'info');
+            if (totalCount === 0) return;
 
-            for (let i = 0; i < selectedItems.length; i++) {
-                const imgItem = selectedItems[i];
-                try {
-                    const baseName = imgItem.originalName || imgItem.name;
-                    const originalFormat = imgItem.originalFormat || '';
-                    const completedFileName = Utils.completeImageSuffix(baseName, originalFormat);
-
-                    if (completedFileName.endsWith('.svg') && imgItem.svgContent) {
-                        const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>${imgItem.svgContent}`;
-                        const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
-                        this._saveAs(blob, completedFileName);
-                        successCount++;
-                    } else {
-                        const response = await fetch(imgItem.url);
-                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                        const blob = await response.blob();
-                        this._saveAs(blob, completedFileName);
-                        successCount++;
-                    }
-                    // 批量下载间隔，避免浏览器阻止
-                    if (i < selectedItems.length - 1) {
-                        await new Promise(r => setTimeout(r, 300));
-                    }
-                } catch (error) {
-                    console.error(`下载失败 ${imgItem.name}:`, error);
-                }
+            // 检查 JSZip 是否可用
+            const useZip = CONFIG.batchDownload.useZip && typeof JSZip !== 'undefined';
+            if (CONFIG.batchDownload.useZip && !useZip) {
+                console.warn('JSZip 未加载，将退回逐个下载模式');
+                Notification.show('JSZip 未加载，回退为逐个下载', 'warning');
             }
 
-            if (successCount > 0) {
-                Notification.show(`批量下载完成: ${successCount}/${totalCount} 张`, 'success');
+            this._cancelFlag = false;
+            this._showProgress(totalCount);
+
+            const concurrency = Math.max(1, Math.min(CONFIG.batchDownload.concurrentDownloads, 8));
+            const usedNames = new Set();
+            let done = 0, ok = 0, fail = 0;
+            const failedItems = [];
+
+            // 构建 zip（若使用 zip 模式）
+            let zip = null;
+            if (useZip) zip = new JSZip();
+
+            // 任务队列
+            let cursor = 0;
+            const runWorker = async () => {
+                while (cursor < selectedItems.length) {
+                    if (this._cancelFlag) return;
+                    const myIdx = cursor++;
+                    const imgItem = selectedItems[myIdx];
+                    const baseName = imgItem.originalName || imgItem.name;
+                    const completedFileName = Utils.completeImageSuffix(baseName, imgItem.originalFormat);
+                    const uniqueName = this._resolveUniqueName(usedNames, completedFileName);
+                    try {
+                        this._updateProgress(done, totalCount, ok, fail,
+                            `下载中 (${myIdx + 1}/${totalCount}): ${uniqueName.slice(0, 30)}`);
+                        const blob = await this._itemToBlob(imgItem);
+                        if (this._cancelFlag) return;
+                        if (useZip) {
+                            zip.file(uniqueName, blob);
+                        } else {
+                            this._saveAs(blob, uniqueName);
+                            // 逐个下载时给浏览器喘息，避免被拦截
+                            await new Promise(r => setTimeout(r, 250));
+                        }
+                        ok++;
+                    } catch (err) {
+                        console.error(`下载失败 ${uniqueName}:`, err);
+                        fail++;
+                        failedItems.push({ name: uniqueName, error: err.message });
+                    }
+                    done++;
+                    this._updateProgress(done, totalCount, ok, fail,
+                        useZip ? `已打包 ${ok}/${totalCount}` : `已下载 ${ok}/${totalCount}`);
+                }
+            };
+
+            // 启动并发 worker
+            const workers = [];
+            for (let i = 0; i < concurrency; i++) workers.push(runWorker());
+            await Promise.all(workers);
+
+            if (this._cancelFlag) {
+                this._updateProgress(done, totalCount, ok, fail, '已取消');
+                document.getElementById('batchProgressCancel').disabled = true;
+                setTimeout(() => this._hideProgress(), 1500);
+                Notification.show('批量下载已取消', 'warning');
+                return;
+            }
+
+            // 生成 zip 并保存
+            if (useZip && ok > 0) {
+                this._updateProgress(done, totalCount, ok, fail, '正在生成 ZIP 文件...');
+                try {
+                    const zipBlob = await zip.generateAsync(
+                        { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } },
+                        (meta) => {
+                            // 压缩进度（占剩余 10%）
+                            const pct = (done / totalCount) * 100 + meta.percent * 0.1;
+                            document.getElementById('batchProgressBar').style.width = Math.min(100, pct) + '%';
+                            document.getElementById('batchProgressStatus').textContent = `压缩中: ${Math.round(meta.percent)}%`;
+                        }
+                    );
+                    const ts = new Date();
+                    const stamp = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}_${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`;
+                    const zipName = `${CONFIG.batchDownload.zipFilenamePrefix}_${stamp}.zip`;
+                    this._saveAs(zipBlob, zipName);
+                    this._updateProgress(done, totalCount, ok, fail, '完成 ✓');
+                    Notification.show(`打包完成: ${zipName} (${ok}/${totalCount} 张)`, 'success');
+                } catch (e) {
+                    console.error('生成 ZIP 失败:', e);
+                    Notification.show('生成 ZIP 失败: ' + e.message, 'error');
+                    this._updateProgress(done, totalCount, ok, fail, '生成 ZIP 失败');
+                }
+            } else if (!useZip && ok > 0) {
+                this._updateProgress(done, totalCount, ok, fail, '完成 ✓');
+                Notification.show(`批量下载完成: ${ok}/${totalCount} 张`, 'success');
             } else {
-                Notification.show('所有图片下载失败', 'error');
+                Notification.show(`所有图片下载失败`, 'error');
+                this._updateProgress(done, totalCount, ok, fail, '全部失败');
+            }
+
+            if (fail > 0) {
+                console.warn('以下图片下载失败:', failedItems);
+            }
+
+            // 关闭面板
+            setTimeout(() => this._hideProgress(), 1500);
+        },
+
+        cancelBatch() {
+            this._cancelFlag = true;
+            const cancelBtn = document.getElementById('batchProgressCancel');
+            if (cancelBtn) {
+                cancelBtn.disabled = true;
+                cancelBtn.textContent = '正在取消...';
             }
         }
     };
@@ -1833,31 +2441,113 @@
             const fullType = item.originalType || item.type;
             const completedFileName = Utils.completeImageSuffix(fullName, fullFormat);
 
-            let previewHtml = '';
-            if (item.format === 'svg' && item.svgContent) {
-                previewHtml = item.svgContent;
-            } else {
-                previewHtml = `<img src="${item.preview}" alt="${fullName}" loading="lazy" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHJ4PSIxNSIgZmlsbD0iI2Y0ZjRmNCIvPjxwYXRoIGQ9Ik0yMCAyNUMyMCAyNSAyMiAyMiAyNSAyMkMyOCAyMiAzMCAyNSAzMCAyNUMyMCAyNSAyOCAyOCAyNSAyOEMyMiAyOCAyMCAyNSAyMCAyNVoiIHN0cm9rZT0iIzc3NyIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+'">`;
-            }
+            // 预览容器：用 DOM 构建，避免 inline onerror/base64 损坏
+            const previewBox = document.createElement('div');
+            previewBox.className = 'svg-preview';
+            previewBox.dataset.imgId = item.id;
+            previewBox.title = '点击预览 ' + Utils.escapeAttr(completedFileName);
 
-            itemElement.innerHTML = `
-                <div style="display: flex; align-items: center; min-width: 0; gap: 10px;">
-                    <input type="checkbox" class="svg-checkbox" data-id="${item.id}" checked>
-                    <div class="svg-preview" data-img-id="${item.id}">${previewHtml}</div>
-                    <div class="svg-info">
-                        <div class="svg-name" title="文件名：${completedFileName}">${item.name}</div>
-                        <div class="svg-meta">
-                            <span title="格式：${fullFormat || CONFIG.defaultImageFormat}">${item.format}</span>
-                            <span title="类型：${fullType}">${item.type}</span>
-                            <span class="svg-size" title="尺寸：${item.width}×${item.height}">${item.width}×${item.height}</span>
-                        </div>
-                    </div>
+            // 默认先放占位图
+            const placeholder = document.createElement('img');
+            placeholder.className = 'svg-preview-placeholder';
+            placeholder.src = Utils.placeholderDataUri;
+            placeholder.alt = '';
+            placeholder.style.cssText = 'width:24px;height:24px;opacity:.55;';
+            previewBox.appendChild(placeholder);
+
+            // 渲染实际预览内容
+            const renderPreview = () => {
+                if (item.format === 'svg' && item.svgContent) {
+                    try {
+                        // 处理SVG，确保命名空间
+                        const processedSvg = SVGProcessor.processForPreview(
+                            Utils.ensureSvgNamespace(item.svgContent)
+                        );
+                        placeholder.remove();
+                        previewBox.innerHTML = processedSvg;
+                    } catch (e) {
+                        console.warn('SVG预览渲染失败:', e);
+                        placeholder.src = Utils.errorDataUri;
+                    }
+                } else {
+                    // 普通 img 标签：加 referrerpolicy / loading / onerror
+                    placeholder.remove();
+                    const img = document.createElement('img');
+                    img.alt = Utils.escapeAttr(fullName);
+                    img.loading = 'lazy';
+                    img.decoding = 'async';
+                    // 不发送 referer，规避部分防盗链
+                    try { img.referrerPolicy = 'no-referrer'; } catch (e) {}
+                    // 跨域图片用 anonymous 以提升加载成功率（不影响显示）
+                    try { img.crossOrigin = 'anonymous'; } catch (e) {}
+
+                    let errored = false;
+                    img.addEventListener('error', () => {
+                        if (errored) return;
+                        errored = true;
+                        // 第一次失败：去掉 crossOrigin 重试（部分服务器对 anonymous 头响应不一致）
+                        try { img.removeAttribute('crossorigin'); img.crossOrigin = null; } catch (e) {}
+                        const retry = () => {
+                            img.addEventListener('error', () => {
+                                // 仍然失败：使用错误占位图
+                                img.src = Utils.errorDataUri;
+                                img.style.width = '24px';
+                                img.style.height = '24px';
+                                img.style.opacity = '.6';
+                            }, { once: true });
+                            // 加随机参数避免缓存命中再次失败
+                            const sep = item.preview.indexOf('?') >= 0 ? '&' : '?';
+                            img.src = item.preview + sep + '_retry=1';
+                        };
+                        // 短暂延迟后重试
+                        setTimeout(retry, 50);
+                    }, { once: true });
+
+                    img.src = item.preview;
+                    previewBox.appendChild(img);
+                }
+            };
+            // 异步渲染，避免阻塞列表绘制
+            requestAnimationFrame(renderPreview);
+
+            // 信息区
+            const infoBox = document.createElement('div');
+            infoBox.className = 'svg-info';
+            infoBox.innerHTML = `
+                <div class="svg-name" title="文件名：${Utils.escapeAttr(completedFileName)}">${Utils.escapeAttr(item.name)}</div>
+                <div class="svg-meta">
+                    <span title="格式：${Utils.escapeAttr(fullFormat || CONFIG.defaultImageFormat)}">${Utils.escapeAttr(item.format)}</span>
+                    <span title="类型：${Utils.escapeAttr(fullType)}">${Utils.escapeAttr(item.type)}</span>
+                    <span class="svg-size" title="尺寸：${Utils.escapeAttr(String(item.width))}×${Utils.escapeAttr(String(item.height))}">${Utils.escapeAttr(String(item.width))}×${Utils.escapeAttr(String(item.height))}</span>
                 </div>
-                <button class="item-download-btn" data-img-id="${item.id}" title="下载 ${completedFileName}">下载</button>
             `;
 
-            const previewElement = itemElement.querySelector('.svg-preview');
-            previewElement.addEventListener('click', (e) => {
+            // 复选框
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'svg-checkbox';
+            checkbox.dataset.id = item.id;
+            checkbox.checked = true;
+
+            // 左侧容器
+            const leftBox = document.createElement('div');
+            leftBox.style.cssText = 'display: flex; align-items: center; min-width: 0; gap: 10px; flex: 1;';
+            leftBox.appendChild(checkbox);
+            leftBox.appendChild(previewBox);
+            leftBox.appendChild(infoBox);
+
+            // 下载按钮
+            const itemDownloadBtn = document.createElement('button');
+            itemDownloadBtn.className = 'item-download-btn';
+            itemDownloadBtn.dataset.imgId = item.id;
+            itemDownloadBtn.title = '下载 ' + completedFileName;
+            itemDownloadBtn.textContent = '下载';
+
+            itemElement.appendChild(leftBox);
+            itemElement.appendChild(itemDownloadBtn);
+
+            // 事件
+            previewBox.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const imgId = e.currentTarget.dataset.imgId;
                 const imgItem = App.imageItemCache.get(imgId);
@@ -1868,7 +2558,6 @@
                 }
             });
 
-            const itemDownloadBtn = itemElement.querySelector('.item-download-btn');
             itemDownloadBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const imgId = e.currentTarget.dataset.imgId;
@@ -1943,10 +2632,14 @@
         imageList: [],
         modal: null,
         escapeHandler: null,
+        // 缩放/旋转/位移状态
+        transform: { scale: 1, rotate: 0, x: 0, y: 0 },
+        dragState: null,
+        wheelTimer: null,
 
         init() {
             this.modal = document.getElementById('imagePreviewModal');
-            const closeBtn = this.modal.querySelector('.preview-close');
+            const closeBtn = this.modal.querySelector('#previewClose');
             closeBtn.addEventListener('click', () => this.hide());
             this.modal.addEventListener('click', (e) => {
                 if (e.target === this.modal) this.hide();
@@ -1961,8 +2654,103 @@
                     await Clipboard.copyUrls([this.currentItem]);
                 }
             });
-            document.getElementById('previewPrev').addEventListener('click', () => this.navigate(-1));
-            document.getElementById('previewNext').addEventListener('click', () => this.navigate(1));
+            document.getElementById('previewPrev').addEventListener('click', (e) => { e.stopPropagation(); this.navigate(-1); });
+            document.getElementById('previewNext').addEventListener('click', (e) => { e.stopPropagation(); this.navigate(1); });
+
+            // 工具栏
+            document.getElementById('previewZoomIn').addEventListener('click', (e) => { e.stopPropagation(); this.zoom(1.25); });
+            document.getElementById('previewZoomOut').addEventListener('click', (e) => { e.stopPropagation(); this.zoom(1 / 1.25); });
+            document.getElementById('previewRotate').addEventListener('click', (e) => { e.stopPropagation(); this.rotate(90); });
+            document.getElementById('previewReset').addEventListener('click', (e) => { e.stopPropagation(); this.resetTransform(); });
+
+            // 滚轮缩放
+            const stage = document.getElementById('previewStage');
+            stage.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+                this.zoom(factor);
+            }, { passive: false });
+
+            // 拖拽平移
+            const wrapper = document.getElementById('previewImgWrapper');
+            wrapper.addEventListener('mousedown', (e) => this.startDrag(e));
+            wrapper.addEventListener('touchstart', (e) => this.startDrag(e), { passive: false });
+        },
+
+        zoom(factor) {
+            const newScale = Math.min(8, Math.max(0.2, this.transform.scale * factor));
+            this.transform.scale = newScale;
+            this.applyTransform();
+            this.showZoomIndicator();
+        },
+
+        rotate(deg) {
+            this.transform.rotate = (this.transform.rotate + deg) % 360;
+            this.applyTransform();
+            this.showZoomIndicator();
+        },
+
+        resetTransform() {
+            this.transform = { scale: 1, rotate: 0, x: 0, y: 0 };
+            this.applyTransform();
+            this.showZoomIndicator();
+        },
+
+        applyTransform() {
+            const wrapper = document.getElementById('previewImgWrapper');
+            if (!wrapper) return;
+            const t = this.transform;
+            wrapper.style.transform = `translate(${t.x}px, ${t.y}px) rotate(${t.rotate}deg) scale(${t.scale})`;
+        },
+
+        showZoomIndicator() {
+            const ind = document.getElementById('previewZoomIndicator');
+            if (!ind) return;
+            const t = this.transform;
+            ind.textContent = `${Math.round(t.scale * 100)}% · ${t.rotate}°${t.x || t.y ? ' · 已平移' : ''}`;
+            ind.classList.add('show');
+            clearTimeout(this.wheelTimer);
+            this.wheelTimer = setTimeout(() => ind.classList.remove('show'), 1200);
+        },
+
+        startDrag(e) {
+            // 仅当放大或旋转时才允许拖动
+            if (this.transform.scale <= 1.05 && this.transform.rotate === 0) return;
+            e.preventDefault();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            this.dragState = {
+                startX: clientX, startY: clientY,
+                originX: this.transform.x, originY: this.transform.y
+            };
+            const wrapper = document.getElementById('previewImgWrapper');
+            wrapper.classList.add('dragging');
+            document.addEventListener('mousemove', this._dragMoveHandler);
+            document.addEventListener('touchmove', this._dragMoveHandler, { passive: false });
+            document.addEventListener('mouseup', this._dragEndHandler);
+            document.addEventListener('touchend', this._dragEndHandler);
+        },
+
+        _dragMoveHandler(e) {
+            if (!PreviewModal.dragState) return;
+            e.preventDefault();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            const ds = PreviewModal.dragState;
+            PreviewModal.transform.x = ds.originX + (clientX - ds.startX);
+            PreviewModal.transform.y = ds.originY + (clientY - ds.startY);
+            PreviewModal.applyTransform();
+        },
+
+        _dragEndHandler() {
+            if (!PreviewModal.dragState) return;
+            PreviewModal.dragState = null;
+            const wrapper = document.getElementById('previewImgWrapper');
+            if (wrapper) wrapper.classList.remove('dragging');
+            document.removeEventListener('mousemove', PreviewModal._dragMoveHandler);
+            document.removeEventListener('touchmove', PreviewModal._dragMoveHandler);
+            document.removeEventListener('mouseup', PreviewModal._dragEndHandler);
+            document.removeEventListener('touchend', PreviewModal._dragEndHandler);
         },
 
         navigate(direction) {
@@ -1990,6 +2778,18 @@
             }
         },
 
+        updateInfoBar(imgItem) {
+            const formatEl = document.getElementById('previewInfoFormat');
+            const sizeEl = document.getElementById('previewInfoSize');
+            const filesizeEl = document.getElementById('previewInfoFilesize');
+            const fullFormat = imgItem.originalFormat || imgItem.format || '-';
+            formatEl.textContent = String(fullFormat).toUpperCase();
+            const w = imgItem.width, h = imgItem.height;
+            sizeEl.textContent = (w && h && w !== '未知') ? `${w} × ${h}` : '-';
+            filesizeEl.textContent = imgItem.fileSize && imgItem.fileSize !== '未知'
+                ? Utils.formatFileSize(imgItem.fileSize) : '计算中...';
+        },
+
         show(imgItem, imageList, index) {
             if (imageList) {
                 this.imageList = imageList;
@@ -2000,52 +2800,127 @@
             }
             this.currentItem = imgItem;
             const title = document.getElementById('previewTitle');
-            const content = document.getElementById('previewContent');
+            const subtitle = document.getElementById('previewSubtitle');
             const completedFileName = Utils.completeImageSuffix(imgItem.originalName || imgItem.name, imgItem.originalFormat);
             title.textContent = completedFileName;
+            const fullType = imgItem.originalType || imgItem.type || '';
+            subtitle.textContent = `${fullType ? fullType + ' · ' : ''}${imgItem.url || ''}`;
 
-            // 找到或创建图片展示容器
-            let imgWrapper = content.querySelector('.preview-img-wrapper');
-            if (!imgWrapper) {
-                imgWrapper = document.createElement('div');
-                imgWrapper.className = 'preview-img-wrapper';
-                imgWrapper.style.cssText = 'max-width:100%;max-height:100%;display:flex;align-items:center;justify-content:center;z-index:2;position:relative;';
-                // 插入到 nav prev 按钮之前
-                const navPrev = content.querySelector('.preview-nav.prev');
-                content.insertBefore(imgWrapper, navPrev);
-            }
-
+            const wrapper = document.getElementById('previewImgWrapper');
             // 清理旧图片
-            imgWrapper.innerHTML = '<div class="loading">加载中...</div>';
+            wrapper.innerHTML = '<div class="loading">加载中...</div>';
+            // 重置变换
+            this.resetTransform();
 
             this.modal.style.display = 'flex';
             this.updateNavButtons();
+            this.updateInfoBar(imgItem);
 
             // 渲染图片
             if (imgItem.format === 'svg' && imgItem.svgContent) {
-                const processedSvg = SVGProcessor.processForPreview(imgItem.svgContent);
-                imgWrapper.innerHTML = `<div class="preview-svg">${processedSvg}</div>`;
+                const processedSvg = SVGProcessor.processForPreview(
+                    Utils.ensureSvgNamespace(imgItem.svgContent)
+                );
+                wrapper.innerHTML = `<div class="preview-svg">${processedSvg}</div>`;
+                // SVG 通常无 fileSize，标注为内容长度
+                if (imgItem.fileSize === '未知' || !imgItem.fileSize) {
+                    const bytes = new Blob([imgItem.svgContent]).size;
+                    const fsEl = document.getElementById('previewInfoFilesize');
+                    if (fsEl) fsEl.textContent = Utils.formatFileSize(bytes);
+                }
             } else {
                 const img = document.createElement('img');
                 img.className = 'preview-image';
-                img.src = imgItem.url;
                 img.alt = completedFileName;
+                try { img.referrerPolicy = 'no-referrer'; } catch (e) {}
                 img.style.opacity = '0';
                 img.style.transition = 'opacity 0.3s';
-                img.onload = () => { img.style.opacity = '1'; };
-                img.onerror = () => {
-                    imgWrapper.innerHTML = '<div class="loading" style="color:#fff;">图片加载失败</div>';
+                img.onload = () => {
+                    img.style.opacity = '1';
+                    // 更新尺寸/大小信息
+                    const sizeEl = document.getElementById('previewInfoSize');
+                    if (sizeEl && imgItem.width === '未知') {
+                        sizeEl.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
+                    }
                 };
-                imgWrapper.innerHTML = '';
-                imgWrapper.appendChild(img);
+                let pvRetried = false;
+                img.onerror = () => {
+                    if (pvRetried) {
+                        wrapper.innerHTML = '<div class="loading" style="color:#fff;">图片加载失败</div>';
+                        return;
+                    }
+                    pvRetried = true;
+                    // 第二次尝试：去掉 referer policy 限制
+                    try { img.removeAttribute('referrerpolicy'); } catch (e) {}
+                    const sep = imgItem.url.indexOf('?') >= 0 ? '&' : '?';
+                    img.src = imgItem.url + sep + '_pvretry=1';
+                };
+                // 异步获取文件大小
+                this._fetchFileSize(imgItem);
+                img.src = imgItem.url;
+                wrapper.innerHTML = '';
+                wrapper.appendChild(img);
             }
 
             this.escapeHandler = (e) => {
                 if (e.key === 'Escape') this.hide();
                 if (e.key === 'ArrowLeft') this.navigate(-1);
                 if (e.key === 'ArrowRight') this.navigate(1);
+                if (e.key === '+' || e.key === '=') this.zoom(1.25);
+                if (e.key === '-' || e.key === '_') this.zoom(1 / 1.25);
+                if (e.key === '0') this.resetTransform();
+                if (e.key === 'r' || e.key === 'R') this.rotate(90);
             };
             document.addEventListener('keydown', this.escapeHandler);
+        },
+
+        async _fetchFileSize(imgItem) {
+            const fsEl = document.getElementById('previewInfoFilesize');
+            if (!fsEl) return;
+            if (imgItem.fileSize && imgItem.fileSize !== '未知') {
+                fsEl.textContent = Utils.formatFileSize(imgItem.fileSize);
+                return;
+            }
+            try {
+                // blob: / data: 直接读取
+                if (imgItem.url.startsWith('blob:') || imgItem.url.startsWith('data:')) {
+                    const resp = await fetch(imgItem.url);
+                    const blob = await resp.blob();
+                    fsEl.textContent = Utils.formatFileSize(blob.size);
+                    imgItem.fileSize = blob.size;
+                    return;
+                }
+                // 跨域请求使用 GM_xmlhttpRequest
+                if (typeof GM_xmlhttpRequest !== 'undefined') {
+                    GM_xmlhttpRequest({
+                        method: 'HEAD',
+                        url: imgItem.url,
+                        onload: (resp) => {
+                            const len = resp.responseHeaders.match(/content-length:\s*(\d+)/i);
+                            if (len) {
+                                const bytes = parseInt(len[1]);
+                                fsEl.textContent = Utils.formatFileSize(bytes);
+                                imgItem.fileSize = bytes;
+                            } else {
+                                fsEl.textContent = '未知';
+                            }
+                        },
+                        onerror: () => { fsEl.textContent = '未知'; }
+                    });
+                } else {
+                    const resp = await fetch(imgItem.url, { method: 'HEAD' });
+                    const len = resp.headers.get('content-length');
+                    if (len) {
+                        const bytes = parseInt(len);
+                        fsEl.textContent = Utils.formatFileSize(bytes);
+                        imgItem.fileSize = bytes;
+                    } else {
+                        fsEl.textContent = '未知';
+                    }
+                }
+            } catch (e) {
+                fsEl.textContent = '未知';
+            }
         },
 
         hide() {
@@ -2057,6 +2932,12 @@
                 document.removeEventListener('keydown', this.escapeHandler);
                 this.escapeHandler = null;
             }
+            // 清理拖拽监听
+            document.removeEventListener('mousemove', this._dragMoveHandler);
+            document.removeEventListener('touchmove', this._dragMoveHandler);
+            document.removeEventListener('mouseup', this._dragEndHandler);
+            document.removeEventListener('touchend', this._dragEndHandler);
+            this.dragState = null;
         }
     };
 
@@ -2210,6 +3091,7 @@
             this.fabElements = DOMBuilder.createFabButton();
             this.mainModal = DOMBuilder.createMainModal();
             DOMBuilder.createPreviewModal();
+            DOMBuilder.createBatchProgressOverlay();
             this.overlay = DOMBuilder.createOverlay();
 
             // 初始化各模块
@@ -2286,6 +3168,25 @@
                 } else {
                     Downloader.downloadMultipleImages(selectedItems);
                 }
+            });
+
+            // 批量下载模式切换
+            const batchModeZip = document.getElementById('batchModeZip');
+            const batchModeSingle = document.getElementById('batchModeSingle');
+            batchModeZip.addEventListener('click', () => {
+                CONFIG.batchDownload.useZip = true;
+                batchModeZip.classList.add('active');
+                batchModeSingle.classList.remove('active');
+            });
+            batchModeSingle.addEventListener('click', () => {
+                CONFIG.batchDownload.useZip = false;
+                batchModeSingle.classList.add('active');
+                batchModeZip.classList.remove('active');
+            });
+
+            // 取消批量下载
+            document.getElementById('batchProgressCancel').addEventListener('click', () => {
+                Downloader.cancelBatch();
             });
 
             document.getElementById('batchCopyBtn').addEventListener('click', () => {
