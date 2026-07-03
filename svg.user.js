@@ -12,7 +12,7 @@
 // @grant        GM_xmlhttpRequest
 // @connect      *
 // @require      https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js
-// @icon         data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTAyNCAxMDI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik01MTIgOTU1LjM0MDhjLTI0My43MTIgMC00NDIuMDA5Ni0xOTguMjk3Ni00NDIuMDA5Ni00NDIuMDA5NlMyNjguMjg4IDcxLjI3MDQgNTEyIDcxLjI3MDRzNDQyLjAwOTYgMTk4LjI5NzYgNDQyLjAwOTYgNDQyLjAwOTYtMTk4LjI5NzYgNDQyLjA2MDgtNDQyLjAwOTYgNDQyLjA2MDh6IG0wLTgwMi4xNTA0Yy0xOTguNTUzNiAwLTM2MC4wODk2IDE2MS41MzYtMzYwLjA4OTYgMzYwLjA4OTZzMTYxLjUzNiAzNjAuMDg5NiAzNjAuMDg5NiAzNjAuMDg5NiAzNjAuMDg5Ni0xNjEuNTM2IDM2MC4wODk2LTM2MC4wODk2UzcxMC41NTM2IDE1My4xOTA0IDUxMiAxNTMuMTkwNHoiIGZpbGw9IiM0Mzg1RjUiLz48cGF0aCBkPSJNNTEyIDUxMy4zMzEybS0yMTMuNjA2NCAwYTIxMy42MDY0IDIxMy42MDY0IDAgMSAwIDQyNy4yMTI4IDAgMjEzLjYwNjQgMjEzLjYwNjQgMCAxIDAtNDI3LjIxMjggMFoiIGZpbGw9IiNEOUZGRUMiLz48cGF0aCBkPSJNNDg2LjYwNDggNjg2Ljc0NTZjLTExMi41ODg4IDAtMjA0LjE4NTYtOTEuNTk2OC0yMDQuMTg1Ni0yMDQuMjM2OCAwLTExMi41ODg4IDkxLjU5NjgtMjA0LjE4NTYgMjA0LjE4NTYtMjA0LjE4NTYgMTEyLjU4ODggMCAyMDQuMjM2OCA5MS41OTY4IDIwNC4yMzY4IDIwNC4xODU2LTAuMDUxMiAxMTIuNjQtOTEuNjQ4IDIwNC4yMzY4LTIwNC4yMzY4IDIwNC4yMzY4eiBtMC0zMzEuNjIyNGMtNzAuMjQ2NCAwLTEyNy4zODU2IDU3LjEzOTItMTI3LjM4NTYgMTI3LjM4NTZzNTcuMTM5MiAxMjcuNDM2OCAxMjcuMzg1NiAxMjcuNDM2OCAxMjcuNDM2OC01Ny4xMzkyIDEyNy40MzY4LTEyNy40MzY4LTU3LjE5MDQtMTI3LjM4NTYtMTI3LjQzNjgtMTI3LjM4NTZ6IiBmaWxsPSIjMzRBODUzIi8+PHBhdGggZD0iTTcwMy4yMzIgNzMzLjY0NDhhMzguMjk3NiAzOC4yOTc2IDAgMCAxLTI3LjU0NTYtMTEuNjIyNGwtODYuNDc2OC04OC45MzQ0Yy0xNC43OTY4LTE1LjIwNjQtMTQuNDM4NC0zOS41MjY0IDAuNzY4LTU0LjMyMzIgMTUuMjA2NC0xNC43OTY4IDM5LjUyNjQtMTQuNDM4NCA1NC4zMjMyIDAuNzY4bDg2LjQ3NjggODguOTM0NGMxNC43OTY4IDE1LjIwNjQgMTQuNDM4NCAzOS41MjY0LTAuNzY4IDU0LjMyMzJhMzguNTA3NTIgMzguNTA3NTIgMCAwIDEtMjYuNzc3NiAxMC44NTQ0eiIgZmlsbD0iIzM0QTg1MyIvPjwvc3ZnPg==
+// @icon         data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff6b6b%22%2F%3E%3Cstop%20offset%3D%220.5%22%20stop-color%3D%22%23feca57%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%231dd1a1%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2218%22%20height%3D%2218%22%20rx%3D%223%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%228.5%22%20cy%3D%228.5%22%20r%3D%221.6%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M21%2015l-5-5L7%2019%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M12%2017v-4%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M9.5%2013L12%2010.5L14.5%2013%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E
 // @license      MIT
 // ==/UserScript==
 
@@ -854,12 +854,12 @@
             width: auto !important;
         }
 
-        /* 缩放提示 */
+        /* 缩放提示 - 移到右下角，避免与顶部工具栏重叠 */
         .preview-zoom-indicator {
             position: absolute;
-            top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: 14px;
+            right: 14px;
+            transform: none;
             background: rgba(0,0,0,0.6);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
@@ -942,33 +942,39 @@
             font-weight: 600;
         }
 
-        /* 工具栏：缩放、旋转、还原 */
+        /* 工具栏：缩放、旋转、还原 - 顶部水平排列，避免与左右导航按钮(中线)重叠 */
         .preview-toolbar {
             position: absolute;
-            top: 50%;
-            right: 14px;
-            transform: translateY(-50%);
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
-            flex-direction: column;
-            gap: 8px;
+            flex-direction: row;
+            gap: 6px;
             z-index: 5;
             pointer-events: auto;
-        }
-        .preview-tool-btn {
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: rgba(255,255,255,0.16);
+            background: rgba(0,0,0,0.42);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.28);
+            border: 1px solid rgba(255,255,255,0.22);
+            border-radius: 12px;
+            padding: 4px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+        }
+        .preview-tool-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            background: rgba(255,255,255,0.14);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.22);
             color: #fff;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.22s;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.22);
         }
         .preview-tool-btn:hover {
             background: rgba(255,255,255,0.32);
@@ -978,8 +984,8 @@
             transform: scale(0.94);
         }
         .preview-tool-btn svg {
-            width: 18px;
-            height: 18px;
+            width: 17px;
+            height: 17px;
             fill: #fff;
             stroke: #fff;
             pointer-events: none;
