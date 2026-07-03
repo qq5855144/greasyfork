@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SVG嗅探器增强版
 // @namespace    http://tampermonkey.net/
-// @version      2.0.2
+// @version      2.0.3
 // @description  扫描、预览、下载网页中的SVG图片 | 支持去重/搜索/排序/多格式导出(PNG/DataURI/React/Base64)/压缩/暗色模式
 // @author       晚风知我意
 // @match        *://*/*
@@ -96,7 +96,13 @@
             --ss-radius: 10px;
             --ss-radius-lg: 14px;
             --ss-radius-xl: 18px;
-            --ss-gradient: linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #ec4899 100%);
+            --ss-glass: rgba(255,255,255,.72);
+            --ss-glass-alt: rgba(248,250,252,.5);
+            --ss-glass-item: rgba(255,255,255,.55);
+            --ss-glass-border: rgba(255,255,255,.5);
+            --ss-glass-header: rgba(99,102,241,.82);
+            --ss-glass-hover: rgba(255,255,255,.65);
+            --ss-blur: blur(20px) saturate(180%);
             --ss-transition: .25s cubic-bezier(.4,0,.2,1);
         }
         .svg-sniffer-root[data-theme="dark"] {
@@ -124,6 +130,12 @@
             --ss-shadow-md: 0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px -2px rgba(0,0,0,.3);
             --ss-shadow-lg: 0 10px 15px -3px rgba(0,0,0,.45), 0 4px 6px -4px rgba(0,0,0,.3);
             --ss-shadow-xl: 0 20px 25px -5px rgba(0,0,0,.55), 0 8px 10px -6px rgba(0,0,0,.4);
+            --ss-glass: rgba(26,35,50,.72);
+            --ss-glass-alt: rgba(36,48,68,.5);
+            --ss-glass-item: rgba(36,48,68,.45);
+            --ss-glass-border: rgba(255,255,255,.08);
+            --ss-glass-header: rgba(99,102,241,.45);
+            --ss-glass-hover: rgba(45,58,79,.55);
         }
         .svg-sniffer-root *,
         .svg-sniffer-root *::before,
@@ -140,20 +152,21 @@
         .ss-radar-button {
             width: ${CONFIG.buttonSize}px !important; height: ${CONFIG.buttonSize}px !important;
             border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important;
-            background: var(--ss-gradient) !important; border: none !important; outline: none !important; position: relative !important;
+            background: var(--ss-glass-header) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
+            border: 1px solid var(--ss-glass-border) !important; outline: none !important; position: relative !important;
             overflow: hidden !important; user-select: none !important; -webkit-tap-highlight-color: transparent !important;
             animation: ss-pulse 2s infinite !important; transition: transform .3s, box-shadow .3s !important;
-            box-shadow: 0 6px 18px rgba(99,102,241,.35), 0 0 0 4px rgba(255,255,255,.15), inset 0 0 12px rgba(0,0,0,.2) !important;
+            box-shadow: 0 6px 18px rgba(99,102,241,.3), 0 0 0 4px rgba(255,255,255,.1), inset 0 1px 1px rgba(255,255,255,.2) !important;
             margin: 0 !important; padding: 0 !important; flex-shrink: 0 !important;
         }
-        .ss-radar-button:hover { transform: scale(1.08) !important; box-shadow: 0 8px 24px rgba(99,102,241,.45), 0 0 0 4px rgba(255,255,255,.25) !important; }
+        .ss-radar-button:hover { transform: scale(1.08) !important; box-shadow: 0 8px 24px rgba(99,102,241,.4), 0 0 0 4px rgba(255,255,255,.2), inset 0 1px 1px rgba(255,255,255,.3) !important; }
         .ss-radar-button:active { transform: scale(.95) !important; }
         .ss-radar-button svg { width: 20px !important; height: 20px !important; animation: ss-scan 4s linear infinite !important; display: block !important; }
         .ss-badge {
             position: absolute !important; top: -4px !important; right: -4px !important; min-width: 16px !important; height: 16px !important;
             border-radius: 8px !important; background: var(--ss-danger) !important; color: #fff !important;
             font-size: 10px !important; font-weight: 700 !important; display: flex !important; align-items: center !important; justify-content: center !important;
-            padding: 0 4px !important; box-shadow: 0 2px 6px rgba(239,68,68,.4) !important; border: 2px solid var(--ss-surface) !important;
+            padding: 0 4px !important; box-shadow: 0 2px 6px rgba(239,68,68,.4) !important; border: 2px solid var(--ss-glass) !important;
             line-height: 1 !important; margin: 0 !important;
         }
 
@@ -169,18 +182,20 @@
         .ss-modal {
             display: none !important; position: fixed !important; top: 50% !important; left: 50% !important;
             transform: translate(-50%,-50%) !important; width: 92% !important; max-width: 880px !important; max-height: 85vh !important;
-            background: var(--ss-surface) !important; z-index: 999999 !important; border-radius: var(--ss-radius-xl) !important;
+            background: var(--ss-glass) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
+            border: 1px solid var(--ss-glass-border) !important; z-index: 999999 !important; border-radius: var(--ss-radius-xl) !important;
             box-shadow: var(--ss-shadow-xl) !important; overflow: hidden !important;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
             animation: ss-scaleIn .35s cubic-bezier(.16,1,.3,1) !important;
-            flex-direction: column !important; margin: 0 !important; padding: 0 !important; border: none !important;
+            flex-direction: column !important; margin: 0 !important; padding: 0 !important;
         }
         @media (max-width: 768px) { .ss-modal { width: 96% !important; max-height: 90vh !important; border-radius: var(--ss-radius-lg) !important; } }
 
         .ss-modal-header {
-            background: var(--ss-gradient) !important; color: #fff !important; padding: 16px 24px !important;
+            background: var(--ss-glass-header) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
+            border-bottom: 1px solid var(--ss-glass-border) !important; color: #fff !important; padding: 16px 24px !important;
             display: flex !important; justify-content: space-between !important; align-items: center !important;
-            flex-shrink: 0 !important; margin: 0 !important; border: none !important; width: 100% !important;
+            flex-shrink: 0 !important; margin: 0 !important; width: 100% !important;
             box-shadow: 0 1px 3px rgba(0,0,0,.05) !important;
         }
         .ss-modal-header h2 {
@@ -202,14 +217,14 @@
         /* ========== 工具栏 ========== */
         .ss-toolbar {
             display: flex !important; align-items: center !important; gap: 12px !important; padding: 12px 20px !important;
-            background: var(--ss-surface-alt) !important; border-bottom: 1px solid var(--ss-border) !important;
+            background: var(--ss-glass-alt) !important; border-bottom: 1px solid var(--ss-border) !important;
             flex-wrap: wrap !important; flex-shrink: 0 !important; margin: 0 !important; width: 100% !important;
         }
         .ss-search-box { flex: 1 1 180px !important; min-width: 120px !important; position: relative !important; margin: 0 !important; padding: 0 !important; }
         .ss-search-box input {
             width: 100% !important; height: 36px !important; padding: 0 12px 0 38px !important; border: 2px solid var(--ss-border) !important;
             border-radius: var(--ss-radius) !important; font-size: 14px !important; color: var(--ss-text) !important;
-            background: var(--ss-surface) !important; transition: var(--ss-transition) !important; outline: none !important;
+            background: var(--ss-glass-item) !important; transition: var(--ss-transition) !important; outline: none !important;
             margin: 0 !important; -webkit-appearance: none !important; appearance: none !important;
             display: block !important; box-sizing: border-box !important;
         }
@@ -220,7 +235,7 @@
         }
         .ss-select {
             height: 36px !important; padding: 0 10px !important; border: 2px solid var(--ss-border) !important; border-radius: var(--ss-radius-sm) !important;
-            font-size: 13px !important; color: var(--ss-text) !important; background: var(--ss-surface) !important;
+            font-size: 13px !important; color: var(--ss-text) !important; background: var(--ss-glass-item) !important;
             cursor: pointer !important; outline: none !important; transition: var(--ss-transition) !important;
             margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important;
             flex-shrink: 0 !important;
@@ -233,11 +248,11 @@
             margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; -webkit-appearance: none !important; appearance: none !important;
         }
         .ss-view-toggle button svg { width: 14px !important; height: 14px !important; display: block !important; }
-        .ss-view-toggle button.active { background: var(--ss-surface) !important; color: var(--ss-primary) !important; font-weight: 600 !important; box-shadow: var(--ss-shadow-sm) !important; }
+        .ss-view-toggle button.active { background: var(--ss-glass-hover) !important; color: var(--ss-primary) !important; font-weight: 600 !important; box-shadow: var(--ss-shadow-sm) !important; }
 
         /* ========== 统计栏 ========== */
         .ss-stats {
-            display: flex !important; gap: 8px !important; padding: 10px 20px !important; background: var(--ss-surface-alt) !important;
+            display: flex !important; gap: 8px !important; padding: 10px 20px !important; background: var(--ss-glass-alt) !important;
             border-bottom: 1px solid var(--ss-border) !important; font-size: 12px !important; color: var(--ss-text-secondary) !important;
             flex-shrink: 0 !important; margin: 0 !important; width: 100% !important; flex-wrap: wrap !important; align-items: center !important;
         }
@@ -245,7 +260,7 @@
         .ss-stat-item strong { color: var(--ss-primary) !important; font-size: 14px !important; font-weight: 700 !important; }
         .ss-stat-pill {
             display: inline-flex !important; align-items: center !important; gap: 4px !important;
-            background: var(--ss-surface) !important; border: 1px solid var(--ss-border) !important;
+            background: var(--ss-glass-item) !important; border: 1px solid var(--ss-border) !important;
             padding: 4px 10px !important; border-radius: 999px !important; font-size: 12px !important;
             color: var(--ss-text-secondary) !important; margin: 0 !important; white-space: nowrap !important;
         }
@@ -254,7 +269,7 @@
         /* ========== 操作栏 ========== */
         .ss-action-bar {
             display: flex !important; justify-content: space-between !important; align-items: center !important;
-            padding: 12px 20px !important; background: var(--ss-surface) !important; border-top: 1px solid var(--ss-border) !important;
+            padding: 12px 20px !important; background: var(--ss-glass-alt) !important; border-top: 1px solid var(--ss-border) !important;
             flex-shrink: 0 !important; margin: 0 !important; width: 100% !important; gap: 8px !important;
         }
         .ss-select-all-control { display: flex !important; align-items: center !important; gap: 8px !important; font-size: 13px !important; color: var(--ss-text-secondary) !important; cursor: pointer !important; margin: 0 !important; padding: 0 !important; flex-shrink: 0 !important; }
@@ -274,8 +289,8 @@
         .ss-btn-primary:hover { background: var(--ss-primary-dark) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; filter: brightness(1.05) !important; }
         .ss-btn-success { background: var(--ss-success) !important; color: #fff !important; }
         .ss-btn-success:hover { filter: brightness(1.1) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
-        .ss-btn-secondary { background: var(--ss-surface-alt) !important; color: var(--ss-text) !important; border: 1px solid var(--ss-border) !important; }
-        .ss-btn-secondary:hover { background: var(--ss-surface-hover) !important; border-color: var(--ss-primary) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; filter: brightness(1.02) !important; }
+        .ss-btn-secondary { background: var(--ss-glass-item) !important; color: var(--ss-text) !important; border: 1px solid var(--ss-border) !important; }
+        .ss-btn-secondary:hover { background: var(--ss-glass-hover) !important; border-color: var(--ss-primary) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; filter: brightness(1.02) !important; }
         .ss-btn-danger { background: var(--ss-danger) !important; color: #fff !important; }
         .ss-btn-danger:hover { filter: brightness(1.1) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
 
@@ -291,16 +306,16 @@
         .ss-svg-item {
             display: flex !important; align-items: center !important; padding: 12px 14px !important; border: 1px solid var(--ss-border) !important;
             border-radius: 12px !important; transition: var(--ss-transition) !important; gap: 12px !important;
-            background: var(--ss-surface) !important; margin: 0 !important; width: 100% !important;
+            background: var(--ss-glass-item) !important; margin: 0 !important; width: 100% !important;
         }
-        .ss-svg-item:hover { background: var(--ss-surface-hover) !important; border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-sm) !important; }
+        .ss-svg-item:hover { background: var(--ss-glass-hover) !important; border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-sm) !important; }
         .ss-svg-checkbox {
             width: 18px !important; height: 18px !important; cursor: pointer !important; accent-color: var(--ss-primary) !important; flex-shrink: 0 !important;
             margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important;
         }
 
         /* ========== 预览尺寸 ========== */
-        .ss-preview { display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 10px !important; background: var(--ss-surface-alt) !important; background-image: linear-gradient(45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(-45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ss-border-light) 75%), linear-gradient(-45deg, transparent 75%, var(--ss-border-light) 75%) !important; background-size: 12px 12px !important; background-position: 0 0, 0 6px, 6px -6px, -6px 0px !important; border: 1px solid var(--ss-border) !important; flex-shrink: 0 !important; margin: 0 !important; overflow: hidden !important; }
+        .ss-preview { display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 10px !important; background: var(--ss-glass-alt) !important; background-image: linear-gradient(45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(-45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ss-border-light) 75%), linear-gradient(-45deg, transparent 75%, var(--ss-border-light) 75%) !important; background-size: 12px 12px !important; background-position: 0 0, 0 6px, 6px -6px, -6px 0px !important; border: 1px solid var(--ss-border) !important; flex-shrink: 0 !important; margin: 0 !important; overflow: hidden !important; }
         .ss-preview[data-size="small"] { width: 40px !important; height: 40px !important; }
         .ss-preview[data-size="medium"] { width: 52px !important; height: 52px !important; }
         .ss-preview[data-size="large"] { width: 72px !important; height: 72px !important; }
@@ -317,7 +332,7 @@
         .ss-item-actions { display: flex !important; gap: 4px !important; flex-shrink: 0 !important; margin: 0 !important; padding: 0 !important; }
         .ss-item-btn {
             width: 30px !important; height: 30px !important; border: 1px solid var(--ss-border) !important; border-radius: 50% !important;
-            background: var(--ss-surface) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important;
+            background: var(--ss-glass-item) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important;
             transition: var(--ss-transition) !important; color: var(--ss-text-secondary) !important; padding: 0 !important; margin: 0 !important;
             -webkit-appearance: none !important; appearance: none !important; flex-shrink: 0 !important;
         }
@@ -328,12 +343,12 @@
         .ss-svg-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; gap: 12px !important; margin: 0 !important; padding: 0 !important; list-style: none !important; }
         .ss-grid-card {
             border: 1px solid var(--ss-border) !important; border-radius: 12px !important; padding: 10px !important;
-            background: var(--ss-surface) !important; transition: var(--ss-transition) !important; cursor: pointer !important; position: relative !important; margin: 0 !important;
+            background: var(--ss-glass-item) !important; transition: var(--ss-transition) !important; cursor: pointer !important; position: relative !important; margin: 0 !important;
         }
-        .ss-grid-card:hover { border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-md) !important; transform: translateY(-3px) !important; }
+        .ss-grid-card:hover { border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-md) !important; transform: translateY(-3px) !important; background: var(--ss-glass-hover) !important; }
         .ss-grid-card .ss-grid-preview {
             width: 100% !important; aspect-ratio: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important;
-            background: var(--ss-surface-alt) !important; background-image: linear-gradient(45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(-45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ss-border-light) 75%), linear-gradient(-45deg, transparent 75%, var(--ss-border-light) 75%) !important; background-size: 12px 12px !important; background-position: 0 0, 0 6px, 6px -6px, -6px 0px !important; border: 1px solid var(--ss-border) !important; border-radius: 10px !important; margin-bottom: 6px !important; overflow: hidden !important;
+            background: var(--ss-glass-alt) !important; background-image: linear-gradient(45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(-45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ss-border-light) 75%), linear-gradient(-45deg, transparent 75%, var(--ss-border-light) 75%) !important; background-size: 12px 12px !important; background-position: 0 0, 0 6px, 6px -6px, -6px 0px !important; border: 1px solid var(--ss-border) !important; border-radius: 10px !important; margin-bottom: 6px !important; overflow: hidden !important;
         }
         .ss-grid-card .ss-grid-preview svg { max-width: 75% !important; max-height: 75% !important; display: block !important; }
         .ss-grid-card .ss-grid-name { font-size: 12px !important; color: var(--ss-text) !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-weight: 500 !important; margin: 0 !important; padding: 0 !important; }
@@ -346,7 +361,8 @@
         /* ========== 下拉菜单 ========== */
         .ss-dropdown {
             position: absolute !important; bottom: 100% !important; right: 0 !important; margin-bottom: 6px !important;
-            background: var(--ss-surface) !important; border: 1px solid var(--ss-border) !important; border-radius: 12px !important;
+            background: var(--ss-glass) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
+            border: 1px solid var(--ss-glass-border) !important; border-radius: 12px !important;
             box-shadow: var(--ss-shadow-lg) !important; z-index: 10 !important; overflow: hidden !important; min-width: 170px !important;
             display: none !important; animation: ss-scaleIn .15s ease !important; padding: 0 !important;
         }
@@ -355,7 +371,7 @@
             display: flex !important; align-items: center !important; gap: 8px !important; padding: 10px 14px !important; cursor: pointer !important;
             font-size: 13px !important; color: var(--ss-text) !important; transition: var(--ss-transition) !important; white-space: nowrap !important; margin: 0 !important;
         }
-        .ss-dropdown-item:hover { background: var(--ss-surface-hover) !important; color: var(--ss-primary) !important; }
+        .ss-dropdown-item:hover { background: var(--ss-glass-hover) !important; color: var(--ss-primary) !important; }
         .ss-dropdown-item svg { width: 14px !important; height: 14px !important; display: block !important; flex-shrink: 0 !important; }
         .ss-dropdown-item:first-child { border-radius: 12px 12px 0 0 !important; }
         .ss-dropdown-item:last-child { border-radius: 0 0 12px 12px !important; }
@@ -375,20 +391,21 @@
         }
         .ss-toast {
             padding: 12px 20px !important; border-radius: 12px !important; color: #fff !important; font-size: 14px !important; font-weight: 500 !important;
+            backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important; border: 1px solid var(--ss-glass-border) !important;
             box-shadow: var(--ss-shadow-lg) !important; display: flex !important; align-items: center !important; gap: 8px !important;
             animation: ss-slideDown .3s ease, ss-fadeOut .4s ease 2.6s forwards !important; max-width: 90vw !important; margin: 0 !important;
         }
-        .ss-toast.success { background: var(--ss-success) !important; }
-        .ss-toast.error { background: var(--ss-danger) !important; }
-        .ss-toast.warning { background: var(--ss-warning) !important; }
-        .ss-toast.info { background: var(--ss-primary) !important; }
+        .ss-toast.success { background: rgba(16,185,129,.82) !important; }
+        .ss-toast.error { background: rgba(239,68,68,.82) !important; }
+        .ss-toast.warning { background: rgba(245,158,11,.82) !important; }
+        .ss-toast.info { background: rgba(99,102,241,.82) !important; }
 
         /* ========== 动画 ========== */
         @keyframes ss-scan { to { transform: rotate(360deg); } }
         @keyframes ss-pulse {
-            0% { box-shadow: 0 0 0 0 rgba(99,102,241,.5), 0 6px 18px rgba(99,102,241,.35), 0 0 0 4px rgba(255,255,255,.15); }
-            70% { box-shadow: 0 0 0 12px rgba(99,102,241,0), 0 6px 18px rgba(99,102,241,.35), 0 0 0 4px rgba(255,255,255,.15); }
-            100% { box-shadow: 0 0 0 0 rgba(99,102,241,0), 0 6px 18px rgba(99,102,241,.35), 0 0 0 4px rgba(255,255,255,.15); }
+            0% { box-shadow: 0 0 0 0 rgba(99,102,241,.4), 0 6px 18px rgba(99,102,241,.3), 0 0 0 4px rgba(255,255,255,.1); }
+            70% { box-shadow: 0 0 0 12px rgba(99,102,241,0), 0 6px 18px rgba(99,102,241,.3), 0 0 0 4px rgba(255,255,255,.1); }
+            100% { box-shadow: 0 0 0 0 rgba(99,102,241,0), 0 6px 18px rgba(99,102,241,.3), 0 0 0 4px rgba(255,255,255,.1); }
         }
         @keyframes ss-fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes ss-fadeOut { to { opacity: 0; transform: translateY(-10px); } }
@@ -1048,15 +1065,9 @@
 
             ui.radar.addEventListener('mousedown', (e) => this.start(e));
             ui.radar.addEventListener('touchstart', (e) => this.start(e), { passive: false });
-            ui.radarBtn.addEventListener('click', () => {
-                if (!state.isDragging && Date.now() - state.dragStartTime > CONFIG.touchDelay) {
-                    modalManager.show();
-                }
-            });
         },
 
         start(e) {
-            e.preventDefault();
             const cx = e.clientX || e.touches[0].clientX;
             const cy = e.clientY || e.touches[0].clientY;
             const cs = window.getComputedStyle(ui.radar);
@@ -1072,43 +1083,54 @@
             state.startX = cx;
             state.startY = cy;
             state.dragStartTime = Date.now();
+            state.isDragging = false;
 
             if (e.type === 'touchstart') {
+                e.preventDefault();
                 state.touchTimer = setTimeout(() => {
                     state.isDragging = true;
                     ui.radar.style.transition = 'none';
                 }, CONFIG.touchDelay);
-            } else {
-                state.isDragging = true;
             }
 
-            document.addEventListener('mousemove', (e) => this.move(e));
-            document.addEventListener('touchmove', (e) => this.move(e), { passive: false });
-            document.addEventListener('mouseup', () => this.end());
-            document.addEventListener('touchend', () => this.end());
+            document.addEventListener('mousemove', this._move = (e) => this.move(e));
+            document.addEventListener('touchmove', this._moveT = (e) => this.move(e), { passive: false });
+            document.addEventListener('mouseup', this._end = () => this.end());
+            document.addEventListener('touchend', this._endT = () => this.end());
         },
 
         move(e) {
-            if (!state.isDragging) return;
-            e.preventDefault();
             const cx = e.clientX || e.touches[0].clientX;
             const cy = e.clientY || e.touches[0].clientY;
-            ui.radar.style.left = `${state.startLeft + cx - state.startX}px`;
-            ui.radar.style.top = `${state.startTop + cy - state.startY}px`;
+            const dx = cx - state.startX;
+            const dy = cy - state.startY;
+
+            if (!state.isDragging) {
+                if (e.type === 'touchmove') return;
+                if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+                state.isDragging = true;
+                ui.radar.style.transition = 'none';
+            }
+
+            e.preventDefault();
+            ui.radar.style.left = `${state.startLeft + dx}px`;
+            ui.radar.style.top = `${state.startTop + dy}px`;
         },
 
         end() {
             if (state.touchTimer) { clearTimeout(state.touchTimer); state.touchTimer = null; }
+            document.removeEventListener('mousemove', this._move);
+            document.removeEventListener('touchmove', this._moveT);
+            document.removeEventListener('mouseup', this._end);
+            document.removeEventListener('touchend', this._endT);
+
             if (!state.isDragging) {
-                if (Date.now() - state.dragStartTime < CONFIG.touchDelay) modalManager.show();
+                modalManager.show();
                 return;
             }
+
             state.isDragging = false;
             ui.radar.style.transition = '';
-            document.removeEventListener('mousemove', (e) => this.move(e));
-            document.removeEventListener('touchmove', (e) => this.move(e));
-            document.removeEventListener('mouseup', () => this.end());
-            document.removeEventListener('touchend', () => this.end());
 
             const domain = location.hostname.replace(/\./g, '-');
             const rect = ui.radar.getBoundingClientRect();
