@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SVG嗅探器增强版
 // @namespace    http://tampermonkey.net/
-// @version      2.0.0
+// @version      2.0.1
 // @description  扫描、预览、下载网页中的SVG图片 | 支持去重/搜索/排序/多格式导出(PNG/DataURI/React/Base64)/压缩/暗色模式
 // @author       晚风知我意
 // @match        *://*/*
@@ -124,221 +124,251 @@
         }
         .svg-sniffer-root *,
         .svg-sniffer-root *::before,
-        .svg-sniffer-root *::after { box-sizing: border-box; }
+        .svg-sniffer-root *::after { box-sizing: border-box !important; margin: 0 !important; padding: 0 !important; }
+        .svg-sniffer-root { all: initial; }
+        .svg-sniffer-root { box-sizing: border-box !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; }
 
         /* ========== 雷达浮动按钮 ========== */
         .ss-radar-container {
-            position: fixed; z-index: 99999;
-            cursor: move; transition: transform .2s; touch-action: none;
+            position: fixed !important; z-index: 999999 !important;
+            cursor: move !important; transition: transform .2s !important; touch-action: none !important;
+            margin: 0 !important; padding: 0 !important;
         }
         .ss-radar-button {
-            width: ${CONFIG.buttonSize}px; height: ${CONFIG.buttonSize}px;
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            background: var(--ss-gradient); border: none; outline: none; position: relative;
-            overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent;
-            animation: ss-pulse 2s infinite; transition: transform .3s, box-shadow .3s;
-            box-shadow: 0 6px 18px rgba(99,102,241,.35), 0 0 0 4px rgba(255,255,255,.15), inset 0 0 12px rgba(0,0,0,.2);
+            width: ${CONFIG.buttonSize}px !important; height: ${CONFIG.buttonSize}px !important;
+            border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important;
+            background: var(--ss-gradient) !important; border: none !important; outline: none !important; position: relative !important;
+            overflow: hidden !important; user-select: none !important; -webkit-tap-highlight-color: transparent !important;
+            animation: ss-pulse 2s infinite !important; transition: transform .3s, box-shadow .3s !important;
+            box-shadow: 0 6px 18px rgba(99,102,241,.35), 0 0 0 4px rgba(255,255,255,.15), inset 0 0 12px rgba(0,0,0,.2) !important;
+            margin: 0 !important; padding: 0 !important; flex-shrink: 0 !important;
         }
-        .ss-radar-button:hover { transform: scale(1.08); box-shadow: 0 8px 24px rgba(99,102,241,.45), 0 0 0 4px rgba(255,255,255,.25); }
-        .ss-radar-button:active { transform: scale(.95); }
-        .ss-radar-button svg { width: 20px; height: 20px; animation: ss-scan 4s linear infinite; }
+        .ss-radar-button:hover { transform: scale(1.08) !important; box-shadow: 0 8px 24px rgba(99,102,241,.45), 0 0 0 4px rgba(255,255,255,.25) !important; }
+        .ss-radar-button:active { transform: scale(.95) !important; }
+        .ss-radar-button svg { width: 20px !important; height: 20px !important; animation: ss-scan 4s linear infinite !important; display: block !important; }
         .ss-badge {
-            position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px;
-            border-radius: 8px; background: var(--ss-danger); color: #fff;
-            font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
-            padding: 0 4px; box-shadow: 0 2px 6px rgba(239,68,68,.4); border: 2px solid var(--ss-surface);
+            position: absolute !important; top: -4px !important; right: -4px !important; min-width: 16px !important; height: 16px !important;
+            border-radius: 8px !important; background: var(--ss-danger) !important; color: #fff !important;
+            font-size: 10px !important; font-weight: 700 !important; display: flex !important; align-items: center !important; justify-content: center !important;
+            padding: 0 4px !important; box-shadow: 0 2px 6px rgba(239,68,68,.4) !important; border: 2px solid var(--ss-surface) !important;
+            line-height: 1 !important; margin: 0 !important;
         }
 
         /* ========== 遮罩层 ========== */
         .ss-overlay {
-            position: fixed; inset: 0; z-index: 99998;
-            background: rgba(15,23,42,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-            display: none; animation: ss-fadeIn .25s ease;
+            position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important;
+            z-index: 999998 !important; background: rgba(15,23,42,.55) !important;
+            backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important;
+            display: none !important; animation: ss-fadeIn .25s ease !important; margin: 0 !important; padding: 0 !important;
         }
 
         /* ========== 模态框 ========== */
         .ss-modal {
-            display: none; position: fixed; top: 50%; left: 50%;
-            transform: translate(-50%,-50%); width: 92%; max-width: 880px; max-height: 85vh;
-            background: var(--ss-surface); z-index: 99999; border-radius: var(--ss-radius-xl);
-            box-shadow: var(--ss-shadow-xl); overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            animation: ss-scaleIn .35s cubic-bezier(.16,1,.3,1);
+            display: none !important; position: fixed !important; top: 50% !important; left: 50% !important;
+            transform: translate(-50%,-50%) !important; width: 92% !important; max-width: 880px !important; max-height: 85vh !important;
+            background: var(--ss-surface) !important; z-index: 999999 !important; border-radius: var(--ss-radius-xl) !important;
+            box-shadow: var(--ss-shadow-xl) !important; overflow: hidden !important;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+            animation: ss-scaleIn .35s cubic-bezier(.16,1,.3,1) !important;
+            flex-direction: column !important; margin: 0 !important; padding: 0 !important; border: none !important;
         }
-        @media (max-width: 768px) { .ss-modal { width: 96%; max-height: 90vh; border-radius: var(--ss-radius-lg); } }
+        @media (max-width: 768px) { .ss-modal { width: 96% !important; max-height: 90vh !important; border-radius: var(--ss-radius-lg) !important; } }
 
         .ss-modal-header {
-            background: var(--ss-gradient); color: #fff; padding: 16px 24px;
-            display: flex; justify-content: space-between; align-items: center;
+            background: var(--ss-gradient) !important; color: #fff !important; padding: 14px 20px !important;
+            display: flex !important; justify-content: space-between !important; align-items: center !important;
+            flex-shrink: 0 !important; margin: 0 !important; border: none !important; width: 100% !important;
         }
-        .ss-modal-header h2 { margin: 0; font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-        .ss-header-actions { display: flex; gap: 6px; align-items: center; }
+        .ss-modal-header h2 {
+            margin: 0 !important; font-size: 1.15rem !important; font-weight: 700 !important;
+            display: flex !important; align-items: center !important; gap: 8px !important; color: #fff !important;
+            line-height: 1.4 !important; padding: 0 !important;
+        }
+        .ss-modal-header h2 svg { width: 20px !important; height: 20px !important; flex-shrink: 0 !important; display: block !important; }
+        .ss-header-actions { display: flex !important; gap: 6px !important; align-items: center !important; flex-shrink: 0 !important; margin: 0 !important; padding: 0 !important; }
         .ss-icon-btn {
-            width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.15);
-            color: #fff; transition: var(--ss-transition);
+            width: 32px !important; height: 32px !important; border-radius: 50% !important; border: none !important; cursor: pointer !important;
+            display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(255,255,255,.15) !important;
+            color: #fff !important; transition: var(--ss-transition) !important; padding: 0 !important; margin: 0 !important; flex-shrink: 0 !important;
+            -webkit-appearance: none !important; appearance: none !important;
         }
-        .ss-icon-btn:hover { background: rgba(255,255,255,.3); }
-        .ss-icon-btn svg { width: 18px; height: 18px; }
+        .ss-icon-btn:hover { background: rgba(255,255,255,.3) !important; }
+        .ss-icon-btn svg { width: 16px !important; height: 16px !important; display: block !important; }
 
         /* ========== 工具栏 ========== */
         .ss-toolbar {
-            display: flex; align-items: center; gap: 12px; padding: 12px 20px;
-            background: var(--ss-surface-alt); border-bottom: 1px solid var(--ss-border);
-            flex-wrap: wrap;
+            display: flex !important; align-items: center !important; gap: 10px !important; padding: 10px 16px !important;
+            background: var(--ss-surface-alt) !important; border-bottom: 1px solid var(--ss-border) !important;
+            flex-wrap: wrap !important; flex-shrink: 0 !important; margin: 0 !important; width: 100% !important;
         }
-        .ss-search-box {
-            flex: 1; min-width: 180px; position: relative;
-        }
+        .ss-search-box { flex: 1 1 180px !important; min-width: 120px !important; position: relative !important; margin: 0 !important; padding: 0 !important; }
         .ss-search-box input {
-            width: 100%; padding: 8px 12px 8px 36px; border: 2px solid var(--ss-border);
-            border-radius: var(--ss-radius); font-size: 14px; color: var(--ss-text);
-            background: var(--ss-surface); transition: var(--ss-transition); outline: none;
+            width: 100% !important; padding: 8px 12px 8px 34px !important; border: 2px solid var(--ss-border) !important;
+            border-radius: var(--ss-radius) !important; font-size: 14px !important; color: var(--ss-text) !important;
+            background: var(--ss-surface) !important; transition: var(--ss-transition) !important; outline: none !important;
+            margin: 0 !important; -webkit-appearance: none !important; appearance: none !important;
+            display: block !important; box-sizing: border-box !important; height: auto !important;
         }
-        .ss-search-box input:focus { border-color: var(--ss-primary); box-shadow: 0 0 0 3px rgba(99,102,241,.15); }
+        .ss-search-box input:focus { border-color: var(--ss-primary) !important; box-shadow: 0 0 0 3px rgba(99,102,241,.15) !important; }
         .ss-search-box svg {
-            position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-            width: 16px; height: 16px; color: var(--ss-text-muted); pointer-events: none;
+            position: absolute !important; left: 10px !important; top: 50% !important; transform: translateY(-50%) !important;
+            width: 14px !important; height: 14px !important; color: var(--ss-text-muted) !important; pointer-events: none !important; display: block !important;
         }
         .ss-select {
-            padding: 8px 12px; border: 2px solid var(--ss-border); border-radius: var(--ss-radius);
-            font-size: 13px; color: var(--ss-text); background: var(--ss-surface);
-            cursor: pointer; outline: none; transition: var(--ss-transition);
+            padding: 7px 10px !important; border: 2px solid var(--ss-border) !important; border-radius: var(--ss-radius) !important;
+            font-size: 13px !important; color: var(--ss-text) !important; background: var(--ss-surface) !important;
+            cursor: pointer !important; outline: none !important; transition: var(--ss-transition) !important;
+            margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important;
+            height: auto !important; flex-shrink: 0 !important;
         }
-        .ss-select:focus { border-color: var(--ss-primary); }
-        .ss-view-toggle { display: flex; gap: 2px; background: var(--ss-border); border-radius: var(--ss-radius); padding: 2px; }
+        .ss-select:focus { border-color: var(--ss-primary) !important; }
+        .ss-view-toggle { display: flex !important; gap: 2px !important; background: var(--ss-border) !important; border-radius: var(--ss-radius) !important; padding: 2px !important; margin: 0 !important; flex-shrink: 0 !important; }
         .ss-view-toggle button {
-            padding: 6px 10px; border: none; border-radius: 7px; cursor: pointer;
-            background: transparent; color: var(--ss-text-secondary); font-size: 13px; transition: var(--ss-transition);
+            padding: 5px 8px !important; border: none !important; border-radius: 7px !important; cursor: pointer !important;
+            background: transparent !important; color: var(--ss-text-secondary) !important; font-size: 12px !important; transition: var(--ss-transition) !important;
+            margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; -webkit-appearance: none !important; appearance: none !important;
         }
-        .ss-view-toggle button.active { background: var(--ss-surface); color: var(--ss-primary); font-weight: 600; box-shadow: var(--ss-shadow-sm); }
+        .ss-view-toggle button svg { width: 14px !important; height: 14px !important; display: block !important; }
+        .ss-view-toggle button.active { background: var(--ss-surface) !important; color: var(--ss-primary) !important; font-weight: 600 !important; box-shadow: var(--ss-shadow-sm) !important; }
 
         /* ========== 操作栏 ========== */
         .ss-action-bar {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 20px; background: var(--ss-surface); border-bottom: 1px solid var(--ss-border);
+            display: flex !important; justify-content: space-between !important; align-items: center !important;
+            padding: 8px 16px !important; background: var(--ss-surface) !important; border-bottom: 1px solid var(--ss-border) !important;
+            flex-shrink: 0 !important; margin: 0 !important; width: 100% !important; gap: 8px !important;
         }
-        .ss-select-all-control { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ss-text-secondary); cursor: pointer; }
-        .ss-select-all-control input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--ss-primary); }
-        .ss-action-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+        .ss-select-all-control { display: flex !important; align-items: center !important; gap: 8px !important; font-size: 14px !important; color: var(--ss-text-secondary) !important; cursor: pointer !important; margin: 0 !important; padding: 0 !important; flex-shrink: 0 !important; }
+        .ss-select-all-control input {
+            width: 18px !important; height: 18px !important; cursor: pointer !important; accent-color: var(--ss-primary) !important;
+            margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important;
+        }
+        .ss-action-buttons { display: flex !important; gap: 8px !important; flex-wrap: wrap !important; margin: 0 !important; padding: 0 !important; }
         .ss-btn {
-            padding: 8px 16px; border: none; border-radius: var(--ss-radius); cursor: pointer;
-            font-weight: 600; font-size: 13px; transition: var(--ss-transition); display: flex; align-items: center; gap: 6px;
+            padding: 8px 14px !important; border: none !important; border-radius: var(--ss-radius) !important; cursor: pointer !important;
+            font-weight: 600 !important; font-size: 13px !important; transition: var(--ss-transition) !important;
+            display: flex !important; align-items: center !important; gap: 5px !important; margin: 0 !important;
+            -webkit-appearance: none !important; appearance: none !important; line-height: 1.4 !important; white-space: nowrap !important;
         }
-        .ss-btn svg { width: 15px; height: 15px; }
-        .ss-btn-primary { background: var(--ss-primary); color: #fff; }
-        .ss-btn-primary:hover { background: var(--ss-primary-dark); transform: translateY(-1px); box-shadow: var(--ss-shadow-md); }
-        .ss-btn-success { background: var(--ss-success); color: #fff; }
-        .ss-btn-success:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: var(--ss-shadow-md); }
-        .ss-btn-secondary { background: var(--ss-surface-alt); color: var(--ss-text); border: 1px solid var(--ss-border); }
-        .ss-btn-secondary:hover { background: var(--ss-surface-hover); border-color: var(--ss-primary); }
-        .ss-btn-danger { background: var(--ss-danger); color: #fff; }
-        .ss-btn-danger:hover { filter: brightness(1.1); }
+        .ss-btn svg { width: 14px !important; height: 14px !important; display: block !important; flex-shrink: 0 !important; }
+        .ss-btn-primary { background: var(--ss-primary) !important; color: #fff !important; }
+        .ss-btn-primary:hover { background: var(--ss-primary-dark) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
+        .ss-btn-success { background: var(--ss-success) !important; color: #fff !important; }
+        .ss-btn-success:hover { filter: brightness(1.1) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
+        .ss-btn-secondary { background: var(--ss-surface-alt) !important; color: var(--ss-text) !important; border: 1px solid var(--ss-border) !important; }
+        .ss-btn-secondary:hover { background: var(--ss-surface-hover) !important; border-color: var(--ss-primary) !important; }
+        .ss-btn-danger { background: var(--ss-danger) !important; color: #fff !important; }
+        .ss-btn-danger:hover { filter: brightness(1.1) !important; }
 
         /* ========== 统计栏 ========== */
         .ss-stats {
-            display: flex; gap: 16px; padding: 8px 20px; background: var(--ss-surface-alt);
-            border-bottom: 1px solid var(--ss-border); font-size: 12px; color: var(--ss-text-secondary);
+            display: flex !important; gap: 16px !important; padding: 6px 16px !important; background: var(--ss-surface-alt) !important;
+            border-bottom: 1px solid var(--ss-border) !important; font-size: 12px !important; color: var(--ss-text-secondary) !important;
+            flex-shrink: 0 !important; margin: 0 !important; width: 100% !important;
         }
-        .ss-stat-item { display: flex; align-items: center; gap: 4px; }
-        .ss-stat-item strong { color: var(--ss-primary); font-size: 14px; }
+        .ss-stat-item { display: flex !important; align-items: center !important; gap: 4px !important; margin: 0 !important; padding: 0 !important; }
+        .ss-stat-item strong { color: var(--ss-primary) !important; font-size: 14px !important; font-weight: 700 !important; }
 
         /* ========== 内容区 ========== */
-        .ss-modal-content { padding: 16px 20px; overflow-y: auto; max-height: calc(85vh - 240px); }
+        .ss-modal-content { padding: 12px 16px !important; overflow-y: auto !important; flex: 1 1 auto !important; min-height: 100px !important; max-height: 50vh !important; margin: 0 !important; width: 100% !important; }
         .ss-modal-content::-webkit-scrollbar { width: 6px; }
         .ss-modal-content::-webkit-scrollbar-track { background: transparent; }
         .ss-modal-content::-webkit-scrollbar-thumb { background: var(--ss-border); border-radius: 3px; }
         .ss-modal-content::-webkit-scrollbar-thumb:hover { background: var(--ss-text-muted); }
 
         /* ========== 列表视图 ========== */
-        .ss-svg-list { display: flex; flex-direction: column; gap: 8px; }
+        .ss-svg-list { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; padding: 0 !important; list-style: none !important; }
         .ss-svg-item {
-            display: flex; align-items: center; padding: 12px; border: 1px solid var(--ss-border);
-            border-radius: var(--ss-radius); transition: var(--ss-transition); gap: 12px;
-            background: var(--ss-surface);
+            display: flex !important; align-items: center !important; padding: 10px !important; border: 1px solid var(--ss-border) !important;
+            border-radius: var(--ss-radius) !important; transition: var(--ss-transition) !important; gap: 10px !important;
+            background: var(--ss-surface) !important; margin: 0 !important; width: 100% !important;
         }
-        .ss-svg-item:hover { background: var(--ss-surface-hover); border-color: var(--ss-primary-light); box-shadow: var(--ss-shadow-sm); }
-        .ss-svg-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: var(--ss-primary); flex-shrink: 0; }
+        .ss-svg-item:hover { background: var(--ss-surface-hover) !important; border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-sm) !important; }
+        .ss-svg-checkbox {
+            width: 18px !important; height: 18px !important; cursor: pointer !important; accent-color: var(--ss-primary) !important; flex-shrink: 0 !important;
+            margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important;
+        }
 
         /* ========== 预览尺寸 ========== */
-        .ss-preview { display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--ss-surface-alt); border: 1px solid var(--ss-border); flex-shrink: 0; }
-        .ss-preview[data-size="small"] { width: 36px; height: 36px; }
-        .ss-preview[data-size="medium"] { width: 50px; height: 50px; }
-        .ss-preview[data-size="large"] { width: 72px; height: 72px; }
-        .ss-preview svg { max-width: 85%; max-height: 85%; }
-        .ss-preview[data-size="large"] svg { max-width: 90%; max-height: 90%; }
+        .ss-preview { display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 8px !important; background: var(--ss-surface-alt) !important; border: 1px solid var(--ss-border) !important; flex-shrink: 0 !important; margin: 0 !important; overflow: hidden !important; }
+        .ss-preview[data-size="small"] { width: 36px !important; height: 36px !important; }
+        .ss-preview[data-size="medium"] { width: 50px !important; height: 50px !important; }
+        .ss-preview[data-size="large"] { width: 72px !important; height: 72px !important; }
+        .ss-preview svg { max-width: 85% !important; max-height: 85% !important; display: block !important; }
+        .ss-preview[data-size="large"] svg { max-width: 90% !important; max-height: 90% !important; display: block !important; }
 
-        .ss-svg-info { flex-grow: 1; min-width: 0; }
-        .ss-svg-name { font-size: 14px; color: var(--ss-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .ss-svg-meta { font-size: 11px; color: var(--ss-text-muted); margin-top: 2px; display: flex; gap: 8px; }
-        .ss-svg-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
-        .ss-svg-tag-size { background: var(--ss-primary-bg); color: var(--ss-primary); }
-        .ss-svg-tag-dim { background: var(--ss-success-bg); color: var(--ss-success); }
+        .ss-svg-info { flex-grow: 1 !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
+        .ss-svg-name { font-size: 14px !important; color: var(--ss-text) !important; font-weight: 500 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; margin: 0 !important; padding: 0 !important; line-height: 1.4 !important; }
+        .ss-svg-meta { font-size: 11px !important; color: var(--ss-text-muted) !important; margin-top: 2px !important; display: flex !important; gap: 6px !important; padding: 0 !important; }
+        .ss-svg-tag { display: inline-block !important; padding: 1px 6px !important; border-radius: 4px !important; font-size: 10px !important; font-weight: 600 !important; margin: 0 !important; }
+        .ss-svg-tag-size { background: var(--ss-primary-bg) !important; color: var(--ss-primary) !important; }
+        .ss-svg-tag-dim { background: var(--ss-success-bg) !important; color: var(--ss-success) !important; }
 
-        .ss-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .ss-item-actions { display: flex !important; gap: 4px !important; flex-shrink: 0 !important; margin: 0 !important; padding: 0 !important; }
         .ss-item-btn {
-            width: 30px; height: 30px; border: 1px solid var(--ss-border); border-radius: 7px;
-            background: var(--ss-surface); cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: var(--ss-transition); color: var(--ss-text-secondary);
+            width: 28px !important; height: 28px !important; border: 1px solid var(--ss-border) !important; border-radius: 7px !important;
+            background: var(--ss-surface) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important;
+            transition: var(--ss-transition) !important; color: var(--ss-text-secondary) !important; padding: 0 !important; margin: 0 !important;
+            -webkit-appearance: none !important; appearance: none !important; flex-shrink: 0 !important;
         }
-        .ss-item-btn:hover { background: var(--ss-primary); color: #fff; border-color: var(--ss-primary); }
-        .ss-item-btn svg { width: 14px; height: 14px; }
+        .ss-item-btn:hover { background: var(--ss-primary) !important; color: #fff !important; border-color: var(--ss-primary) !important; }
+        .ss-item-btn svg { width: 14px !important; height: 14px !important; display: block !important; }
 
         /* ========== 网格视图 ========== */
-        .ss-svg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+        .ss-svg-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important; gap: 10px !important; margin: 0 !important; padding: 0 !important; list-style: none !important; }
         .ss-grid-card {
-            border: 1px solid var(--ss-border); border-radius: var(--ss-radius); padding: 10px;
-            background: var(--ss-surface); transition: var(--ss-transition); cursor: pointer; position: relative;
+            border: 1px solid var(--ss-border) !important; border-radius: var(--ss-radius) !important; padding: 8px !important;
+            background: var(--ss-surface) !important; transition: var(--ss-transition) !important; cursor: pointer !important; position: relative !important; margin: 0 !important;
         }
-        .ss-grid-card:hover { border-color: var(--ss-primary-light); box-shadow: var(--ss-shadow-md); transform: translateY(-2px); }
+        .ss-grid-card:hover { border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-md) !important; transform: translateY(-2px) !important; }
         .ss-grid-card .ss-grid-preview {
-            width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-            background: var(--ss-surface-alt); border-radius: 8px; margin-bottom: 8px;
+            width: 100% !important; aspect-ratio: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important;
+            background: var(--ss-surface-alt) !important; border-radius: 8px !important; margin-bottom: 6px !important; overflow: hidden !important;
         }
-        .ss-grid-card .ss-grid-preview svg { max-width: 80%; max-height: 80%; }
-        .ss-grid-card .ss-grid-name { font-size: 12px; color: var(--ss-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-        .ss-grid-card .ss-grid-meta { font-size: 10px; color: var(--ss-text-muted); margin-top: 2px; }
-        .ss-grid-card .ss-grid-checkbox { position: absolute; top: 6px; left: 6px; width: 16px; height: 16px; accent-color: var(--ss-primary); }
-        .ss-grid-card .ss-grid-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 3px; opacity: 0; transition: var(--ss-transition); }
-        .ss-grid-card:hover .ss-grid-actions { opacity: 1; }
-        .ss-grid-card .ss-item-btn { width: 26px; height: 26px; }
+        .ss-grid-card .ss-grid-preview svg { max-width: 80% !important; max-height: 80% !important; display: block !important; }
+        .ss-grid-card .ss-grid-name { font-size: 12px !important; color: var(--ss-text) !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-weight: 500 !important; margin: 0 !important; padding: 0 !important; }
+        .ss-grid-card .ss-grid-meta { font-size: 10px !important; color: var(--ss-text-muted) !important; margin-top: 2px !important; padding: 0 !important; }
+        .ss-grid-card .ss-grid-checkbox { position: absolute !important; top: 4px !important; left: 4px !important; width: 16px !important; height: 16px !important; accent-color: var(--ss-primary) !important; z-index: 1 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; }
+        .ss-grid-card .ss-grid-actions { position: absolute !important; top: 4px !important; right: 4px !important; display: flex !important; gap: 3px !important; opacity: 0 !important; transition: var(--ss-transition) !important; margin: 0 !important; padding: 0 !important; }
+        .ss-grid-card:hover .ss-grid-actions { opacity: 1 !important; }
+        .ss-grid-card .ss-item-btn { width: 24px !important; height: 24px !important; }
 
         /* ========== 下拉菜单 ========== */
         .ss-dropdown {
-            position: absolute; bottom: 100%; right: 0; margin-bottom: 4px;
-            background: var(--ss-surface); border: 1px solid var(--ss-border); border-radius: var(--ss-radius);
-            box-shadow: var(--ss-shadow-lg); z-index: 10; overflow: hidden; min-width: 160px;
-            display: none; animation: ss-scaleIn .15s ease;
+            position: absolute !important; bottom: 100% !important; right: 0 !important; margin-bottom: 4px !important;
+            background: var(--ss-surface) !important; border: 1px solid var(--ss-border) !important; border-radius: var(--ss-radius) !important;
+            box-shadow: var(--ss-shadow-lg) !important; z-index: 10 !important; overflow: hidden !important; min-width: 160px !important;
+            display: none !important; animation: ss-scaleIn .15s ease !important; padding: 0 !important;
         }
-        .ss-dropdown.show { display: block; }
+        .ss-dropdown.show { display: block !important; }
         .ss-dropdown-item {
-            display: flex; align-items: center; gap: 8px; padding: 8px 14px; cursor: pointer;
-            font-size: 13px; color: var(--ss-text); transition: var(--ss-transition); white-space: nowrap;
+            display: flex !important; align-items: center !important; gap: 8px !important; padding: 8px 14px !important; cursor: pointer !important;
+            font-size: 13px !important; color: var(--ss-text) !important; transition: var(--ss-transition) !important; white-space: nowrap !important; margin: 0 !important;
         }
-        .ss-dropdown-item:hover { background: var(--ss-surface-hover); color: var(--ss-primary); }
-        .ss-dropdown-item svg { width: 14px; height: 14px; }
-        .ss-dropdown-divider { height: 1px; background: var(--ss-border); margin: 2px 0; }
+        .ss-dropdown-item:hover { background: var(--ss-surface-hover) !important; color: var(--ss-primary) !important; }
+        .ss-dropdown-item svg { width: 14px !important; height: 14px !important; display: block !important; flex-shrink: 0 !important; }
+        .ss-dropdown-divider { height: 1px !important; background: var(--ss-border) !important; margin: 2px 0 !important; padding: 0 !important; }
 
         /* ========== 空状态/加载 ========== */
         .ss-empty, .ss-loading {
-            text-align: center; padding: 48px 20px; color: var(--ss-text-muted); font-size: 15px;
+            text-align: center !important; padding: 40px 20px !important; color: var(--ss-text-muted) !important; font-size: 15px !important; margin: 0 !important;
         }
-        .ss-loading svg { width: 32px; height: 32px; animation: ss-spin 1s linear infinite; margin-bottom: 12px; }
+        .ss-loading svg { width: 32px !important; height: 32px !important; animation: ss-spin 1s linear infinite !important; margin-bottom: 12px !important; display: inline-block !important; }
 
         /* ========== Toast 通知 ========== */
         .ss-toast-container {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 100001; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none;
+            position: fixed !important; top: 20px !important; left: 50% !important; transform: translateX(-50%) !important;
+            z-index: 1000001 !important; display: flex !important; flex-direction: column !important; gap: 8px !important; align-items: center !important; pointer-events: none !important;
+            margin: 0 !important; padding: 0 !important;
         }
         .ss-toast {
-            padding: 10px 20px; border-radius: var(--ss-radius); color: #fff; font-size: 14px; font-weight: 500;
-            box-shadow: var(--ss-shadow-lg); display: flex; align-items: center; gap: 8px;
-            animation: ss-slideDown .3s ease, ss-fadeOut .4s ease 2.6s forwards; max-width: 400px;
+            padding: 10px 20px !important; border-radius: var(--ss-radius) !important; color: #fff !important; font-size: 14px !important; font-weight: 500 !important;
+            box-shadow: var(--ss-shadow-lg) !important; display: flex !important; align-items: center !important; gap: 8px !important;
+            animation: ss-slideDown .3s ease, ss-fadeOut .4s ease 2.6s forwards !important; max-width: 90vw !important; margin: 0 !important;
         }
-        .ss-toast.success { background: var(--ss-success); }
-        .ss-toast.error { background: var(--ss-danger); }
-        .ss-toast.warning { background: var(--ss-warning); }
-        .ss-toast.info { background: var(--ss-primary); }
+        .ss-toast.success { background: var(--ss-success) !important; }
+        .ss-toast.error { background: var(--ss-danger) !important; }
+        .ss-toast.warning { background: var(--ss-warning) !important; }
+        .ss-toast.info { background: var(--ss-primary) !important; }
 
         /* ========== 动画 ========== */
         @keyframes ss-scan { to { transform: rotate(360deg); } }
