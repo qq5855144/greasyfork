@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.6
+// @version      v2.1.7
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -108,11 +108,12 @@ const githubEnhancer = {
             }
             
             .github-tags-container {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                margin-top: 4px;
-                gap: 4px;
+                display: flex !important;
+                flex-wrap: wrap !important;
+                align-items: center !important;
+                margin-top: 6px !important;
+                margin-bottom: 4px !important;
+                gap: 6px !important;
                 animation: fadeInUp 0.3s ease-out;
             }
             
@@ -376,42 +377,62 @@ const githubEnhancer = {
     },
 
     findBestPosition(repoItem) {
+        const createContainer = () => {
+            const container = document.createElement('div');
+            container.className = 'github-tags-container';
+            return container;
+        };
+
         const positions = [
+            // 1st: GitHub CSS Modules — description content block (stable prefix)
             () => {
-                const description = repoItem.querySelector('[class*="description"], .jsbtiO');
-                if (description) {
-                    const container = document.createElement('div');
-                    container.className = 'github-tags-container';
+                const description = repoItem.querySelector('[class*="Content-module__Content__"]');
+                if (description && description.textContent.trim()) {
+                    const container = createContainer();
                     description.parentNode.insertBefore(container, description.nextSibling);
                     return container;
                 }
                 return null;
             },
+            // 2nd: Structural fallback — description is the <div> right after <h3>
             () => {
-                const metadata = repoItem.querySelector('[class*="metadata"], .dmuROe, .gbntE');
-                if (metadata) {
-                    const container = document.createElement('div');
-                    container.className = 'github-tags-container';
-                    metadata.appendChild(container);
+                const h3 = repoItem.querySelector('h3');
+                if (h3 && h3.nextElementSibling && h3.nextElementSibling.tagName === 'DIV') {
+                    const desc = h3.nextElementSibling;
+                    if (desc.textContent.trim()) {
+                        const container = createContainer();
+                        desc.parentNode.insertBefore(container, desc.nextSibling);
+                        return container;
+                    }
+                }
+                return null;
+            },
+            // 3rd: Legacy description selectors (older GitHub layouts or other pages)
+            () => {
+                const description = repoItem.querySelector('[class*="description"], .jsbtiO, [class*="repo-description"]');
+                if (description) {
+                    const container = createContainer();
+                    description.parentNode.insertBefore(container, description.nextSibling);
                     return container;
                 }
                 return null;
             },
+            // 4th: Footer/metadata area (stars, language, updated time)
             () => {
-                const container = document.createElement('div');
-                container.className = 'github-tags-container';
-                repoItem.appendChild(container);
+                const footer = repoItem.querySelector('[class*="Footer-module__footer__"], [class*="metadata"], .dmuROe, .gbntE');
+                if (footer) {
+                    const container = createContainer();
+                    footer.parentNode.insertBefore(container, footer);
+                    return container;
+                }
+                return null;
+            },
+            // 5th: Fallback — append to result content column
+            () => {
+                const contentCol = repoItem.querySelector('[class*="Repositories-module__resultContent__"]') || repoItem;
+                const container = createContainer();
+                contentCol.appendChild(container);
                 return container;
-            },
-            () => {
-                const repoLink = repoItem.querySelector('a[href*="/"][href*="/"]:first-child');
-                if (repoLink && repoLink.parentNode) {
-                    const container = document.createElement('div');
-                    container.className = 'github-tags-container';
-                    repoLink.parentNode.insertBefore(container, repoLink.nextSibling);
-                    return container;
-                }
-                return null;
             }
         ];
 
@@ -487,6 +508,8 @@ const githubEnhancer = {
 
     findRepoItems() {
         const selectors = [
+            '[data-testid="results-list"] [class*="Result-module__Result__"]',
+            '[class*="Result-module__Result__"]',
             '.fXzjPH',
             '[data-testid="repository-card"]',
             '.Box-row',
