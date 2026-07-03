@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         网页图片采集器 Pro
 // @namespace    http://tampermonkey.net/
-// @version      v2.3
+// @version      v2.4
 // @description  支持动态加载、智能去重、大图预览的网页图片下载工具 | 七彩毛玻璃UI
 // @author       YourName
 // @match        *://*/*
@@ -9,7 +9,7 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_download
-// @icon         https://cdn-icons-png.flaticon.com/512/2107/2107957.png
+// @icon         data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTAyNCAxMDI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik01MTIgOTU1LjM0MDhjLTI0My43MTIgMC00NDIuMDA5Ni0xOTguMjk3Ni00NDIuMDA5Ni00NDIuMDA5NlMyNjguMjg4IDcxLjI3MDQgNTEyIDcxLjI3MDRzNDQyLjAwOTYgMTk4LjI5NzYgNDQyLjAwOTYgNDQyLjAwOTYtMTk4LjI5NzYgNDQyLjA2MDgtNDQyLjAwOTYgNDQyLjA2MDh6IG0wLTgwMi4xNTA0Yy0xOTguNTUzNiAwLTM2MC4wODk2IDE2MS41MzYtMzYwLjA4OTYgMzYwLjA4OTZzMTYxLjUzNiAzNjAuMDg5NiAzNjAuMDg5NiAzNjAuMDg5NiAzNjAuMDg5Ni0xNjEuNTM2IDM2MC4wODk2LTM2MC4wODk2UzcxMC41NTM2IDE1My4xOTA0IDUxMiAxNTMuMTkwNHoiIGZpbGw9IiM0Mzg1RjUiLz48cGF0aCBkPSJNNTEyIDUxMy4zMzEybS0yMTMuNjA2NCAwYTIxMy42MDY0IDIxMy42MDY0IDAgMSAwIDQyNy4yMTI4IDAgMjEzLjYwNjQgMjEzLjYwNjQgMCAxIDAtNDI3LjIxMjggMFoiIGZpbGw9IiNEOUZGRUMiLz48cGF0aCBkPSJNNDg2LjYwNDggNjg2Ljc0NTZjLTExMi41ODg4IDAtMjA0LjE4NTYtOTEuNTk2OC0yMDQuMTg1Ni0yMDQuMjM2OCAwLTExMi41ODg4IDkxLjU5NjgtMjA0LjE4NTYgMjA0LjE4NTYtMjA0LjE4NTYgMTEyLjU4ODggMCAyMDQuMjM2OCA5MS41OTY4IDIwNC4yMzY4IDIwNC4xODU2LTAuMDUxMiAxMTIuNjQtOTEuNjQ4IDIwNC4yMzY4LTIwNC4yMzY4IDIwNC4yMzY4eiBtMC0zMzEuNjIyNGMtNzAuMjQ2NCAwLTEyNy4zODU2IDU3LjEzOTItMTI3LjM4NTYgMTI3LjM4NTZzNTcuMTM5MiAxMjcuNDM2OCAxMjcuMzg1NiAxMjcuNDM2OCAxMjcuNDM2OC01Ny4xMzkyIDEyNy40MzY4LTEyNy40MzY4LTU3LjE5MDQtMTI3LjM4NTYtMTI3LjQzNjgtMTI3LjM4NTZ6IiBmaWxsPSIjMzRBODUzIi8+PHBhdGggZD0iTTcwMy4yMzIgNzMzLjY0NDhhMzguMjk3NiAzOC4yOTc2IDAgMCAxLTI3LjU0NTYtMTEuNjIyNGwtODYuNDc2OC04OC45MzQ0Yy0xNC43OTY4LTE1LjIwNjQtMTQuNDM4NC0zOS41MjY0IDAuNzY4LTU0LjMyMzIgMTUuMjA2NC0xNC43OTY4IDM5LjUyNjQtMTQuNDM4NCA1NC4zMjMyIDAuNzY4bDg2LjQ3NjggODguOTM0NGMxNC43OTY4IDE1LjIwNjQgMTQuNDM4NCAzOS41MjY0LTAuNzY4IDU0LjMyMzJhMzguNTA3NTIgMzguNTA3NTIgMCAwIDEtMjYuNzc3NiAxMC44NTQ0eiIgZmlsbD0iIzM0QTg1MyIvPjwvc3ZnPg==
 // @license      MIT
 // ==/UserScript==
 
@@ -1756,14 +1756,11 @@
                         this._saveAs(blob, completedFileName);
                         successCount++;
                     } else {
-                        await new Promise((resolve, reject) => {
-                            GM_download({
-                                url: imgItem.url,
-                                name: completedFileName,
-                                onload: () => { successCount++; resolve(); },
-                                onerror: (e) => { console.error('下载失败:', completedFileName, e); resolve(); }
-                            });
-                        });
+                        const response = await fetch(imgItem.url);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        const blob = await response.blob();
+                        this._saveAs(blob, completedFileName);
+                        successCount++;
                     }
                     // 批量下载间隔，避免浏览器阻止
                     if (i < selectedItems.length - 1) {
@@ -2007,40 +2004,41 @@
             const completedFileName = Utils.completeImageSuffix(imgItem.originalName || imgItem.name, imgItem.originalFormat);
             title.textContent = completedFileName;
 
-            // 保留导航按钮，只替换加载内容
-            const loadingEl = content.querySelector('.loading');
-            if (!loadingEl) {
-                const existingLoading = document.createElement('div');
-                existingLoading.className = 'loading';
-                // 清除除了 nav 按钮和 counter 之外的内容
+            // 找到或创建图片展示容器
+            let imgWrapper = content.querySelector('.preview-img-wrapper');
+            if (!imgWrapper) {
+                imgWrapper = document.createElement('div');
+                imgWrapper.className = 'preview-img-wrapper';
+                imgWrapper.style.cssText = 'max-width:100%;max-height:100%;display:flex;align-items:center;justify-content:center;z-index:2;position:relative;';
+                // 插入到 nav prev 按钮之前
                 const navPrev = content.querySelector('.preview-nav.prev');
-                const navNext = content.querySelector('.preview-nav.next');
-                const counter = content.querySelector('.preview-counter');
-                content.innerHTML = '';
-                content.appendChild(existingLoading);
-                content.appendChild(navPrev);
-                content.appendChild(navNext);
-                content.appendChild(counter);
+                content.insertBefore(imgWrapper, navPrev);
             }
+
+            // 清理旧图片
+            imgWrapper.innerHTML = '<div class="loading">加载中...</div>';
 
             this.modal.style.display = 'flex';
             this.updateNavButtons();
 
-            let previewContent = '';
+            // 渲染图片
             if (imgItem.format === 'svg' && imgItem.svgContent) {
                 const processedSvg = SVGProcessor.processForPreview(imgItem.svgContent);
-                previewContent = `<div class="preview-svg">${processedSvg}</div>`;
+                imgWrapper.innerHTML = `<div class="preview-svg">${processedSvg}</div>`;
             } else {
-                previewContent = `<img class="preview-image" src="${imgItem.url}" alt="${completedFileName}" onload="this.style.opacity='1'" style="opacity:0;transition:opacity 0.3s">`;
+                const img = document.createElement('img');
+                img.className = 'preview-image';
+                img.src = imgItem.url;
+                img.alt = completedFileName;
+                img.style.opacity = '0';
+                img.style.transition = 'opacity 0.3s';
+                img.onload = () => { img.style.opacity = '1'; };
+                img.onerror = () => {
+                    imgWrapper.innerHTML = '<div class="loading" style="color:#fff;">图片加载失败</div>';
+                };
+                imgWrapper.innerHTML = '';
+                imgWrapper.appendChild(img);
             }
-
-            const loadingEl2 = content.querySelector('.loading');
-            if (loadingEl2) loadingEl2.remove();
-            const insertBefore = content.querySelector('.preview-nav.prev');
-            const wrapper = document.createElement('div');
-            wrapper.innerHTML = previewContent;
-            const previewEl = wrapper.firstElementChild;
-            content.insertBefore(previewEl, insertBefore);
 
             this.escapeHandler = (e) => {
                 if (e.key === 'Escape') this.hide();
