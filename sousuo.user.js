@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.5
+// @version      v2.1.6
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -3342,10 +3342,10 @@ const domHandler = {
             }
             .pk-panel-title svg { flex-shrink: 0; }
             .pk-search-input {
-                width: 100%; padding: 11px 18px; box-sizing: border-box; background: var(--pk-surface-alt);
-                border-radius: var(--pk-radius); font-size: 15px; color: var(--pk-text); outline: none;
-                border: 2px solid transparent; margin-bottom: 14px; -webkit-appearance: none; font-weight: 500; transition: all .3s ease;
-                box-shadow: var(--pk-shadow-sm);
+                width: 100% !important; padding: 11px 18px !important; box-sizing: border-box !important; background: var(--pk-surface-alt) !important;
+                border-radius: var(--pk-radius) !important; font-size: 15px !important; color: var(--pk-text) !important; outline: none !important;
+                border: 2px solid transparent !important; margin-bottom: 14px !important; -webkit-appearance: none !important; appearance: none !important; font-weight: 500 !important; transition: all .3s ease !important;
+                box-shadow: var(--pk-shadow-sm) !important; visibility: visible !important; opacity: 1 !important; display: block !important;
             }
             .pk-search-input:focus { border-color: var(--pk-primary); box-shadow: 0 0 0 3px rgba(99,102,241,.12), var(--pk-shadow); }
             .pk-search-input::placeholder { color: var(--pk-text-muted); }
@@ -3435,7 +3435,14 @@ const domHandler = {
             }
             .pk-engine-card:hover { transform: translateY(-2px); box-shadow: var(--pk-shadow-lg); border-color: var(--pk-primary-light); }
             .pk-engine-card.pk-active { border-color: var(--pk-success); background: var(--pk-gradient-soft); }
-            .pk-engine-card input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); accent-color: var(--pk-primary); cursor: pointer; flex-shrink: 0; }
+            .pk-engine-card input[type="checkbox"] {
+                appearance: auto !important; -webkit-appearance: auto !important;
+                -moz-appearance: auto !important; width: 18px !important; height: 18px !important;
+                margin: 0 10px 0 0 !important; transform: scale(1.2) !important;
+                accent-color: var(--pk-primary) !important; cursor: pointer !important;
+                flex-shrink: 0 !important; visibility: visible !important; opacity: 1 !important;
+                display: inline-block !important; box-sizing: content-box !important;
+            }
             .pk-engine-icon { width: 36px; height: 24px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-right: 10px; border: 1px solid var(--pk-border); border-radius: 5px; flex-shrink: 0; }
             .pk-engine-info { flex-grow: 1; min-width: 0; overflow: hidden; }
             .pk-engine-name { font-weight: 700; color: var(--pk-text); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
@@ -3451,8 +3458,13 @@ const domHandler = {
             @media (max-width: 600px) { .pk-form-grid { grid-template-columns: 1fr; } }
             .pk-field-full { grid-column: 1 / -1; }
             .pk-field label { display: block; margin-bottom: 6px; font-weight: 600; color: var(--pk-text-secondary); font-size: 13px; }
-            .pk-field input, .pk-field select { width: 100%; padding: 12px 14px; border: 2px solid var(--pk-border); border-radius: 10px; font-size: 14px; color: var(--pk-text); background: var(--pk-surface); box-sizing: border-box; transition: all .25s ease; }
-            .pk-field input:focus, .pk-field select:focus { outline: none; border-color: var(--pk-primary); box-shadow: 0 0 0 4px rgba(99,102,241,.12); }
+            .pk-field input, .pk-field select {
+                width: 100% !important; padding: 12px 14px !important; border: 2px solid var(--pk-border) !important;
+                border-radius: 10px !important; font-size: 14px !important; color: var(--pk-text) !important;
+                background: var(--pk-surface) !important; box-sizing: border-box !important; transition: all .25s ease !important;
+                -webkit-appearance: none !important; appearance: none !important; visibility: visible !important; opacity: 1 !important;
+            }
+            .pk-field input:focus, .pk-field select:focus { outline: none !important; border-color: var(--pk-primary) !important; box-shadow: 0 0 0 4px rgba(99,102,241,.12) !important; }
             .pk-icon-grid { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 12px; align-items: end; }
             @media (max-width: 600px) { .pk-icon-grid { grid-template-columns: 1fr; } }
             .pk-preview-btn { width: 100%; padding: 12px; background: var(--pk-primary); color: #fff; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 14px; transition: all .25s ease; }
