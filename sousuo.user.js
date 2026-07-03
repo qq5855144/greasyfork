@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.0.0
+// @version      v2.1.0
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -2906,7 +2906,7 @@ const accessibility = {
                 if (appState.searchOverlayVisible) searchOverlay.hideSearchOverlay();
                 if (appState.hamburgerMenuOpen) hamburgerMenu.hideHamburgerMenu();
                 const panel = document.getElementById(CLASS_NAMES.MANAGEMENT_PANEL);
-                if (panel && panel.style.display === 'block') managementPanel.closeManagementPanel();
+                if (panel && panel.style.display === 'flex') managementPanel.closeManagementPanel();
             }
             if (e.altKey && e.key === 'm') {
                 e.preventDefault();
@@ -3231,107 +3231,232 @@ const domHandler = {
         const cssNode = document.createElement("style");
         cssNode.id = `${CLASS_NAMES.ENGINE_CONTAINER}-style`;
         cssNode.textContent = `
+            /* ========== 引擎栏样式 ========== */
             .${CLASS_NAMES.ENGINE_CONTAINER} {
-                display: flex;
-                position: fixed;
-                bottom: 0px;
-                left: 2%;
-                width: 96%;
-                height: 36px;
-                overflow: hidden;
-                justify-content: center;
-                align-items: center;
-                z-index: 1000;
-                background-color: rgba(255, 255, 255, 0);
-                margin-top: 1px;
-                transition: all 0.3s ease;
-                transform: translateY(0);
-                opacity: 1;
-                overflow-y: hidden;
-                overflow-x: visible;
+                display: flex; position: fixed; bottom: 0; left: 2%; width: 96%;
+                height: 36px; overflow: hidden; justify-content: center; align-items: center;
+                z-index: 1000; background-color: rgba(255,255,255,0); margin-top: 1px;
+                transition: all .3s ease; transform: translateY(0); opacity: 1;
+                overflow-y: hidden; overflow-x: visible;
             }
-            .${CLASS_NAMES.ENGINE_CONTAINER}.hidden {
-                transform: translateY(100%);
-                opacity: 0;
-            }
+            .${CLASS_NAMES.ENGINE_CONTAINER}.hidden { transform: translateY(100%); opacity: 0; }
             .${CLASS_NAMES.ENGINE_DISPLAY} {
-                display: flex;
-                overflow-x: auto;
-                overflow-y: hidden;
-                white-space: nowrap;
-                height: 100%;
-                gap: 0px;
-                flex-grow: 1;
-                scrollbar-width: none;
-                -ms-overflow-style: none;
+                display: flex; overflow-x: auto; overflow-y: hidden; white-space: nowrap;
+                height: 100%; gap: 0; flex-grow: 1; scrollbar-width: none; -ms-overflow-style: none;
             }
-            .${CLASS_NAMES.ENGINE_DISPLAY}::-webkit-scrollbar {
-                display: none;
-            }
+            .${CLASS_NAMES.ENGINE_DISPLAY}::-webkit-scrollbar { display: none; }
             .${CLASS_NAMES.ENGINE_BUTTON} {
-                width: 55.5px;
-                height: 32px;
-                padding: 0;
-                border: 1px solid #f0f0f0;
-                border-radius: 8px;
-                background-color: rgba(255, 255, 255, 1);
-                color: transparent;
-                font-size: 14px;
-                cursor: pointer;
-                margin: 2px;
-                background-size: contain;
-                background-repeat: no-repeat;
-                background-position: center;
-                backdrop-filter: blur(5px);
-                box-shadow: 
-                    1px 1px 1px rgba(0, 0, 0, 0.1),
-                    0px 0px 0px rgba(255, 255, 255, 0.5),
-                    6px 6px 10px rgba(0, 0, 0, 0.1) inset,
-                    -6px -6px 10px rgba(255, 255, 255, 0) inset;
-                transition: all 0.3s ease;
-                flex-shrink: 0;
-                overflow: hidden;
+                width: 55.5px; height: 32px; padding: 0; border: 1px solid #f0f0f0;
+                border-radius: 8px; background-color: rgba(255,255,255,1); color: transparent;
+                font-size: 14px; cursor: pointer; margin: 2px; background-size: contain;
+                background-repeat: no-repeat; background-position: center; backdrop-filter: blur(5px);
+                box-shadow: 1px 1px 1px rgba(0,0,0,.1), 0 0 0 rgba(255,255,255,.5),
+                    6px 6px 10px rgba(0,0,0,.1) inset, -6px -6px 10px rgba(255,255,255,0) inset;
+                transition: all .3s ease; flex-shrink: 0; overflow: hidden;
             }
-            .${CLASS_NAMES.ENGINE_BUTTON}:focus {
-                border: 2px dashed #2196F3;
-                background-color: #f0f8ff;
-            }
-            .${CLASS_NAMES.ENGINE_BUTTON}.selected {
-                border: 2px dashed #2196F3;
-                background-color: #f0f8ff;
-            }
-            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAGGING} {
-                opacity: 0.5;
-                transform: rotate(5deg);
-            }
+            .${CLASS_NAMES.ENGINE_BUTTON}:focus, .${CLASS_NAMES.ENGINE_BUTTON}.selected,
             .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAG_OVER} {
-                border: 2px dashed #2196F3;
-                background-color: #f0f8ff;
+                border: 2px dashed #2196F3; background-color: #f0f8ff;
             }
-            .${CLASS_NAMES.ENGINE_CARD} {
-                transition: all 0.3s ease;
+            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAGGING} { opacity: .5; transform: rotate(5deg); }
+            .${CLASS_NAMES.ENGINE_CARD} { transition: all .3s ease; }
+
+            /* ========== 动画 ========== */
+            @keyframes slideIn { from { opacity: 0; transform: translate(-50%,-48%); } to { opacity: 1; transform: translate(-50%,-50%); } }
+            @keyframes slideInLeft { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes scaleIn { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
+            @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+            @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+            #${CLASS_NAMES.MANAGEMENT_PANEL} { animation: slideIn .35s cubic-bezier(.16,1,.3,1); }
+            #${CLASS_NAMES.HAMBURGER_MENU} { animation: slideInLeft .3s ease; }
+            #${CLASS_NAMES.SEARCH_OVERLAY} { animation: fadeIn .25s ease; }
+
+            /* ========== CSS 变量（亮色/暗色） ========== */
+            :root {
+                --pk-bg: #f0f2f5; --pk-surface: #ffffff; --pk-surface-alt: #f8f9fa;
+                --pk-text: #1a1a2e; --pk-text-secondary: #64748b; --pk-text-muted: #94a3b8;
+                --pk-border: #e2e8f0; --pk-border-light: #f1f5f9;
+                --pk-primary: #6366f1; --pk-primary-light: #818cf8; --pk-primary-dark: #4f46e5;
+                --pk-accent: #ec4899; --pk-success: #10b981; --pk-danger: #ef4444; --pk-warning: #f59e0b;
+                --pk-shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+                --pk-shadow: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
+                --pk-shadow-lg: 0 10px 30px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+                --pk-shadow-xl: 0 20px 50px -10px rgba(0,0,0,.15), 0 8px 16px -4px rgba(0,0,0,.06);
+                --pk-radius: 12px; --pk-radius-lg: 16px; --pk-radius-xl: 24px;
+                --pk-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+                --pk-gradient-soft: linear-gradient(135deg, rgba(99,102,241,.08), rgba(236,72,153,.08));
             }
-            #${CLASS_NAMES.MANAGEMENT_PANEL} {
-                animation: slideIn 0.3s ease;
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --pk-bg: #0f172a; --pk-surface: #1e293b; --pk-surface-alt: #334155;
+                    --pk-text: #f1f5f9; --pk-text-secondary: #cbd5e1; --pk-text-muted: #94a3b8;
+                    --pk-border: #334155; --pk-border-light: #1e293b;
+                    --pk-shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+                    --pk-shadow: 0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px -1px rgba(0,0,0,.3);
+                    --pk-shadow-lg: 0 10px 30px -3px rgba(0,0,0,.5), 0 4px 6px -2px rgba(0,0,0,.3);
+                    --pk-shadow-xl: 0 20px 50px -10px rgba(0,0,0,.6), 0 8px 16px -4px rgba(0,0,0,.4);
+                    --pk-gradient-soft: linear-gradient(135deg, rgba(99,102,241,.15), rgba(236,72,153,.15));
+                }
             }
-            #${CLASS_NAMES.HAMBURGER_MENU} {
-                animation: slideInLeft 0.3s ease;
-            }
+
+            /* ========== 搜索遮罩层 ========== */
             #${CLASS_NAMES.SEARCH_OVERLAY} {
-                animation: fadeIn 0.3s ease;
+                position: fixed; inset: 0; z-index: 9998; display: none;
+                background: rgba(15,23,42,.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             }
-            @keyframes slideIn {
-                from { opacity: 0; transform: translate(-50%, -48%); }
-                to { opacity: 1; transform: translate(-50%, -50%); }
+            .pk-overlay-scroll { width: 100%; height: 100%; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; display: flex; align-items: flex-start; justify-content: center; padding: 5vh 16px; box-sizing: border-box; }
+            .pk-search-card {
+                width: 100%; max-width: 860px; background: var(--pk-surface);
+                border-radius: var(--pk-radius-xl); padding: 32px 28px; box-shadow: var(--pk-shadow-xl);
+                border: 1px solid var(--pk-border); position: relative; box-sizing: border-box;
+                animation: scaleIn .35s cubic-bezier(.16,1,.3,1);
             }
-            @keyframes slideInLeft {
-                from { opacity: 0; transform: translateX(-10px); }
-                to { opacity: 1; transform: translateX(0); }
+            @media (max-width: 768px) { .pk-search-card { padding: 24px 18px; border-radius: var(--pk-radius-lg); max-width: 94%; } .pk-overlay-scroll { padding: 3vh 10px; } }
+            .pk-close-btn {
+                position: absolute; top: 16px; right: 16px; width: 36px; height: 36px;
+                border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+                background: var(--pk-surface-alt); color: var(--pk-text-secondary); z-index: 2;
+                transition: all .25s cubic-bezier(.4,0,.2,1); box-shadow: var(--pk-shadow-sm);
             }
-            @keyframes fadeIn {
-                from { opacity: 0; }
-                to { opacity: 1; }
+            .pk-close-btn:hover { background: var(--pk-danger); color: #fff; transform: scale(1.1) rotate(90deg); box-shadow: 0 8px 20px rgba(239,68,68,.3); }
+            .pk-panel-title {
+                margin: 0 0 24px 0; color: var(--pk-text); text-align: center;
+                font-size: clamp(20px, 4vw, 28px); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
             }
+            .pk-panel-title svg { flex-shrink: 0; }
+            .pk-search-input {
+                width: 100%; padding: 18px 24px; box-sizing: border-box; background: var(--pk-surface-alt);
+                border-radius: var(--pk-radius-lg); font-size: 18px; color: var(--pk-text); outline: none;
+                border: 2px solid transparent; margin-bottom: 24px; -webkit-appearance: none; font-weight: 500; transition: all .3s ease;
+                box-shadow: var(--pk-shadow-sm);
+            }
+            .pk-search-input:focus { border-color: var(--pk-primary); box-shadow: 0 0 0 4px rgba(99,102,241,.12), var(--pk-shadow); }
+            .pk-search-input::placeholder { color: var(--pk-text-muted); }
+            @media (max-width: 768px) { .pk-search-input { font-size: 16px; padding: 16px 20px; } }
+            .pk-quick-engines { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; justify-content: center; }
+            .pk-quick-engine-btn {
+                padding: 8px 16px; border: 1px solid var(--pk-border); border-radius: 20px;
+                background: var(--pk-surface-alt); color: var(--pk-text-secondary); font-size: 13px; font-weight: 500;
+                cursor: pointer; transition: all .25s ease; display: inline-flex; align-items: center; gap: 6px;
+            }
+            .pk-quick-engine-btn:hover { background: var(--pk-primary); color: #fff; border-color: var(--pk-primary); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,.25); }
+            .pk-quick-engine-btn svg { width: 16px; height: 16px; }
+            .pk-nav-section { margin-top: 8px; }
+            .pk-nav-title {
+                color: var(--pk-text); margin-bottom: 16px; font-size: clamp(16px, 3.5vw, 20px); font-weight: 700;
+                display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center; flex-wrap: wrap;
+                padding-bottom: 12px; border-bottom: 2px solid var(--pk-gradient); border-image: var(--pk-gradient) 1;
+            }
+            .pk-nav-filter { width: 100%; max-width: 400px; margin: 0 auto 20px; display: block; }
+            .pk-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 12px; }
+            @media (max-width: 480px) { .pk-categories { grid-template-columns: 1fr; gap: 12px; } }
+            @media (max-width: 768px) { .pk-categories { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; } }
+            .pk-category {
+                background: var(--pk-surface-alt); border-radius: var(--pk-radius); padding: 16px;
+                border: 1px solid var(--pk-border); transition: all .3s ease; break-inside: avoid;
+            }
+            .pk-category:hover { transform: translateY(-3px); box-shadow: var(--pk-shadow-lg); border-color: var(--pk-primary-light); }
+            .pk-category-title { margin: 0 0 12px 0; color: var(--pk-text); font-size: 14px; font-weight: 700; padding-bottom: 8px; border-bottom: 1px solid var(--pk-border); word-break: break-word; }
+            .pk-sites { display: flex; flex-wrap: wrap; gap: 6px; }
+            .pk-site-link {
+                display: inline-block; padding: 6px 12px; background: var(--pk-surface); border: 1px solid var(--pk-border);
+                border-radius: 8px; text-decoration: none; color: var(--pk-text-secondary); font-size: 12px; font-weight: 500;
+                transition: all .25s ease; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; flex-shrink: 0;
+            }
+            .pk-site-link:hover { background: var(--pk-gradient); color: #fff; border-color: transparent; transform: translateY(-2px) scale(1.05); box-shadow: 0 4px 12px rgba(99,102,241,.3); }
+            .pk-site-link:active { transform: translateY(0) scale(1); }
+
+            /* ========== 管理面板 ========== */
+            #${CLASS_NAMES.MANAGEMENT_PANEL} {
+                position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+                width: 92%; max-width: 860px; height: 90vh; max-height: 90vh;
+                background: var(--pk-surface); border-radius: var(--pk-radius-xl); box-shadow: var(--pk-shadow-xl);
+                z-index: 10000; display: none; overflow: hidden;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                flex-direction: column; box-sizing: border-box; border: 1px solid var(--pk-border);
+            }
+            @media (max-width: 768px) { #${CLASS_NAMES.MANAGEMENT_PANEL} { width: 96%; height: 94vh; border-radius: var(--pk-radius-lg); } }
+            .pk-panel-header {
+                background: var(--pk-gradient); color: #fff; padding: 24px 28px; position: relative;
+                box-sizing: border-box; flex-shrink: 0; overflow: hidden;
+            }
+            .pk-panel-header::before { content: ''; position: absolute; top: -50%; right: -20%; width: 300px; height: 300px; background: rgba(255,255,255,.08); border-radius: 50%; }
+            .pk-panel-header::after { content: ''; position: absolute; bottom: -30%; left: -10%; width: 200px; height: 200px; background: rgba(255,255,255,.05); border-radius: 50%; }
+            .pk-panel-header h2 { margin: 0; font-size: clamp(18px, 4vw, 24px); font-weight: 700; display: flex; align-items: center; gap: 10px; position: relative; z-index: 1; }
+            .pk-panel-header p { margin: 6px 0 0 0; opacity: .85; font-size: .85em; position: relative; z-index: 1; }
+            .pk-unsaved-indicator {
+                position: absolute; top: 16px; right: 24px; color: #fef3c7; font-size: .8em; font-weight: 600;
+                display: none; align-items: center; gap: 6px; z-index: 2; background: rgba(245,158,11,.2); padding: 4px 12px; border-radius: 20px; backdrop-filter: blur(8px);
+            }
+            .pk-panel-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box; background: var(--pk-bg); }
+            .pk-quick-actions { padding: 20px 24px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; background: var(--pk-surface); border-bottom: 1px solid var(--pk-border); box-sizing: border-box; flex-shrink: 0; }
+            .pk-action-group { display: flex; gap: 10px; flex-wrap: wrap; }
+            .pk-action-btn {
+                padding: 10px 18px; color: #fff; border: none; border-radius: 10px; cursor: pointer;
+                font-size: 14px; font-weight: 600; min-width: 120px; transition: all .3s cubic-bezier(.4,0,.2,1);
+                display: flex; align-items: center; gap: 6px; justify-content: center; box-shadow: var(--pk-shadow-sm);
+            }
+            .pk-action-btn:hover { transform: translateY(-2px); box-shadow: var(--pk-shadow-lg); }
+            .pk-action-btn:active { transform: translateY(0); }
+            .pk-action-btn.pk-btn-primary { background: var(--pk-primary); }
+            .pk-action-btn.pk-btn-success { background: var(--pk-success); }
+            .pk-action-btn.pk-btn-danger { background: var(--pk-danger); }
+            .pk-action-btn.pk-btn-secondary { background: var(--pk-text-muted); }
+            .pk-save-btn {
+                padding: 10px 22px; background: var(--pk-text-muted); color: #fff; border: none; border-radius: 10px;
+                cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;
+                transition: all .3s ease; opacity: .6; pointer-events: none; min-width: 130px; justify-content: center;
+            }
+            .pk-save-btn.pk-active { opacity: 1; pointer-events: auto; background: var(--pk-warning); box-shadow: 0 4px 12px rgba(245,158,11,.3); }
+            .pk-list-section { flex: 1; overflow: auto; padding: 0 24px; box-sizing: border-box; display: flex; flex-direction: column; }
+            .pk-list-title { color: var(--pk-text); margin: 18px 0; font-weight: 700; font-size: 16px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
+            .pk-engine-list { flex: 1; overflow-y: auto; overflow-x: hidden; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); padding-bottom: 16px; box-sizing: border-box; }
+            @media (max-width: 480px) { .pk-engine-list { grid-template-columns: 1fr; } }
+            .pk-engine-card {
+                display: flex; align-items: center; padding: 14px 16px; background: var(--pk-surface);
+                border: 2px solid var(--pk-border); border-radius: var(--pk-radius); transition: all .3s ease;
+                cursor: grab; min-height: 64px; box-sizing: border-box;
+            }
+            .pk-engine-card:hover { transform: translateY(-2px); box-shadow: var(--pk-shadow-lg); border-color: var(--pk-primary-light); }
+            .pk-engine-card.pk-active { border-color: var(--pk-success); background: var(--pk-gradient-soft); }
+            .pk-engine-card input[type="checkbox"] { margin-right: 14px; transform: scale(1.3); accent-color: var(--pk-primary); cursor: pointer; }
+            .pk-engine-icon { width: 44px; height: 28px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-right: 14px; border: 1px solid var(--pk-border); border-radius: 6px; flex-shrink: 0; }
+            .pk-engine-info { flex-grow: 1; min-width: 0; }
+            .pk-engine-name { font-weight: 700; color: var(--pk-text); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+            .pk-engine-url { font-size: .8em; color: var(--pk-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .pk-engine-actions { display: flex; gap: 6px; flex-shrink: 0; }
+            .pk-delete-btn { padding: 8px; border: none; background: var(--pk-danger); color: #fff; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .25s ease; }
+            .pk-delete-btn:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(239,68,68,.3); }
+
+            /* ========== 添加表单 ========== */
+            .pk-add-form { display: none; background: var(--pk-surface-alt); padding: 24px; border-radius: var(--pk-radius); margin: 12px 0; box-sizing: border-box; flex-shrink: 0; border: 1px solid var(--pk-border); }
+            .pk-form-title { color: var(--pk-text); margin-bottom: 18px; font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+            .pk-form-grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+            @media (max-width: 600px) { .pk-form-grid { grid-template-columns: 1fr; } }
+            .pk-field-full { grid-column: 1 / -1; }
+            .pk-field label { display: block; margin-bottom: 6px; font-weight: 600; color: var(--pk-text-secondary); font-size: 13px; }
+            .pk-field input, .pk-field select { width: 100%; padding: 12px 14px; border: 2px solid var(--pk-border); border-radius: 10px; font-size: 14px; color: var(--pk-text); background: var(--pk-surface); box-sizing: border-box; transition: all .25s ease; }
+            .pk-field input:focus, .pk-field select:focus { outline: none; border-color: var(--pk-primary); box-shadow: 0 0 0 4px rgba(99,102,241,.12); }
+            .pk-icon-grid { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 12px; align-items: end; }
+            @media (max-width: 600px) { .pk-icon-grid { grid-template-columns: 1fr; } }
+            .pk-preview-btn { width: 100%; padding: 12px; background: var(--pk-primary); color: #fff; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600; font-size: 14px; transition: all .25s ease; }
+            .pk-preview-btn:hover { background: var(--pk-primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,.3); }
+            .pk-preview-area { margin-top: 16px; text-align: center; }
+            .pk-preview-area label { display: block; margin-bottom: 10px; font-weight: 600; color: var(--pk-text-secondary); font-size: 13px; }
+            .pk-icon-preview { width: 88px; height: 55px; border: 2px dashed var(--pk-border); border-radius: 8px; margin: 0 auto; display: flex; justify-content: center; align-items: center; overflow: hidden; background: var(--pk-surface); }
+            .pk-form-actions { grid-column: 1 / -1; display: flex; gap: 12px; margin-top: 20px; }
+
+            /* ========== 面板底部 ========== */
+            .pk-panel-footer { background: var(--pk-surface); padding: 16px 24px; border-top: 1px solid var(--pk-border); display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; flex-shrink: 0; }
+            .pk-selected-count { color: var(--pk-text-secondary); font-size: .9em; display: flex; align-items: center; gap: 6px; font-weight: 500; }
+
+            /* ========== 滚动条美化 ========== */
+            .pk-list-section::-webkit-scrollbar, .pk-engine-list::-webkit-scrollbar, .pk-overlay-scroll::-webkit-scrollbar { width: 6px; }
+            .pk-list-section::-webkit-scrollbar-track, .pk-engine-list::-webkit-scrollbar-track, .pk-overlay-scroll::-webkit-scrollbar-track { background: transparent; }
+            .pk-list-section::-webkit-scrollbar-thumb, .pk-engine-list::-webkit-scrollbar-thumb, .pk-overlay-scroll::-webkit-scrollbar-thumb { background: var(--pk-border); border-radius: 3px; }
+            .pk-list-section::-webkit-scrollbar-thumb:hover, .pk-engine-list::-webkit-scrollbar-thumb:hover, .pk-overlay-scroll::-webkit-scrollbar-thumb:hover { background: var(--pk-text-muted); }
         `;
         document.head.appendChild(cssNode);
     },
@@ -3724,211 +3849,84 @@ const searchOverlay = {
         if (overlay) return overlay;
         overlay = document.createElement("div");
         overlay.id = CLASS_NAMES.SEARCH_OVERLAY;
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.98);
-            z-index: 9998;
-            display: none;
-            flex-direction: column;
-            backdrop-filter: blur(10px);
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        `;
+
         const scrollContainer = document.createElement("div");
-        scrollContainer.style.cssText = `
-            width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            overflow-x: hidden;
-            -webkit-overflow-scrolling: touch;
-            padding: 10px 0;
-            box-sizing: border-box;
-        `;
+        scrollContainer.className = 'pk-overlay-scroll';
+
         const searchContainer = document.createElement("div");
-        searchContainer.style.cssText = `
-            width: 95%;
-            max-width: 900px;
-            min-height: min-content;
-            background: linear-gradient(145deg, #f8f9fa, #ffffff);
-            border-radius: 20px;
-            padding: 25px 20px;
-            box-shadow: 
-                0 10px 40px rgba(0, 0, 0, 0.1),
-                0 2px 10px rgba(0, 0, 0, 0.05);
-            position: relative;
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            margin: 10px auto;
-            box-sizing: border-box;
-        `;
-        const updateSearchContainerStyle = () => {
-            const isMobile = window.innerWidth <= 768;
-            if (isMobile) {
-                searchContainer.style.width = '92%';
-                searchContainer.style.padding = '20px 15px';
-                searchContainer.style.borderRadius = '16px';
-                searchContainer.style.margin = '5px auto';
-            } else {
-                searchContainer.style.width = '95%';
-                searchContainer.style.padding = '25px 20px';
-                searchContainer.style.borderRadius = '20px';
-                searchContainer.style.margin = '10px auto';
-            }
-        };
-        updateSearchContainerStyle();
-        window.addEventListener('resize', updateSearchContainerStyle);
+        searchContainer.className = 'pk-search-card';
+
+        // Close button
         const closeBtn = document.createElement("button");
+        closeBtn.className = 'pk-close-btn';
         closeBtn.innerHTML = utils.createInlineSVG('times');
         closeBtn.setAttribute('aria-label', '关闭搜索');
-        closeBtn.style.cssText = `
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-            border: none;
-            font-size: 18px;
-            color: #64748b;
-            cursor: pointer;
-            padding: 3px;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 
-                0 4px 12px rgba(0, 0, 0, 0.1),
-                0 2px 6px rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            z-index: 1;
-            backdrop-filter: blur(10px);
-        `;
-        closeBtn.addEventListener('mouseenter', () => {
-            closeBtn.style.background = 'linear-gradient(135deg, #ff4757 0%, #ff3742 100%)';
-            closeBtn.style.color = 'white';
-            closeBtn.style.transform = 'scale(1.1) rotate(90deg)';
-            closeBtn.style.boxShadow = '0 8px 25px rgba(255, 71, 87, 0.4)';
-        });
-        closeBtn.addEventListener('mouseleave', () => {
-            closeBtn.style.background = 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)';
-            closeBtn.style.color = '#64748b';
-            closeBtn.style.transform = 'scale(1) rotate(0deg)';
-            closeBtn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05)';
-        });
         closeBtn.addEventListener('click', () => this.hideSearchOverlay());
+
+        // Title
         const title = document.createElement("h2");
+        title.className = 'pk-panel-title';
         title.innerHTML = utils.createInlineSVG('search') + ' 快捷搜索 (Alt+S)';
-        title.style.cssText = `
-            margin: 0 0 20px 0;
-            color: #2c3e50;
-            text-align: center;
-            font-size: clamp(18px, 4vw, 24px);
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            word-break: break-word;
-        `;
+
+        // Search input
         const searchInput = document.createElement("input");
         searchInput.type = "text";
         searchInput.placeholder = "输入关键词或网址...";
         searchInput.id = "overlay-search-input";
+        searchInput.className = 'pk-search-input';
         searchInput.setAttribute('autocomplete', 'off');
         searchInput.setAttribute('autocorrect', 'off');
         searchInput.setAttribute('autocapitalize', 'off');
         searchInput.setAttribute('spellcheck', 'false');
-        searchInput.style.cssText = `
-            width: 100%;
-            padding: 20px 24px; 
-            box-sizing: border-box;
-            background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
-            border-radius: 16px;
-            font-size: 18px;
-            color: #1e293b;
-            outline: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 
-                inset 3px 3px 6px rgba(0, 0, 0, 0.04),
-                inset -3px -3px 6px rgba(255, 255, 255, 0.8),
-                0 8px 30px rgba(0, 0, 0, 0.08);
-            border: 2px solid transparent; 
-            margin-bottom: 28px;
-            -webkit-appearance: none;
-            font-weight: 500;
-            line-height: 1.5;
-            min-height: 64px; 
-        `;
-        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-            searchInput.style.fontSize = '16px';
-            searchInput.style.padding = '20px 22px'; 
-            searchInput.style.minHeight = '50px';
-        }
-        searchInput.addEventListener('focus', () => {
-            searchInput.style.boxShadow = 
-                'inset 3px 3px 6px rgba(0, 0, 0, 0.06), inset -3px -3px 6px rgba(255, 255, 255, 0.9), 0 12px 40px rgba(99, 102, 241, 0.15)'; 
-            searchInput.style.borderColor = 'transparent'; 
-            searchInput.style.background = 'linear-gradient(135deg, #ffffff 0%, #fefefe 100%)';
-            searchInput.style.transform = 'translateY(-2px)';
+
+        // Quick engine buttons
+        const quickEnginesContainer = document.createElement("div");
+        quickEnginesContainer.className = 'pk-quick-engines';
+        const showList = GM_getValue(STORAGE_KEYS.PUNK_SETUP_SEARCH, DEFAULT_CONFIG.PUNK_DEFAULT_MARK).split('-').slice(0, 8);
+        showList.forEach(showMark => {
+            const engine = appState.searchUrlMap.find(e => e.mark === showMark);
+            if (!engine) return;
+            const btn = document.createElement("button");
+            btn.className = 'pk-quick-engine-btn';
+            btn.innerHTML = utils.createInlineSVG('paper-plane') + ' ' + engine.name;
+            btn.addEventListener('click', () => {
+                const query = searchInput.value.trim();
+                if (!query) { searchInput.focus(); return; }
+                const searchUrl = engine.searchUrl.replace('{keyword}', encodeURIComponent(query));
+                window.open(searchUrl, '_blank');
+            });
+            quickEnginesContainer.appendChild(btn);
         });
-        searchInput.addEventListener('blur', () => {
-            searchInput.style.boxShadow = 
-                'inset 3px 3px 6px rgba(0, 0, 0, 0.04), inset -3px -3px 6px rgba(255, 255, 255, 0.8), 0 8px 30px rgba(0, 0, 0, 0.08)';
-            searchInput.style.borderColor = 'transparent'; 
-            searchInput.style.transform = 'translateY(0)';
-        });
+
+        // Navigation section
         const navigationSection = document.createElement("div");
-        navigationSection.style.cssText = `margin-top: 10px;`;
+        navigationSection.className = 'pk-nav-section';
+
         const navTitle = document.createElement("h3");
+        navTitle.className = 'pk-nav-title';
         navTitle.innerHTML = utils.createInlineSVG('globe') + ' 常用网站导航';
-        navTitle.style.cssText = `
-            color: #2c3e50;
-            margin-bottom: 15px;
-            font-size: clamp(16px, 3.5vw, 18px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 8px;
-            text-align: center;
-            flex-wrap: wrap;
-        `;
         navigationSection.appendChild(navTitle);
+
+        // Navigation filter input
+        const navFilter = document.createElement("input");
+        navFilter.type = "text";
+        navFilter.placeholder = "搜索网站名称...";
+        navFilter.className = 'pk-search-input pk-nav-filter';
+        navFilter.style.fontSize = '14px';
+        navFilter.style.padding = '10px 16px';
+        navFilter.style.marginBottom = '16px';
+        navFilter.setAttribute('aria-label', '筛选网站');
+
         const categoriesContainer = document.createElement("div");
-        categoriesContainer.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-            margin-top: 10px;
-        `;
-        const updateGridLayout = () => {
-            const width = window.innerWidth;
-            if (width <= 480) {
-                categoriesContainer.style.gridTemplateColumns = '1fr';
-                categoriesContainer.style.gap = '12px';
-            } else if (width <= 768) {
-                categoriesContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(250px, 1fr))';
-                categoriesContainer.style.gap = '14px';
-            } else {
-                categoriesContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
-                categoriesContainer.style.gap = '16px';
-            }
-        };
-        updateGridLayout();
-        window.addEventListener('resize', updateGridLayout);
+        categoriesContainer.className = 'pk-categories';
+
         const websiteCategories = [
             {
                 title: "🔧 逆向论坛区",
                 sites: [
                     { name: "MT论坛", url: "https://bbs.binmt.cc" },
                     { name: "吾爱破解", url: "https://www.52pojie.cn" },
-                    { name: "看雪论坛", url: "https://bbs.pediy.com" },            
+                    { name: "看雪论坛", url: "https://bbs.pediy.com" },
                     { name: "飘云阁", url: "https://www.chinapyg.com" },
                     { name: "卡饭论坛", url: "https://www.kafan.cn" },
                     { name: "绿盟科技社区", url: "https://www.nsfocus.net" },
@@ -3941,7 +3939,7 @@ const searchOverlay = {
             },
             {
                 title: "💎 软件资源区",
-                sites: [  
+                sites: [
                     { name: "GETMODS", url: "https://getmodsapk.com/" },
                     { name: "APKdone", url: "https://apkdone.com/" },
                     { name: "LITEAPKS", url: "https://liteapks.com/" },
@@ -3949,9 +3947,9 @@ const searchOverlay = {
                     { name: "423Down", url: "https://www.423down.com" },
                     { name: "果核剥壳", url: "https://www.ghxi.com" },
                     { name: "大眼仔旭", url: "https://www.dayanzai.me" },
-                    { name: "ZD423", url: "https://www.zdfans.com" },         
+                    { name: "ZD423", url: "https://www.zdfans.com" },
                     { name: "软件缘", url: "https://www.appcgn.com" },
-                    { name: "小众软件", url: "https://www.appinn.com" },         
+                    { name: "小众软件", url: "https://www.appinn.com" },
                     { name: "Rutor", url: "http://rutor.info" },
                     { name: "RuTracker", url: "https://rutracker.org" }
                 ]
@@ -3975,7 +3973,6 @@ const searchOverlay = {
                 title: "🎬 影视区",
                 sites: [
                     { name: "网飞猫", url: "https://www.ncat21.com/" },
-                    { name: "毒舌电影", url: "https://www.ncat21.com/" },
                     { name: "诺影导航", url: "https://nuoin.com/" },
                     { name: "哔哩哔哩", url: "https://www.bilibili.com" },
                     { name: "YouTube", url: "https://www.youtube.com" },
@@ -3984,11 +3981,10 @@ const searchOverlay = {
                     { name: "NT动漫", url: "https://ntdm8.com/" },
                     { name: "AGE动漫", url: "https://m.agedm.io/#/" },
                     { name: "樱花动漫", url: "https://www.yhdm.io" },
-                    { name: "樱花动漫2", url: "https://www.295yhw.com/" },
                     { name: "腾讯视频", url: "https://v.qq.com" },
                     { name: "爱奇艺", url: "https://www.iqiyi.com" },
                     { name: "芒果TV", url: "https://www.mgtv.com" },
-                    { name: "1905电影网", url: "https://www.1905.com" }                     
+                    { name: "1905电影网", url: "https://www.1905.com" }
                 ]
             },
             {
@@ -4004,7 +4000,6 @@ const searchOverlay = {
                     { name: "石墨文档", url: "https://shimo.im" },
                     { name: "腾讯文档", url: "https://docs.qq.com" },
                     { name: "讯飞听见", url: "https://www.iflyrec.com" },
-                    { name: "格式工厂在线版", url: "https://www.pcgeshi.com" },
                     { name: "Figma", url: "https://www.figma.com" },
                     { name: "Excalidraw", url: "https://excalidraw.com" },
                     { name: "Photopea", url: "https://www.photopea.com" }
@@ -4022,8 +4017,6 @@ const searchOverlay = {
                     { name: "腾讯课堂", url: "https://ke.qq.com" },
                     { name: "可汗学院", url: "https://www.khanacademy.org" },
                     { name: "中国大学MOOC", url: "https://www.icourse163.org" },
-                    { name: "知乎大学", url: "https://www.zhihu.com/university" },
-                    { name: "豆包文库", url: "https://www.docin.com" },
                     { name: "Library Genesis", url: "http://libgen.is" },
                     { name: "Z-Library", url: "https://z-lib.is" },
                     { name: "Sci-Hub", url: "https://sci-hub.se" }
@@ -4038,13 +4031,11 @@ const searchOverlay = {
                     { name: "美团", url: "https://www.meituan.com" },
                     { name: "饿了么", url: "https://www.ele.me" },
                     { name: "苏宁易购", url: "https://www.suning.com" },
-                    { name: "唯品会", url: "https://www.vip.com" },          
+                    { name: "唯品会", url: "https://www.vip.com" },
                     { name: "闲鱼", url: "https://2.taobao.com" },
                     { name: "盒马鲜生", url: "https://www.hemaxiansheng.com" },
-                    { name: "每日优鲜", url: "https://www.missfresh.cn" },
                     { name: "亚马逊", url: "https://www.amazon.cn" },
-                    { name: "当当网", url: "https://www.dangdang.com" },
-                    { name: "考拉海购", url: "https://www.kaola.com" }
+                    { name: "当当网", url: "https://www.dangdang.com" }
                 ]
             },
             {
@@ -4060,7 +4051,6 @@ const searchOverlay = {
                     { name: "央视新闻", url: "https://news.cctv.com" },
                     { name: "财新网", url: "https://www.caixin.com" },
                     { name: "第一财经", url: "https://www.yicai.com" },
-                    { name: "界面新闻", url: "https://www.jiemian.com" },
                     { name: "华尔街见闻", url: "https://wallstreetcn.com" },
                     { name: "雪球", url: "https://xueqiu.com" }
                 ]
@@ -4077,8 +4067,7 @@ const searchOverlay = {
                     { name: "咪咕音乐", url: "https://music.migu.cn" },
                     { name: "荔枝FM", url: "https://www.lizhi.fm" },
                     { name: "蜻蜓FM", url: "https://www.qingting.fm" },
-                    { name: "网易云音乐播客", url: "https://music.163.com/podcast" },
-                    { name: "Bandcamp（独立音乐）", url: "https://bandcamp.com" },
+                    { name: "Bandcamp", url: "https://bandcamp.com" },
                     { name: "SoundCloud", url: "https://soundcloud.com" },
                     { name: "Audius", url: "https://audius.co" }
                 ]
@@ -4097,8 +4086,7 @@ const searchOverlay = {
                     { name: "华为开发者联盟", url: "https://developer.huawei.com" },
                     { name: "小米开发者平台", url: "https://dev.mi.com" },
                     { name: "阿里开发者社区", url: "https://developer.aliyun.com" },
-                    { name: "腾讯云开发者社区", url: "https://cloud.tencent.com/developer" },
-                    { name: "字节跳动技术团队", url: "https://techblog.bytedance.com" }
+                    { name: "腾讯云开发者社区", url: "https://cloud.tencent.com/developer" }
                 ]
             },
             {
@@ -4112,7 +4100,6 @@ const searchOverlay = {
                     { name: "游侠网", url: "https://www.ali213.net" },
                     { name: "NGA玩家社区", url: "https://bbs.nga.cn" },
                     { name: "TapTap", url: "https://www.taptap.cn" },
-                    { name: "好游快爆", url: "https://www.3839.com" },
                     { name: "itch.io", url: "https://itch.io" },
                     { name: "GameJolt", url: "https://gamejolt.com" }
                 ]
@@ -4192,110 +4179,75 @@ const searchOverlay = {
                 ]
             }
         ];
+
+        const categoryElements = [];
         websiteCategories.forEach(category => {
             const categoryElement = document.createElement("div");
-            categoryElement.style.cssText = `
-                background: rgba(255, 255, 255, 0.9);
-                border-radius: 12px;
-                padding: 16px;
-                box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-                border: 1px solid rgba(0, 0, 0, 0.06);
-                transition: transform 0.2s ease;
-                break-inside: avoid;
-            `;
-            categoryElement.addEventListener('mouseenter', () => {
-                categoryElement.style.transform = 'translateY(-2px)';
-                categoryElement.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.12)';
-            });
-            categoryElement.addEventListener('mouseleave', () => {
-                categoryElement.style.transform = 'translateY(0)';
-                categoryElement.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.08)';
-            });
+            categoryElement.className = 'pk-category';
             const categoryTitle = document.createElement("h4");
+            categoryTitle.className = 'pk-category-title';
             categoryTitle.textContent = category.title;
-            categoryTitle.style.cssText = `
-                margin: 0 0 12px 0;
-                color: #2c3e50;
-                font-size: 14px;
-                font-weight: 600;
-                border-bottom: 1px solid #ecf0f1;
-                padding-bottom: 8px;
-                word-break: break-word;
-            `;
             const sitesContainer = document.createElement("div");
-            sitesContainer.style.cssText = `
-                display: flex;
-                flex-wrap: wrap;
-                gap: 6px;
-            `;
+            sitesContainer.className = 'pk-sites';
             category.sites.forEach(site => {
                 const siteLink = document.createElement("a");
+                siteLink.className = 'pk-site-link';
                 siteLink.textContent = site.name;
                 siteLink.href = site.url;
                 siteLink.target = "_blank";
                 siteLink.rel = "noopener noreferrer";
-                siteLink.style.cssText = `
-                    display: inline-block;
-                    padding: 6px 10px;
-                    background: linear-gradient(145deg, #f8f9fa, #ffffff);
-                    border: 1px solid #e9ecef;
-                    border-radius: 6px;
-                    text-decoration: none;
-                    color: #495057;
-                    font-size: 12px;
-                    transition: all 0.2s ease;
-                    cursor: pointer;
-                    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    max-width: 100%;
-                    flex-shrink: 0;
-                `;
-                siteLink.addEventListener('mouseenter', () => {
-                    siteLink.style.background = 'linear-gradient(145deg, #3498db, #2980b9)';
-                    siteLink.style.color = 'white';
-                    siteLink.style.transform = 'translateY(-1px)';
-                    siteLink.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.15)';
-                    siteLink.style.borderColor = '#2980b9';
-                });
-                siteLink.addEventListener('mouseleave', () => {
-                    siteLink.style.background = 'linear-gradient(145deg, #f8f9fa, #ffffff)';
-                    siteLink.style.color = '#495057';
-                    siteLink.style.transform = 'translateY(0)';
-                    siteLink.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.08)';
-                    siteLink.style.borderColor = '#e9ecef';
-                });
-                siteLink.addEventListener('touchstart', () => {
-                    siteLink.style.background = 'linear-gradient(145deg, #3498db, #2980b9)';
-                    siteLink.style.color = 'white';
-                }, { passive: true });
                 sitesContainer.appendChild(siteLink);
             });
             categoryElement.appendChild(categoryTitle);
             categoryElement.appendChild(sitesContainer);
             categoriesContainer.appendChild(categoryElement);
+            categoryElements.push({ element: categoryElement, title: category.title, sites: category.sites });
         });
+
+        // Navigation filter functionality
+        navFilter.addEventListener('input', () => {
+            const filter = navFilter.value.trim().toLowerCase();
+            categoryElements.forEach(cat => {
+                const titleMatch = cat.title.toLowerCase().includes(filter);
+                const siteMatch = cat.sites.some(s => s.name.toLowerCase().includes(filter));
+                if (!filter || titleMatch || siteMatch) {
+                    cat.element.style.display = '';
+                    if (filter) {
+                        // Highlight matching sites, hide non-matching
+                        const links = cat.element.querySelectorAll('.pk-site-link');
+                        links.forEach((link, i) => {
+                            link.style.display = (!filter || cat.sites[i].name.toLowerCase().includes(filter) || titleMatch) ? '' : 'none';
+                        });
+                    } else {
+                        const links = cat.element.querySelectorAll('.pk-site-link');
+                        links.forEach(link => link.style.display = '');
+                    }
+                } else {
+                    cat.element.style.display = 'none';
+                }
+            });
+        });
+
+        navigationSection.appendChild(navFilter);
         navigationSection.appendChild(categoriesContainer);
+
+        // Assemble
         searchContainer.appendChild(closeBtn);
         searchContainer.appendChild(title);
         searchContainer.appendChild(searchInput);
+        searchContainer.appendChild(quickEnginesContainer);
         searchContainer.appendChild(navigationSection);
         scrollContainer.appendChild(searchContainer);
         overlay.appendChild(scrollContainer);
+
+        // Events
         searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.performOverlaySearch();
-            }
+            if (e.key === 'Enter') this.performOverlaySearch();
         });
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                this.hideSearchOverlay();
-            }
+            if (e.target === overlay || e.target === scrollContainer) this.hideSearchOverlay();
         });
-        searchContainer.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
+        searchContainer.addEventListener('click', (e) => e.stopPropagation());
         document.body.appendChild(overlay);
         return overlay;
     },
@@ -4650,29 +4602,13 @@ const managementPanel = {
         const button = document.createElement("button");
         button.innerHTML = html;
         button.title = title;
-        button.style.cssText = `
-            padding: 10px 15px;
-            background-color: ${color};
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            min-width: 120px;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            justify-content: center;
-        `;
-        button.addEventListener("mouseenter", () => {
-            button.style.transform = "translateY(-2px)";
-            button.style.boxShadow = "0 4px 8px rgba(0,0,0,0.2)";
-        });
-        button.addEventListener("mouseleave", () => {
-            button.style.transform = "translateY(0)";
-            button.style.boxShadow = "none";
-        });
+        button.className = 'pk-action-btn';
+        // Map colors to semantic classes
+        const colorMap = {
+            '#3498db': 'pk-btn-primary', '#27ae60': 'pk-btn-success',
+            '#e74c3c': 'pk-btn-danger', '#95a5a6': 'pk-btn-secondary'
+        };
+        button.classList.add(colorMap[color] || 'pk-btn-primary');
         return button;
     },
 
@@ -4893,22 +4829,22 @@ const managementPanel = {
     showAddForm(show) {
         const formSection = document.getElementById("add-engine-form");
         const engineList = document.getElementById("engine-management-list");
-        const listTitle = formSection?.previousElementSibling;
-        if (!formSection || !engineList || !listTitle) return;
+        const listTitle = document.querySelector('.pk-list-title');
+        if (!formSection) return;
         if (show) {
             formSection.style.display = "block";
-            engineList.style.display = "none";
-            listTitle.style.display = "none";
-            document.getElementById("engine-name").value = "";
-            document.getElementById("engine-mark").value = "";
-            document.getElementById("engine-url").value = "";
-            document.getElementById("engine-keys").value = "";
-            document.getElementById("icon-input").value = "";
-            document.getElementById("icon-preview").innerHTML = "";
+            if (engineList) engineList.style.display = "none";
+            if (listTitle) listTitle.style.display = "none";
+            ["engine-name", "engine-mark", "engine-url", "engine-keys", "icon-input"].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = "";
+            });
+            const preview = document.getElementById("icon-preview");
+            if (preview) preview.innerHTML = "";
         } else {
             formSection.style.display = "none";
-            engineList.style.display = "grid";
-            listTitle.style.display = "block";
+            if (engineList) engineList.style.display = "grid";
+            if (listTitle) listTitle.style.display = "flex";
         }
     },
 
@@ -4918,7 +4854,6 @@ const managementPanel = {
         const preview = document.getElementById("icon-preview");
         preview.innerHTML = "";
         preview.style.backgroundImage = "none";
-        preview.style.backgroundColor = "#ecf0f1";
         if (!value) return;
         try {
             switch (type) {
@@ -5032,91 +4967,41 @@ const managementPanel = {
         engineList.innerHTML = "";
         appState.searchUrlMap.forEach((engine) => {
             const engineCard = document.createElement("div");
-            engineCard.className = CLASS_NAMES.ENGINE_CARD;
-            engineCard.style.cssText = `
-                display: flex;
-                align-items: center;
-                padding: 15px;
-                background: white;
-                border: 2px solid ${activeMarks.includes(engine.mark) ? '#27ae60' : '#ecf0f1'};
-                border-radius: 10px;
-                transition: all 0.3s ease;
-                cursor: grab;
-                min-height: 60px;
-                box-sizing: border-box;
-            `;
-            engineCard.addEventListener("mouseenter", () => {
-                engineCard.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-                engineCard.style.transform = "translateY(-2px)";
-            });
-            engineCard.addEventListener("mouseleave", () => {
-                engineCard.style.boxShadow = "none";
-                engineCard.style.transform = "translateY(0)";
-            });
+            engineCard.className = 'pk-engine-card' + (activeMarks.includes(engine.mark) ? ' pk-active' : '');
+
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.dataset.mark = engine.mark;
             checkbox.checked = activeMarks.includes(engine.mark);
-            checkbox.style.cssText = `margin-right: 15px; transform: scale(1.2);`;
             checkbox.addEventListener("change", () => {
                 utils.updateSelectedCount();
                 utils.markUnsavedChanges();
+                if (checkbox.checked) engineCard.classList.add('pk-active');
+                else engineCard.classList.remove('pk-active');
             });
+
             const iconPreview = document.createElement("div");
-            iconPreview.style.cssText = `
-                width: 40px;
-                height: 25px;
-                background-image: url('data:image/svg+xml;utf8,${encodeURIComponent(engine.svgCode)}');
-                background-size: contain;
-                background-repeat: no-repeat;
-                background-position: center;
-                margin-right: 15px;
-                border: 1px solid #eee;
-                border-radius: 5px;
-                flex-shrink: 0;
-            `;
+            iconPreview.className = 'pk-engine-icon';
+            iconPreview.style.backgroundImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(engine.svgCode)}')`;
+
             const infoContainer = document.createElement("div");
-            infoContainer.style.cssText = `flex-grow: 1; min-width: 0;`;
+            infoContainer.className = 'pk-engine-info';
             const name = document.createElement("div");
+            name.className = 'pk-engine-name';
             name.textContent = engine.name;
-            name.style.cssText = `
-                font-weight: bold;
-                color: #2c3e50;
-                margin-bottom: 5px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            `;
             const url = document.createElement("div");
+            url.className = 'pk-engine-url';
             url.textContent = engine.searchUrl;
-            url.style.cssText = `
-                font-size: 0.8em;
-                color: #7f8c8d;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            `;
             infoContainer.appendChild(name);
             infoContainer.appendChild(url);
+
             const actions = document.createElement("div");
-            actions.style.cssText = `display: flex; gap: 5px; flex-shrink: 0;`;
+            actions.className = 'pk-engine-actions';
             if (engine.custom) {
                 const deleteBtn = document.createElement("button");
+                deleteBtn.className = 'pk-delete-btn';
                 deleteBtn.innerHTML = utils.createInlineSVG('trash', 'white');
                 deleteBtn.title = "删除";
-                deleteBtn.style.cssText = `
-                    padding: 8px 12px;
-                    border: none;
-                    background: #e74c3c;
-                    color: white;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    flex-shrink: 0;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                `;
-                actions.appendChild(deleteBtn);
                 deleteBtn.addEventListener("click", (e) => {
                     e.stopPropagation();
                     if (confirm(`确定要删除 ${engine.name} 吗?`)) {
@@ -5130,6 +5015,7 @@ const managementPanel = {
                         this.refreshEngineList();
                     }
                 });
+                actions.appendChild(deleteBtn);
             }
             engineCard.appendChild(checkbox);
             engineCard.appendChild(iconPreview);
@@ -5172,226 +5058,111 @@ const managementPanel = {
         if (panel) return panel;
         panel = document.createElement("div");
         panel.id = CLASS_NAMES.MANAGEMENT_PANEL;
-        panel.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 90%;
-            max-width: 800px;
-            height: 90vh;
-            max-height: 90vh;
-            background-color: #ffffff;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            padding: 0;
-            z-index: 10000;
-            display: none;
-            overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            box-sizing: border-box;
-        `;
+
+        // ========== Header ==========
         const header = document.createElement("div");
-        header.style.cssText = `
-            height: 15vh;
-            min-height: 80px;
-            max-height: 120px;
-            background-color: #2c3e50;
-            color: white;
-            padding: 20px;
-            border-radius: 15px 15px 0 0;
-            position: relative;
-            box-sizing: border-box;
-            flex-shrink: 0;
-        `;
+        header.className = 'pk-panel-header';
         const title = document.createElement("h2");
         title.innerHTML = utils.createInlineSVG('cog', 'white') + ' 搜索引擎管理中心';
-        title.style.cssText = `
-            margin: 0;
-            font-size: 1.5em;
-            font-weight: 300;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        `;
         const subtitle = document.createElement("p");
-        subtitle.textContent = "管理您的搜索快捷方式";
-        subtitle.style.cssText = `margin: 5px 0 0 0; opacity: 0.8; font-size: 0.9em;`;
+        subtitle.textContent = "管理您的搜索快捷方式 · 拖拽排序 · 勾选启用";
         const unsavedIndicator = document.createElement("div");
         unsavedIndicator.id = "unsaved-indicator";
-        unsavedIndicator.innerHTML = utils.createInlineSVG('circle', '#e74c3c') + ' 有未保存的更改';
-        unsavedIndicator.style.cssText = `
-            position: absolute;
-            top: 15px;
-            right: 20px;
-            color: #e74c3c;
-            font-size: 0.8em;
-            display: none;
-            align-items: center;
-            gap: 5px;
-        `;
+        unsavedIndicator.className = 'pk-unsaved-indicator';
+        unsavedIndicator.innerHTML = utils.createInlineSVG('circle', '#fef3c7') + ' 有未保存的更改';
         header.appendChild(title);
         header.appendChild(subtitle);
         header.appendChild(unsavedIndicator);
         panel.appendChild(header);
+
+        // ========== Content ==========
         const content = document.createElement("div");
-        content.style.cssText = `
-            height: 65vh;
-            min-height: 300px;
-            position: relative;
-            overflow: hidden;
-            padding: 0;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-        `;
+        content.className = 'pk-panel-content';
+
+        // --- Quick Actions ---
         const quickActions = document.createElement("div");
-        quickActions.style.cssText = `
-            padding: 20px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            background-color: #ffffff;
-            border-bottom: 1px solid #ecf0f1;
-            box-sizing: border-box;
-            flex-shrink: 0;
-        `;
+        quickActions.className = 'pk-quick-actions';
         const leftActionGroup = document.createElement("div");
-        leftActionGroup.style.cssText = `display: flex; gap: 10px; flex-wrap: wrap;`;
+        leftActionGroup.className = 'pk-action-group';
         const extractBtn = this.createActionButton(utils.createInlineSVG('globe') + ' 自动添加', "#3498db", "自动识别当前页面的搜索引擎");
         const addBtn = this.createActionButton(utils.createInlineSVG('plus') + ' 手动添加', "#27ae60", "手动添加新的搜索引擎");
         leftActionGroup.appendChild(extractBtn);
         leftActionGroup.appendChild(addBtn);
         const rightActionGroup = document.createElement("div");
-        rightActionGroup.style.cssText = `display: flex; gap: 10px; flex-wrap: wrap;`;
+        rightActionGroup.className = 'pk-action-group';
         const saveBtn = document.createElement("button");
         saveBtn.id = "panel-save-btn";
+        saveBtn.className = 'pk-save-btn';
         saveBtn.innerHTML = utils.createInlineSVG('save') + ' 保存设置';
         saveBtn.title = "保存当前设置";
-        saveBtn.style.cssText = `
-            padding: 10px 20px;
-            background: #95a5a6;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: all 0.3s ease;
-            opacity: 0.7;
-            pointer-events: none;
-            min-width: 120px;
-            justify-content: center;
-        `;
         const resetBtn = this.createActionButton(utils.createInlineSVG('undo') + ' 恢复默认', "#e74c3c", "恢复默认搜索引擎设置");
         rightActionGroup.appendChild(saveBtn);
         rightActionGroup.appendChild(resetBtn);
         quickActions.appendChild(leftActionGroup);
         quickActions.appendChild(rightActionGroup);
         content.appendChild(quickActions);
+
+        // --- List Section ---
         const listSection = document.createElement("div");
-        listSection.style.cssText = `
-            flex: 1;
-            overflow: hidden;
-            padding: 0 20px;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            overflow: auto;
-        `;
+        listSection.className = 'pk-list-section';
         const listTitle = document.createElement("h3");
+        listTitle.className = 'pk-list-title';
         listTitle.innerHTML = utils.createInlineSVG('list') + ' 已配置的搜索引擎';
-        listTitle.style.cssText = `
-            color: #2c3e50;
-            margin: 15px 0;
-            font-weight: 500;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        `;
         const engineList = document.createElement("div");
         engineList.id = "engine-management-list";
-        engineList.style.cssText = `
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            display: grid;
-            gap: 10px;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            padding-bottom: 10px;
-            box-sizing: border-box;
-        `;
+        engineList.className = 'pk-engine-list';
         listSection.appendChild(listTitle);
-        listSection.appendChild(engineList);
+
+        // --- Add Form ---
         const formSection = document.createElement("div");
         formSection.id = "add-engine-form";
-        formSection.style.cssText = `
-            display: none;
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 10px 0;
-            box-sizing: border-box;
-            flex-shrink: 0;
-        `;
+        formSection.className = 'pk-add-form';
         const formTitle = document.createElement("h3");
+        formTitle.className = 'pk-form-title';
         formTitle.innerHTML = utils.createInlineSVG('magic') + ' 添加新搜索引擎';
-        formTitle.style.cssText = `
-            color: #2c3e50;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        `;
         formSection.appendChild(formTitle);
         const form = document.createElement("div");
-        form.style.cssText = `display: grid; gap: 15px; grid-template-columns: 1fr 1fr;`;
+        form.className = 'pk-form-grid';
         const fields = [
-            { label: "引擎名称", placeholder: "例如: Google", type: "text", id: "engine-name", required: true },
-            { label: "唯一标识", placeholder: "例如: google", type: "text", id: "engine-mark", required: true },
-            { label: "搜索URL", placeholder: "使用 {keyword} 作为占位符", type: "text", id: "engine-url", required: true, fullWidth: true },
-            { label: "关键词参数", placeholder: "例如: q,query,search", type: "text", id: "engine-keys", required: true, fullWidth: true }
+            { label: "引擎名称", placeholder: "例如: Google", id: "engine-name", required: true },
+            { label: "唯一标识", placeholder: "例如: google", id: "engine-mark", required: true },
+            { label: "搜索URL", placeholder: "使用 {keyword} 作为占位符", id: "engine-url", required: true, fullWidth: true },
+            { label: "关键词参数", placeholder: "例如: q,query,search", id: "engine-keys", required: true, fullWidth: true }
         ];
         fields.forEach(field => {
             const container = document.createElement("div");
-            if (field.fullWidth) container.style.gridColumn = "1 / -1";
+            container.className = 'pk-field' + (field.fullWidth ? ' pk-field-full' : '');
             const label = document.createElement("label");
             label.textContent = field.label;
-            label.style.cssText = `display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;`;
+            label.setAttribute('for', field.id);
             const input = document.createElement("input");
-            input.type = field.type;
+            input.type = "text";
             input.placeholder = field.placeholder;
             input.id = field.id;
             input.required = field.required;
-            input.style.cssText = `width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;`;
             container.appendChild(label);
             container.appendChild(input);
             form.appendChild(container);
         });
+
+        // Icon settings
         const iconContainer = document.createElement("div");
-        iconContainer.style.gridColumn = "1 / -1";
+        iconContainer.className = 'pk-field-full';
         const iconTitle = document.createElement("h4");
+        iconTitle.className = 'pk-form-title';
+        iconTitle.style.fontSize = '14px';
         iconTitle.innerHTML = utils.createInlineSVG('palette') + ' 图标设置';
-        iconTitle.style.cssText = `margin-bottom: 10px; color: #34495e; display: flex; align-items: center; gap: 10px;`;
         iconContainer.appendChild(iconTitle);
         const iconGrid = document.createElement("div");
-        iconGrid.style.cssText = `display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; align-items: end;`;
+        iconGrid.className = 'pk-icon-grid';
+        // Type select
         const typeGroup = document.createElement("div");
+        typeGroup.className = 'pk-field';
         const typeLabel = document.createElement("label");
         typeLabel.textContent = "图标类型";
-        typeLabel.style.cssText = `display: block; margin-bottom: 5px; font-weight: 500;`;
         typeGroup.appendChild(typeLabel);
         const iconTypeSelect = document.createElement("select");
         iconTypeSelect.id = "icon-type";
-        iconTypeSelect.style.cssText = `width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;`;
         ["svg", "image", "text", "emoji"].forEach(type => {
             const option = document.createElement("option");
             option.value = type;
@@ -5399,146 +5170,87 @@ const managementPanel = {
             iconTypeSelect.appendChild(option);
         });
         typeGroup.appendChild(iconTypeSelect);
+        // Input
         const inputGroup = document.createElement("div");
+        inputGroup.className = 'pk-field';
         const inputLabel = document.createElement("label");
         inputLabel.textContent = "图标内容";
-        inputLabel.style.cssText = `display: block; margin-bottom: 5px; font-weight: 500;`;
         inputGroup.appendChild(inputLabel);
         const iconInput = document.createElement("input");
         iconInput.type = "text";
         iconInput.id = "icon-input";
         iconInput.placeholder = "SVG代码、图片URL、文字或表情符号";
-        iconInput.style.cssText = `width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;`;
         inputGroup.appendChild(iconInput);
+        // Preview button
         const previewGroup = document.createElement("div");
+        previewGroup.className = 'pk-field';
         const previewButton = document.createElement("button");
         previewButton.innerHTML = utils.createInlineSVG('eye') + ' 预览图标';
-        previewButton.style.cssText = `
-            width: 100%;
-            padding: 10px;
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-        `;
+        previewButton.className = 'pk-preview-btn';
         previewButton.id = "preview-icon";
-                    previewGroup.appendChild(previewButton);
-                    // 组装图标设置网格
-                    iconGrid.appendChild(typeGroup);
-                    iconGrid.appendChild(inputGroup);
-                    iconGrid.appendChild(previewGroup);
-                    iconContainer.appendChild(iconGrid);
-                    // 图标预览区域
-                    const previewContainer = document.createElement("div");
-                    previewContainer.style.gridColumn = "1 / -1";
-                    previewContainer.style.cssText = `
-            margin-top: 15px;
-            text-align: center;
-        `;
-                    const previewLabel = document.createElement("label");
-                    previewLabel.textContent = "图标预览 (推荐比例 8:5)";
-                    previewLabel.style.cssText = `
-            display: block;
-            margin-bottom: 10px;
-            font-weight: 500;
-        `;
-                    const iconPreview = document.createElement("div");
-                    iconPreview.id = "icon-preview";
-                    iconPreview.style.cssText = `
-            width: 88px;
-            height: 55px;
-            border: 2px dashed #bdc3c7;
-            border-radius: 8px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            background: #ecf0f1;
-        `;
-                    previewContainer.appendChild(previewLabel);
-                    previewContainer.appendChild(iconPreview);
-                    iconContainer.appendChild(previewContainer);
-                    form.appendChild(iconContainer);
-                    // 表单操作按钮
-                    const formActions = document.createElement("div");
-                    formActions.style.cssText = `
-            grid-column: 1 / -1;
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        `;
-                    const saveFormBtn = this.createActionButton(utils.createInlineSVG('save') + ' 保存引擎', "#27ae60", "");
-                    const cancelFormBtn = this.createActionButton(utils.createInlineSVG('times') + ' 取消', "#95a5a6", "");
-                    formActions.appendChild(saveFormBtn);
-                    formActions.appendChild(cancelFormBtn);
-                    formSection.appendChild(form);
-                    formSection.appendChild(formActions);
-                    listSection.appendChild(formSection);
-                    content.appendChild(listSection);
-                    panel.appendChild(content);
+        previewGroup.appendChild(previewButton);
+        iconGrid.appendChild(typeGroup);
+        iconGrid.appendChild(inputGroup);
+        iconGrid.appendChild(previewGroup);
+        iconContainer.appendChild(iconGrid);
 
-                    // 4. 面板底部
-                    const footer = document.createElement("div");
-                    footer.style.cssText = `
-            height: 20vh;
-            min-height: 60px;
-            max-height: 90px;
-            background-color: #ecf0f1;
-            padding: 15px 20px;
-            border-top: 1px solid #bdc3c7;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-sizing: border-box;
-            flex-shrink: 0;
-            border-radius: 0 0 15px 15px;
-        `;
-                    const selectedCount = document.createElement("span");
-                    selectedCount.id = "selected-count";
-                    selectedCount.innerHTML = utils.createInlineSVG('check-circle') + ' 已选择 0 个引擎';
-                    selectedCount.style.cssText = `
-            color: #7f8c8d;
-            font-size: 0.9em;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        `;
-                    const footerActions = document.createElement("div");
-                    footerActions.style.cssText = `
-            display: flex;
-            gap: 10px;
-        `;
-                    const closeBtn = this.createActionButton(utils.createInlineSVG('times') + ' 关闭', "#95a5a6", "");
-                    footerActions.appendChild(closeBtn);
-                    footer.appendChild(selectedCount);
-                    footer.appendChild(footerActions);
-                    panel.appendChild(footer);
+        // Preview area
+        const previewContainer = document.createElement("div");
+        previewContainer.className = 'pk-preview-area pk-field-full';
+        const previewLabel = document.createElement("label");
+        previewLabel.textContent = "图标预览 (推荐比例 8:5)";
+        const iconPreview = document.createElement("div");
+        iconPreview.id = "icon-preview";
+        iconPreview.className = 'pk-icon-preview';
+        previewContainer.appendChild(previewLabel);
+        previewContainer.appendChild(iconPreview);
+        iconContainer.appendChild(previewContainer);
+        form.appendChild(iconContainer);
 
-                    // 5. 绑定事件
-                    extractBtn.addEventListener("click", () => this.extractFromCurrentPage());
-                    addBtn.addEventListener("click", () => this.showAddForm(true));
-                    resetBtn.addEventListener("click", () => this.resetToDefault());
-                    previewButton.addEventListener("click", () => this.previewIcon());
-                    saveFormBtn.addEventListener("click", () => this.saveNewEngine());
-                    cancelFormBtn.addEventListener("click", () => this.showAddForm(false));
-                    saveBtn.addEventListener("click", () => this.saveEngineSettings());
-                    closeBtn.addEventListener("click", () => this.closeManagementPanel());
-                    // 点击面板背景关闭
-                    panel.addEventListener("click", (e) => {
-                        if (e.target === panel) {
-                            this.closeManagementPanel();
-                        }
-                    });
+        // Form actions
+        const formActions = document.createElement("div");
+        formActions.className = 'pk-form-actions';
+        const saveFormBtn = this.createActionButton(utils.createInlineSVG('save') + ' 保存引擎', "#27ae60", "");
+        const cancelFormBtn = this.createActionButton(utils.createInlineSVG('times') + ' 取消', "#95a5a6", "");
+        formActions.appendChild(saveFormBtn);
+        formActions.appendChild(cancelFormBtn);
+        form.appendChild(formActions);
+        formSection.appendChild(form);
+        listSection.appendChild(formSection);
+        content.appendChild(listSection);
+        panel.appendChild(content);
 
-                    document.body.appendChild(panel);
-                    return panel;
-                },
+        // ========== Footer ==========
+        const footer = document.createElement("div");
+        footer.className = 'pk-panel-footer';
+        const selectedCount = document.createElement("span");
+        selectedCount.id = "selected-count";
+        selectedCount.className = 'pk-selected-count';
+        selectedCount.innerHTML = utils.createInlineSVG('check-circle') + ' 已选择 0 个引擎';
+        const footerActions = document.createElement("div");
+        footerActions.className = 'pk-action-group';
+        const closeBtn = this.createActionButton(utils.createInlineSVG('times') + ' 关闭', "#95a5a6", "");
+        footerActions.appendChild(closeBtn);
+        footer.appendChild(selectedCount);
+        footer.appendChild(footerActions);
+        panel.appendChild(footer);
+
+        // ========== Events ==========
+        extractBtn.addEventListener("click", () => this.extractFromCurrentPage());
+        addBtn.addEventListener("click", () => this.showAddForm(true));
+        resetBtn.addEventListener("click", () => this.resetToDefault());
+        previewButton.addEventListener("click", () => this.previewIcon());
+        saveFormBtn.addEventListener("click", () => this.saveNewEngine());
+        cancelFormBtn.addEventListener("click", () => this.showAddForm(false));
+        saveBtn.addEventListener("click", () => this.saveEngineSettings());
+        closeBtn.addEventListener("click", () => this.closeManagementPanel());
+        panel.addEventListener("click", (e) => {
+            if (e.target === panel) this.closeManagementPanel();
+        });
+
+        document.body.appendChild(panel);
+        return panel;
+    },
 
     /**
      * 显示管理面板
@@ -5551,7 +5263,7 @@ const managementPanel = {
         // 刷新引擎列表
         this.refreshEngineList();
         // 显示面板
-        panel.style.display = "block";
+        panel.style.display = "flex";
 
         // 应用焦点陷阱
         accessibility.trapFocus(panel);
