@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.12
+// @version      v2.1.13
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -4029,13 +4029,28 @@ const searchOverlay = {
         const searchContainer = document.createElement("div");
         searchContainer.className = 'pk-search-card';
 
-        // Close button — explicit black fill to guarantee visibility on any host page
+        // Close button — force black icon via inline !important on path element
         const closeBtn = document.createElement("button");
         closeBtn.className = 'pk-close-btn';
         closeBtn.innerHTML = utils.createInlineSVG('times', '#000');
         closeBtn.style.color = '#000';
+        // Override any host-page CSS by setting inline !important directly on the path
+        const closeIconPath = closeBtn.querySelector('svg path');
+        if (closeIconPath) {
+            closeIconPath.style.setProperty('fill', '#000', 'important');
+            closeIconPath.setAttribute('fill', '#000');
+        }
         closeBtn.setAttribute('aria-label', '关闭搜索');
         closeBtn.addEventListener('click', () => this.hideSearchOverlay());
+        // Restore white on hover
+        closeBtn.addEventListener('mouseenter', () => {
+            const p = closeBtn.querySelector('svg path');
+            if (p) { p.style.setProperty('fill', '#fff', 'important'); p.setAttribute('fill', '#fff'); }
+        });
+        closeBtn.addEventListener('mouseleave', () => {
+            const p = closeBtn.querySelector('svg path');
+            if (p) { p.style.setProperty('fill', '#000', 'important'); p.setAttribute('fill', '#000'); }
+        });
 
         // Title
         const title = document.createElement("h2");
