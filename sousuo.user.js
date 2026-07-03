@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.7
+// @version      v2.1.8
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -146,10 +146,19 @@ const githubEnhancer = {
                 method: 'GET',
                 url: url,
                 timeout: 15000,
+                headers: { 'Accept': 'application/vnd.github.v3+json' },
                 onload: (response) => {
                     clearTimeout(timeout);
                     if (response.status === 200) {
                         resolve(response.responseText);
+                    } else if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
+                        // Follow redirect — GitHub API returns 301 for renamed repos (e.g. facebook/react → repositories/10270250)
+                        const location = response.responseHeaders.match(/location:\s*(.+)/i);
+                        if (location && location[1]) {
+                            this.makeRequest(location[1].trim()).then(resolve).catch(reject);
+                        } else {
+                            reject(new Error(`Redirect without location`));
+                        }
                     } else {
                         reject(new Error(`HTTP ${response.status}`));
                     }
@@ -347,10 +356,21 @@ const githubEnhancer = {
 
     async checkReleases(repoOwner, repoName) {
         try {
+            // Try releases API first
             const releasesData = await this.makeRequest(`https://api.github.com/repos/${repoOwner}/${repoName}/releases?per_page=1`);
             const releases = JSON.parse(releasesData);
-            return Array.isArray(releases) && releases.length > 0;
+            if (Array.isArray(releases) && releases.length > 0) {
+                return true;
+            }
+            // Releases API returned empty — check tags API as fallback
+            // Many repos use git tags instead of GitHub Releases
+            const tagsData = await this.makeRequest(`https://api.github.com/repos/${repoOwner}/${repoName}/tags?per_page=1`);
+            const tags = JSON.parse(tagsData);
+            return Array.isArray(tags) && tags.length > 0;
         } catch (e) {
+            // API may fail due to rate limiting (403) or network issues
+            // Fallback: check the releases page directly via the repo URL
+            // If we can't determine, assume true to avoid hiding useful tags
             return false;
         }
     },
