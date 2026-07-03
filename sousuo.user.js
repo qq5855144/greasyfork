@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.13
+// @version      v2.1.14
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -3387,14 +3387,20 @@ const domHandler = {
             @media (max-width: 768px) { .pk-search-card { padding: 20px 16px 16px; border-radius: var(--pk-radius-lg); max-width: 94%; } .pk-overlay-scroll { padding: 2vh 10px; } }
             .pk-close-btn {
                 position: absolute; top: 14px; right: 14px; width: 32px; height: 32px;
-                border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
-                background: var(--pk-surface-alt) !important; color: #000 !important; z-index: 2;
+                border: none; border-radius: 50%; cursor: pointer;
+                background: var(--pk-surface-alt) !important; z-index: 2;
                 transition: all .25s cubic-bezier(.4,0,.2,1); box-shadow: var(--pk-shadow-sm);
+                padding: 0; margin: 0; line-height: 1;
             }
-            .pk-close-btn svg { fill: #000 !important; }
-            .pk-close-btn svg path { fill: #000 !important; }
-            .pk-close-btn:hover { background: var(--pk-danger) !important; color: #fff !important; transform: scale(1.1) rotate(90deg); box-shadow: 0 8px 20px rgba(239,68,68,.3); }
-            .pk-close-btn:hover svg, .pk-close-btn:hover svg path { fill: #fff !important; }
+            .pk-close-btn::before, .pk-close-btn::after {
+                content: ''; position: absolute; left: 50%; top: 50%;
+                width: 14px; height: 2.5px; border-radius: 2px;
+                background: #000 !important;
+            }
+            .pk-close-btn::before { transform: translate(-50%, -50%) rotate(45deg); }
+            .pk-close-btn::after { transform: translate(-50%, -50%) rotate(-45deg); }
+            .pk-close-btn:hover { background: var(--pk-danger) !important; transform: scale(1.1) rotate(90deg); box-shadow: 0 8px 20px rgba(239,68,68,.3); }
+            .pk-close-btn:hover::before, .pk-close-btn:hover::after { background: #fff !important; }
             .pk-panel-title {
                 margin: 0 0 16px 0; color: var(--pk-text); text-align: center;
                 font-size: clamp(18px, 3.5vw, 24px); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
@@ -4029,28 +4035,11 @@ const searchOverlay = {
         const searchContainer = document.createElement("div");
         searchContainer.className = 'pk-search-card';
 
-        // Close button — force black icon via inline !important on path element
+        // Close button — pure CSS X icon (no SVG, immune to host-page fill overrides)
         const closeBtn = document.createElement("button");
         closeBtn.className = 'pk-close-btn';
-        closeBtn.innerHTML = utils.createInlineSVG('times', '#000');
-        closeBtn.style.color = '#000';
-        // Override any host-page CSS by setting inline !important directly on the path
-        const closeIconPath = closeBtn.querySelector('svg path');
-        if (closeIconPath) {
-            closeIconPath.style.setProperty('fill', '#000', 'important');
-            closeIconPath.setAttribute('fill', '#000');
-        }
         closeBtn.setAttribute('aria-label', '关闭搜索');
         closeBtn.addEventListener('click', () => this.hideSearchOverlay());
-        // Restore white on hover
-        closeBtn.addEventListener('mouseenter', () => {
-            const p = closeBtn.querySelector('svg path');
-            if (p) { p.style.setProperty('fill', '#fff', 'important'); p.setAttribute('fill', '#fff'); }
-        });
-        closeBtn.addEventListener('mouseleave', () => {
-            const p = closeBtn.querySelector('svg path');
-            if (p) { p.style.setProperty('fill', '#000', 'important'); p.setAttribute('fill', '#000'); }
-        });
 
         // Title
         const title = document.createElement("h2");
