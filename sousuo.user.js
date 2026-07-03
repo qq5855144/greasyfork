@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.9
+// @version      v2.1.10
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -3388,7 +3388,7 @@ const domHandler = {
             .pk-close-btn {
                 position: absolute; top: 14px; right: 14px; width: 32px; height: 32px;
                 border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
-                background: var(--pk-surface-alt); color: var(--pk-text-secondary); z-index: 2;
+                background: var(--pk-surface-alt); color: #000; z-index: 2;
                 transition: all .25s cubic-bezier(.4,0,.2,1); box-shadow: var(--pk-shadow-sm);
             }
             .pk-close-btn:hover { background: var(--pk-danger); color: #fff; transform: scale(1.1) rotate(90deg); box-shadow: 0 8px 20px rgba(239,68,68,.3); }
