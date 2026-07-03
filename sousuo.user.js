@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.2
+// @version      v2.1.3
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -3254,11 +3254,17 @@ const domHandler = {
                     6px 6px 10px rgba(0,0,0,.1) inset, -6px -6px 10px rgba(255,255,255,0) inset;
                 transition: all .3s ease; flex-shrink: 0; overflow: hidden;
             }
-            .${CLASS_NAMES.ENGINE_BUTTON}:focus, .${CLASS_NAMES.ENGINE_BUTTON}.selected,
-            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAG_OVER} {
+            .${CLASS_NAMES.ENGINE_BUTTON}:focus, .${CLASS_NAMES.ENGINE_BUTTON}.selected {
                 border: 2px dashed #2196F3; background-color: #f0f8ff;
             }
-            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAGGING} { opacity: .5; transform: rotate(5deg); }
+            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAG_OVER} {
+                border: 2px solid #6366f1; background-color: #eef2ff; transform: scale(1.08);
+            }
+            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAGGING} {
+                opacity: .4; transform: scale(.92); cursor: grabbing;
+            }
+            .${CLASS_NAMES.ENGINE_BUTTON}[draggable="true"] { cursor: grab; }
+            .${CLASS_NAMES.ENGINE_BUTTON}[draggable="false"] { cursor: default; }
             .${CLASS_NAMES.ENGINE_CARD} { transition: all .3s ease; }
 
             /* ========== 动画 ========== */
@@ -3642,23 +3648,49 @@ const domHandler = {
         const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
         buttons.forEach(button => {
             button.draggable = true;
+            button.style.cursor = 'grab';
+
             button.addEventListener('dragstart', (e) => {
                 button.classList.add(CLASS_NAMES.DRAGGING);
+                button.style.cursor = 'grabbing';
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', button.getAttribute('url'));
+                // Create a clean drag image (no tilt)
+                try {
+                    const dragImg = button.cloneNode(true);
+                    dragImg.style.cssText = 'position:fixed; top:-9999px; left:-9999px; opacity:0.85; transform:none; border:2px solid #6366f1; border-radius:8px;';
+                    document.body.appendChild(dragImg);
+                    e.dataTransfer.setDragImage(dragImg, 28, 16);
+                    setTimeout(() => dragImg.remove(), 0);
+                } catch (_) {}
             });
+
             button.addEventListener('dragend', () => {
                 button.classList.remove(CLASS_NAMES.DRAGGING);
+                button.style.cursor = 'grab';
+                // Clean up any residual drag-over states
+                container.querySelectorAll(`.${CLASS_NAMES.DRAG_OVER}`).forEach(el => el.classList.remove(CLASS_NAMES.DRAG_OVER));
                 utils.saveButtonOrder();
             });
-            button.addEventListener('dragover', (e) => e.preventDefault());
+
+            button.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
             button.addEventListener('dragenter', (e) => {
                 e.preventDefault();
+                if (button.classList.contains(CLASS_NAMES.DRAGGING)) return;
                 button.classList.add(CLASS_NAMES.DRAG_OVER);
             });
-            button.addEventListener('dragleave', () => {
-                button.classList.remove(CLASS_NAMES.DRAG_OVER);
+
+            button.addEventListener('dragleave', (e) => {
+                // Only remove if leaving the button itself, not entering a child
+                if (!button.contains(e.relatedTarget)) {
+                    button.classList.remove(CLASS_NAMES.DRAG_OVER);
+                }
             });
+
             button.addEventListener('drop', (e) => {
                 e.preventDefault();
                 button.classList.remove(CLASS_NAMES.DRAG_OVER);
@@ -3672,6 +3704,8 @@ const domHandler = {
                     } else {
                         container.insertBefore(draggingButton, button);
                     }
+                    // Haptic feedback on supported devices
+                    if (navigator.vibrate) navigator.vibrate(15);
                     utils.markUnsavedChanges();
                 }
             });
