@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SVG嗅探器增强版
 // @namespace    http://tampermonkey.net/
-// @version      2.0.4
+// @version      2.0.5
 // @description  扫描、预览、下载网页中的SVG图片 | 支持去重/搜索/排序/多格式导出(PNG/DataURI/React/Base64)/压缩/暗色模式
 // @author       晚风知我意
 // @match        *://*/*
@@ -181,7 +181,7 @@
         /* ========== 模态框 ========== */
         .ss-modal {
             display: none !important; position: fixed !important; top: 50% !important; left: 50% !important;
-            transform: translate(-50%,-50%) !important; width: 92% !important; max-width: 880px !important; max-height: 85vh !important;
+            transform: translate(-50%,-50%) !important; width: 92% !important; max-width: 880px !important; max-height: 85vh !important; height: auto !important;
             background: var(--ss-glass) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
             border: 1px solid var(--ss-glass-border) !important; z-index: 999999 !important; border-radius: var(--ss-radius-xl) !important;
             box-shadow: var(--ss-shadow-xl) !important; overflow: hidden !important;
@@ -190,6 +190,12 @@
             flex-direction: column !important; margin: 0 !important; padding: 0 !important;
         }
         @media (max-width: 768px) { .ss-modal { width: 96% !important; max-height: 90vh !important; border-radius: var(--ss-radius-lg) !important; } }
+        @media (max-width: 768px) { .ss-modal-content { max-height: calc(90vh - 300px) !important; padding: 12px 16px !important; } }
+        @media (max-width: 768px) { .ss-toolbar { padding: 10px 16px !important; gap: 8px !important; } }
+        @media (max-width: 768px) { .ss-stats { padding: 8px 16px !important; } }
+        @media (max-width: 768px) { .ss-action-bar { padding: 10px 16px !important; } }
+        @media (max-width: 768px) { .ss-modal-header { padding: 14px 18px !important; } }
+        @media (max-width: 768px) { .ss-modal-header h2 { font-size: 1rem !important; } }
 
         .ss-modal-header {
             background: var(--ss-glass-header) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
@@ -295,7 +301,7 @@
         .ss-btn-danger:hover { filter: brightness(1.1) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
 
         /* ========== 内容区 ========== */
-        .ss-modal-content { padding: 16px 20px !important; overflow-y: auto !important; flex: 1 1 auto !important; min-height: 100px !important; max-height: calc(85vh - 280px) !important; margin: 0 !important; width: 100% !important; }
+        .ss-modal-content { padding: 16px 20px !important; overflow-y: auto !important; flex: 0 1 auto !important; min-height: 0 !important; max-height: calc(85vh - 260px) !important; margin: 0 !important; width: 100% !important; }
         .ss-modal-content::-webkit-scrollbar { width: 6px !important; }
         .ss-modal-content::-webkit-scrollbar-track { background: transparent !important; }
         .ss-modal-content::-webkit-scrollbar-thumb { background: var(--ss-border) !important; border-radius: 3px !important; }
@@ -816,6 +822,9 @@
                     </div>
                 </div>
                 <div class="ss-stats" id="ss-stats"></div>
+                <div class="ss-modal-content" id="ss-content">
+                    <div class="ss-loading">${utils.svgIcons.radar}<br>正在扫描页面SVG资源...</div>
+                </div>
                 <div class="ss-action-bar">
                     <label class="ss-select-all-control">
                         <input type="checkbox" id="ss-select-all"> 全选
@@ -842,9 +851,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-                <div class="ss-modal-content" id="ss-content">
-                    <div class="ss-loading">${utils.svgIcons.radar}<br>正在扫描页面SVG资源...</div>
                 </div>
             `;
             this.root.appendChild(this.modal);
