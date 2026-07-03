@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.10
+// @version      v2.1.11
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -3388,10 +3388,13 @@ const domHandler = {
             .pk-close-btn {
                 position: absolute; top: 14px; right: 14px; width: 32px; height: 32px;
                 border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
-                background: var(--pk-surface-alt); color: #000; z-index: 2;
+                background: var(--pk-surface-alt) !important; color: #000 !important; z-index: 2;
                 transition: all .25s cubic-bezier(.4,0,.2,1); box-shadow: var(--pk-shadow-sm);
             }
-            .pk-close-btn:hover { background: var(--pk-danger); color: #fff; transform: scale(1.1) rotate(90deg); box-shadow: 0 8px 20px rgba(239,68,68,.3); }
+            .pk-close-btn svg { fill: #000 !important; }
+            .pk-close-btn svg path { fill: #000 !important; }
+            .pk-close-btn:hover { background: var(--pk-danger) !important; color: #fff !important; transform: scale(1.1) rotate(90deg); box-shadow: 0 8px 20px rgba(239,68,68,.3); }
+            .pk-close-btn:hover svg, .pk-close-btn:hover svg path { fill: #fff !important; }
             .pk-panel-title {
                 margin: 0 0 16px 0; color: var(--pk-text); text-align: center;
                 font-size: clamp(18px, 3.5vw, 24px); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
