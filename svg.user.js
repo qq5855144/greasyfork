@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         SVG嗅探器增强版
+// @name         网页图片采集器
 // @namespace    http://tampermonkey.net/
-// @version      2.0.5
-// @description  扫描、预览、下载网页中的SVG图片 | 支持去重/搜索/排序/多格式导出(PNG/DataURI/React/Base64)/压缩/暗色模式
-// @author       晚风知我意
+// @version      v1.0
+// @description  支持动态加载、智能去重、大图预览的网页图片下载工具
+// @author       YourName
 // @match        *://*/*
 // @grant        GM_addStyle
 // @grant        GM_setValue
@@ -13,1330 +13,1817 @@
 // @grant        GM_download
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js
-// @icon         https://raw.githubusercontent.com/qq5855144/greasyfork/main/download.svg
+// @icon         https://cdn-icons-png.flaticon.com/512/2107/2107957.png
 // @license      MIT
-// @downloadURL  https://update.greasyfork.org/scripts/544921/SVG%E5%97%85%E6%8E%A2%E5%99%A8.user.js
-// @updateURL    https://update.greasyfork.org/scripts/544921/SVG%E5%97%85%E6%8E%A2%E5%99%A8.meta.js
 // ==/UserScript==
-
-(function () {
+(function() {
     'use strict';
-
-    /* ================================================================
-     *  配置 & 常量
-     * ================================================================ */
+    
     const CONFIG = {
         buttonSize: 30,
+        activeColor: '#e74c3c',
+        hoverColor: '#c0392b',
+        zIndex: 99999,
         positionOffset: 25,
         touchDelay: 300,
-        scanDelay: 300,
-        maxNameLength: 50,
-        toastDuration: 3000,
-        maxToasts: 4,
+        supportFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff'],
+        maxPreviewSize: 50,
+        loadTimeout: 5000,
+        infoTruncateLength: 4,
+        panelSafeMargin: '20px',
+        panelMinSize: '320px',
+        defaultImageFormat: 'png',       
+        fixedFontSize: '10px',
+        scrollCheckInterval: 500,
+        clickDetectDelay: 1500,
+        clickLoadSelectors: [
+            '.load-more', '.load-btn', '.next-page', '.load-more-btn',
+            '[data-action="load-more"]', '[class*="load"]', '[class*="more"]',
+            '.pagination-next', '.next-btn', '.load-additional'
+        ],
+        maxBlobUrlCount: 100,
+        blobCleanupNotification: true,
+        previewZoom: {
+            maxWidth: '90vw',
+            maxHeight: '80vh',
+            background: 'rgba(0,0,0,0.9)',
+            closeButtonSize: '40px',
+            headerHeight: '60px',
+            footerHeight: '70px'
+        },
+        deduplication: {
+            enabled: true,
+            similarityThreshold: 0.95,
+            checkContent: true,
+            maxFileSizeForCheck: 5 * 1024 * 1024,
+            urlNormalization: true
+        }
     };
-
-    const STORAGE_KEYS = {
-        position: (domain) => `svgSniffer_pos_${domain}`,
-        theme: 'svgSniffer_theme',
-        viewMode: 'svgSniffer_viewMode',
-        previewSize: 'svgSniffer_previewSize',
-    };
-
-    /* ================================================================
-     *  状态管理
-     * ================================================================ */
-    const state = {
-        svgItems: [],
-        filteredItems: [],
-        cache: new Map(),
-        blobUrls: [],
-        isDragging: false,
-        dragStartTime: 0,
-        touchTimer: null,
-        startX: 0, startY: 0, startLeft: 0, startTop: 0,
-        currentSort: 'position',
-        currentFilter: '',
-        viewMode: GM_getValue(STORAGE_KEYS.viewMode, 'list'),
-        previewSize: GM_getValue(STORAGE_KEYS.previewSize, 'medium'),
-        theme: GM_getValue(STORAGE_KEYS.theme, 'auto'),
-    };
-
-    /* ================================================================
-     *  样式注入 — 现代设计系统 + 暗色模式
-     * ================================================================ */
-    function injectStyles() {
-        GM_addStyle(`
-        /* ========== 设计变量 ========== */
-        .svg-sniffer-root {
-            --ss-bg: #f8fafc;
-            --ss-surface: #ffffff;
-            --ss-surface-alt: #f8fafc;
-            --ss-surface-hover: #eef2ff;
-            --ss-text: #0f172a;
-            --ss-text-secondary: #475569;
-            --ss-text-muted: #94a3b8;
-            --ss-border: #e2e8f0;
-            --ss-border-light: #f1f5f9;
-            --ss-primary: #6366f1;
-            --ss-primary-light: #818cf8;
-            --ss-primary-dark: #4f46e5;
-            --ss-primary-bg: #eef2ff;
-            --ss-success: #10b981;
-            --ss-success-bg: #ecfdf5;
-            --ss-warning: #f59e0b;
-            --ss-warning-bg: #fffbeb;
-            --ss-danger: #ef4444;
-            --ss-danger-bg: #fef2f2;
-            --ss-shadow-xs: 0 1px 2px rgba(0,0,0,.04);
-            --ss-shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-            --ss-shadow-md: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -2px rgba(0,0,0,.04);
-            --ss-shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
-            --ss-shadow-xl: 0 20px 25px -5px rgba(0,0,0,.1), 0 8px 10px -6px rgba(0,0,0,.04);
-            --ss-radius-sm: 8px;
-            --ss-radius: 10px;
-            --ss-radius-lg: 14px;
-            --ss-radius-xl: 18px;
-            --ss-glass: rgba(255,255,255,.72);
-            --ss-glass-alt: rgba(248,250,252,.5);
-            --ss-glass-item: rgba(255,255,255,.55);
-            --ss-glass-border: rgba(255,255,255,.5);
-            --ss-glass-header: rgba(99,102,241,.82);
-            --ss-glass-hover: rgba(255,255,255,.65);
-            --ss-blur: blur(20px) saturate(180%);
-            --ss-transition: .25s cubic-bezier(.4,0,.2,1);
+    
+    GM_addStyle(`
+        #svgSnifferModal,
+        #svgSnifferModal * {
+            font-size: ${CONFIG.fixedFontSize} !important;
+            line-height: 1.4 !important; 
         }
-        .svg-sniffer-root[data-theme="dark"] {
-            --ss-bg: #0b1120;
-            --ss-surface: #1a2332;
-            --ss-surface-alt: #243044;
-            --ss-surface-hover: #2d3a4f;
-            --ss-text: #f1f5f9;
-            --ss-text-secondary: #b4c0d0;
-            --ss-text-muted: #94a3b8;
-            --ss-border: #2d3a4f;
-            --ss-border-light: #1a2332;
-            --ss-primary: #818cf8;
-            --ss-primary-light: #a5b4fc;
-            --ss-primary-dark: #6366f1;
-            --ss-primary-bg: #312e81;
-            --ss-success: #34d399;
-            --ss-success-bg: #064e3b;
-            --ss-warning: #fbbf24;
-            --ss-warning-bg: #78350f;
-            --ss-danger: #f87171;
-            --ss-danger-bg: #7f1d1d;
-            --ss-shadow-xs: 0 1px 2px rgba(0,0,0,.3);
-            --ss-shadow-sm: 0 1px 3px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
-            --ss-shadow-md: 0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px -2px rgba(0,0,0,.3);
-            --ss-shadow-lg: 0 10px 15px -3px rgba(0,0,0,.45), 0 4px 6px -4px rgba(0,0,0,.3);
-            --ss-shadow-xl: 0 20px 25px -5px rgba(0,0,0,.55), 0 8px 10px -6px rgba(0,0,0,.4);
-            --ss-glass: rgba(26,35,50,.72);
-            --ss-glass-alt: rgba(36,48,68,.5);
-            --ss-glass-item: rgba(36,48,68,.45);
-            --ss-glass-border: rgba(255,255,255,.08);
-            --ss-glass-header: rgba(99,102,241,.45);
-            --ss-glass-hover: rgba(45,58,79,.55);
+        .radar-container {position:fixed;z-index:${CONFIG.zIndex};cursor:move;transition:transform 0.2s;touch-action:none;}
+        .radar-button {width:${CONFIG.buttonSize}px;height:${CONFIG.buttonSize}px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#e74c3c,#922b21);box-shadow:0 6px 18px rgba(0,0,0,0.3),0 0 0 4px rgba(255,255,255,0.15),inset 0 0 12px rgba(0,0,0,0.3);cursor:pointer;border:none;outline:none;position:relative;overflow:hidden;user-select:none;-webkit-tap-highlight-color:transparent;animation:pulse 2s infinite;transition:transform 0.3s,box-shadow 0.3s;}
+        .radar-button:hover {transform:scale(1.05);box-shadow:0 8px 22px rgba(0,0,0,0.4),0 0 0 4px rgba(255,255,255,0.25),inset 0 0 15px rgba(0,0,0,0.4);}
+        .radar-button:active {transform:scale(0.95);}
+        .radar-icon {width:24px;height:24px;position:relative;display:flex;justify-content:center;align-items:center;filter:drop-shadow(0 0 2px rgba(255,255,255,0.5));animation:radar-scan 4s linear infinite;}
+        .radar-icon svg {width:100%;height:100%;}
+       
+        #svgSnifferModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            margin: ${CONFIG.panelSafeMargin};
+            max-width: calc(100vw - 2 * ${CONFIG.panelSafeMargin});
+            max-height: calc(100vh - 2 * ${CONFIG.panelSafeMargin});
+            min-width: ${CONFIG.panelMinSize};
+            min-height: ${CONFIG.panelMinSize};
+            width: auto;
+            height: auto;
+            z-index: 10000;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border: 1px solid #ddd;
+            display: none;
+            flex-direction: column;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
         }
-        .svg-sniffer-root *,
-        .svg-sniffer-root *::before,
-        .svg-sniffer-root *::after { box-sizing: border-box !important; margin: 0 !important; padding: 0 !important; }
-        .svg-sniffer-root { all: initial; }
-        .svg-sniffer-root { box-sizing: border-box !important; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important; }
-
-        /* ========== 雷达浮动按钮 ========== */
-        .ss-radar-container {
-            position: fixed !important; z-index: 999999 !important;
-            cursor: move !important; transition: transform .2s !important; touch-action: none !important;
-            margin: 0 !important; padding: 0 !important;
+        .modal-header {
+            padding: 12px 20px;
+            background:linear-gradient(135deg,#e74c3c,#922b21);
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
         }
-        .ss-radar-button {
-            width: ${CONFIG.buttonSize}px !important; height: ${CONFIG.buttonSize}px !important;
-            border-radius: 50% !important; display: flex !important; align-items: center !important; justify-content: center !important;
-            background: var(--ss-glass-header) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
-            border: 1px solid var(--ss-glass-border) !important; outline: none !important; position: relative !important;
-            overflow: hidden !important; user-select: none !important; -webkit-tap-highlight-color: transparent !important;
-            animation: ss-pulse 2s infinite !important; transition: transform .3s, box-shadow .3s !important;
-            box-shadow: 0 6px 18px rgba(99,102,241,.3), 0 0 0 4px rgba(255,255,255,.1), inset 0 1px 1px rgba(255,255,255,.2) !important;
-            margin: 0 !important; padding: 0 !important; flex-shrink: 0 !important;
+        .modal-header h2 {margin: 0; font-weight: 600;} 
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 18px !important; 
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
         }
-        .ss-radar-button:hover { transform: scale(1.08) !important; box-shadow: 0 8px 24px rgba(99,102,241,.4), 0 0 0 4px rgba(255,255,255,.2), inset 0 1px 1px rgba(255,255,255,.3) !important; }
-        .ss-radar-button:active { transform: scale(.95) !important; }
-        .ss-radar-button svg { width: 20px !important; height: 20px !important; animation: ss-scan 4s linear infinite !important; display: block !important; }
-        .ss-badge {
-            position: absolute !important; top: -4px !important; right: -4px !important; min-width: 16px !important; height: 16px !important;
-            border-radius: 8px !important; background: var(--ss-danger) !important; color: #fff !important;
-            font-size: 10px !important; font-weight: 700 !important; display: flex !important; align-items: center !important; justify-content: center !important;
-            padding: 0 4px !important; box-shadow: 0 2px 6px rgba(239,68,68,.4) !important; border: 2px solid var(--ss-glass) !important;
-            line-height: 1 !important; margin: 0 !important;
+        .close-btn:hover {background: rgba(255,255,255,0.2);}
+        .action-bar {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+            gap: 10px;
         }
-
-        /* ========== 遮罩层 ========== */
-        .ss-overlay {
-            position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important;
-            z-index: 999998 !important; background: rgba(15,23,42,.55) !important;
-            backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important;
-            display: none !important; animation: ss-fadeIn .25s ease !important; margin: 0 !important; padding: 0 !important;
+        .select-all-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-
-        /* ========== 模态框 ========== */
-        .ss-modal {
-            display: none !important; position: fixed !important; top: 50% !important; left: 50% !important;
-            transform: translate(-50%,-50%) !important; width: 92% !important; max-width: 880px !important; max-height: 85vh !important; height: auto !important;
-            background: var(--ss-glass) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
-            border: 1px solid var(--ss-glass-border) !important; z-index: 999999 !important; border-radius: var(--ss-radius-xl) !important;
-            box-shadow: var(--ss-shadow-xl) !important; overflow: hidden !important;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-            animation: ss-scaleIn .35s cubic-bezier(.16,1,.3,1) !important;
-            flex-direction: column !important; margin: 0 !important; padding: 0 !important;
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
         }
-        @media (max-width: 768px) { .ss-modal { width: 96% !important; max-height: 90vh !important; border-radius: var(--ss-radius-lg) !important; } }
-        @media (max-width: 768px) { .ss-modal-content { max-height: calc(90vh - 300px) !important; padding: 12px 16px !important; } }
-        @media (max-width: 768px) { .ss-toolbar { padding: 10px 16px !important; gap: 8px !important; } }
-        @media (max-width: 768px) { .ss-stats { padding: 8px 16px !important; } }
-        @media (max-width: 768px) { .ss-action-bar { padding: 10px 16px !important; } }
-        @media (max-width: 768px) { .ss-modal-header { padding: 14px 18px !important; } }
-        @media (max-width: 768px) { .ss-modal-header h2 { font-size: 1rem !important; } }
-
-        .ss-modal-header {
-            background: var(--ss-glass-header) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
-            border-bottom: 1px solid var(--ss-glass-border) !important; color: #fff !important; padding: 16px 24px !important;
-            display: flex !important; justify-content: space-between !important; align-items: center !important;
-            flex-shrink: 0 !important; margin: 0 !important; width: 100% !important;
-            box-shadow: 0 1px 3px rgba(0,0,0,.05) !important;
+        .action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: all 0.2s;
         }
-        .ss-modal-header h2 {
-            margin: 0 !important; font-size: 1.1rem !important; font-weight: 700 !important; letter-spacing: -0.01em !important;
-            display: flex !important; align-items: center !important; gap: 8px !important; color: #fff !important;
-            line-height: 1.4 !important; padding: 0 !important;
+        .download-btn {background: #27ae60;color: #fff;}
+        .download-btn:hover {background: #219653;transform: translateY(-2px);}
+        .copy-btn {background: #2980b9;color: #fff;}
+        .copy-btn:hover {background: #2573a7;transform: translateY(-2px);}
+        .dedupe-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 10px;
         }
-        .ss-modal-header h2 svg { width: 20px !important; height: 20px !important; flex-shrink: 0 !important; display: block !important; }
-        .ss-header-actions { display: flex !important; gap: 6px !important; align-items: center !important; flex-shrink: 0 !important; margin: 0 !important; padding: 0 !important; }
-        .ss-icon-btn {
-            width: 34px !important; height: 34px !important; border-radius: 50% !important; border: none !important; cursor: pointer !important;
-            display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(255,255,255,.12) !important;
-            color: #fff !important; transition: var(--ss-transition) !important; padding: 0 !important; margin: 0 !important; flex-shrink: 0 !important;
-            -webkit-appearance: none !important; appearance: none !important;
+        .dedupe-toggle {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
         }
-        .ss-icon-btn:hover { background: rgba(255,255,255,.25) !important; transform: scale(1.05) !important; }
-        .ss-icon-btn svg { width: 16px !important; height: 16px !important; display: block !important; }
-
-        /* ========== 工具栏 ========== */
-        .ss-toolbar {
-            display: flex !important; align-items: center !important; gap: 12px !important; padding: 12px 20px !important;
-            background: var(--ss-glass-alt) !important; border-bottom: 1px solid var(--ss-border) !important;
-            flex-wrap: wrap !important; flex-shrink: 0 !important; margin: 0 !important; width: 100% !important;
+        .dedupe-label {
+            color: #666;
+            font-size: 12px;
+            white-space: nowrap;
         }
-        .ss-search-box { flex: 1 1 180px !important; min-width: 120px !important; position: relative !important; margin: 0 !important; padding: 0 !important; }
-        .ss-search-box input {
-            width: 100% !important; height: 36px !important; padding: 0 12px 0 38px !important; border: 2px solid var(--ss-border) !important;
-            border-radius: var(--ss-radius) !important; font-size: 14px !important; color: var(--ss-text) !important;
-            background: var(--ss-glass-item) !important; transition: var(--ss-transition) !important; outline: none !important;
-            margin: 0 !important; -webkit-appearance: none !important; appearance: none !important;
-            display: block !important; box-sizing: border-box !important;
+        .modal-content {
+            padding: 15px;
+            overflow-y: auto;
+            flex-grow: 1;
+            min-height: 0;
         }
-        .ss-search-box input:focus { border-color: var(--ss-primary) !important; box-shadow: 0 0 0 3px rgba(99,102,241,.15) !important; }
-        .ss-search-box svg {
-            position: absolute !important; left: 12px !important; top: 50% !important; transform: translateY(-50%) !important;
-            width: 15px !important; height: 15px !important; color: var(--ss-text-muted) !important; pointer-events: none !important; display: block !important;
+        .svg-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+            justify-content: space-between;
+            gap: 10px;
+            min-width: 0;
         }
-        .ss-select {
-            height: 36px !important; padding: 0 10px !important; border: 2px solid var(--ss-border) !important; border-radius: var(--ss-radius-sm) !important;
-            font-size: 13px !important; color: var(--ss-text) !important; background: var(--ss-glass-item) !important;
-            cursor: pointer !important; outline: none !important; transition: var(--ss-transition) !important;
-            margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important;
-            flex-shrink: 0 !important;
+        .svg-item:hover {background: #f8fafc;}
+        .svg-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            flex-shrink: 0;
         }
-        .ss-select:focus { border-color: var(--ss-primary) !important; }
-        .ss-view-toggle { display: flex !important; gap: 2px !important; background: var(--ss-border) !important; border-radius: var(--ss-radius) !important; padding: 3px !important; margin: 0 !important; flex-shrink: 0 !important; }
-        .ss-view-toggle button {
-            height: 30px !important; padding: 0 12px !important; border: none !important; border-radius: 8px !important; cursor: pointer !important;
-            background: transparent !important; color: var(--ss-text-secondary) !important; font-size: 12px !important; transition: var(--ss-transition) !important;
-            margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; -webkit-appearance: none !important; appearance: none !important;
+        .svg-preview {
+            width: ${CONFIG.maxPreviewSize}px;
+            height: ${CONFIG.maxPreviewSize}px;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            background-image: 
+                linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+                linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+                linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+            background-size: 10px 10px;
+            background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+            background-color: #f8f8f8;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+            flex-shrink: 0;
+            min-width: ${CONFIG.maxPreviewSize}px; 
+            min-height: ${CONFIG.maxPreviewSize}px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        .ss-view-toggle button svg { width: 14px !important; height: 14px !important; display: block !important; }
-        .ss-view-toggle button.active { background: var(--ss-glass-hover) !important; color: var(--ss-primary) !important; font-weight: 600 !important; box-shadow: var(--ss-shadow-sm) !important; }
-
-        /* ========== 统计栏 ========== */
-        .ss-stats {
-            display: flex !important; gap: 8px !important; padding: 10px 20px !important; background: var(--ss-glass-alt) !important;
-            border-bottom: 1px solid var(--ss-border) !important; font-size: 12px !important; color: var(--ss-text-secondary) !important;
-            flex-shrink: 0 !important; margin: 0 !important; width: 100% !important; flex-wrap: wrap !important; align-items: center !important;
+        .svg-preview:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
-        .ss-stat-item { display: flex !important; align-items: center !important; gap: 4px !important; margin: 0 !important; padding: 0 !important; }
-        .ss-stat-item strong { color: var(--ss-primary) !important; font-size: 14px !important; font-weight: 700 !important; }
-        .ss-stat-pill {
-            display: inline-flex !important; align-items: center !important; gap: 4px !important;
-            background: var(--ss-glass-item) !important; border: 1px solid var(--ss-border) !important;
-            padding: 4px 10px !important; border-radius: 999px !important; font-size: 12px !important;
-            color: var(--ss-text-secondary) !important; margin: 0 !important; white-space: nowrap !important;
+        .svg-preview svg {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+            display: block !important;
+            max-width: ${CONFIG.maxPreviewSize}px !important;
+            max-height: ${CONFIG.maxPreviewSize}px !important;
         }
-        .ss-stat-pill strong { color: var(--ss-primary) !important; font-size: 13px !important; font-weight: 700 !important; }
-
-        /* ========== 操作栏 ========== */
-        .ss-action-bar {
-            display: flex !important; justify-content: space-between !important; align-items: center !important;
-            padding: 12px 20px !important; background: var(--ss-glass-alt) !important; border-top: 1px solid var(--ss-border) !important;
-            flex-shrink: 0 !important; margin: 0 !important; width: 100% !important; gap: 8px !important;
+        .svg-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
         }
-        .ss-select-all-control { display: flex !important; align-items: center !important; gap: 8px !important; font-size: 13px !important; color: var(--ss-text-secondary) !important; cursor: pointer !important; margin: 0 !important; padding: 0 !important; flex-shrink: 0 !important; }
-        .ss-select-all-control input {
-            width: 18px !important; height: 18px !important; cursor: pointer !important; accent-color: var(--ss-primary) !important;
-            margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important;
+        .svg-info {
+            flex-grow: 1;
+            min-width: 0;
         }
-        .ss-action-buttons { display: flex !important; gap: 8px !important; flex-wrap: wrap !important; margin: 0 !important; padding: 0 !important; }
-        .ss-btn {
-            height: 36px !important; padding: 0 14px !important; border: none !important; border-radius: var(--ss-radius) !important; cursor: pointer !important;
-            font-weight: 600 !important; font-size: 13px !important; transition: var(--ss-transition) !important;
-            display: flex !important; align-items: center !important; gap: 5px !important; margin: 0 !important;
-            -webkit-appearance: none !important; appearance: none !important; line-height: 1.4 !important; white-space: nowrap !important;
+        .svg-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #2c3e50;
+            margin-bottom: 3px;
+            max-width: 80px; 
         }
-        .ss-btn svg { width: 14px !important; height: 14px !important; display: block !important; flex-shrink: 0 !important; }
-        .ss-btn-primary { background: var(--ss-primary) !important; color: #fff !important; }
-        .ss-btn-primary:hover { background: var(--ss-primary-dark) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; filter: brightness(1.05) !important; }
-        .ss-btn-success { background: var(--ss-success) !important; color: #fff !important; }
-        .ss-btn-success:hover { filter: brightness(1.1) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
-        .ss-btn-secondary { background: var(--ss-glass-item) !important; color: var(--ss-text) !important; border: 1px solid var(--ss-border) !important; }
-        .ss-btn-secondary:hover { background: var(--ss-glass-hover) !important; border-color: var(--ss-primary) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; filter: brightness(1.02) !important; }
-        .ss-btn-danger { background: var(--ss-danger) !important; color: #fff !important; }
-        .ss-btn-danger:hover { filter: brightness(1.1) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
-
-        /* ========== 内容区 ========== */
-        .ss-modal-content { padding: 16px 20px !important; overflow-y: auto !important; flex: 0 1 auto !important; min-height: 0 !important; max-height: calc(85vh - 260px) !important; margin: 0 !important; width: 100% !important; }
-        .ss-modal-content::-webkit-scrollbar { width: 6px !important; }
-        .ss-modal-content::-webkit-scrollbar-track { background: transparent !important; }
-        .ss-modal-content::-webkit-scrollbar-thumb { background: var(--ss-border) !important; border-radius: 3px !important; }
-        .ss-modal-content::-webkit-scrollbar-thumb:hover { background: var(--ss-text-muted) !important; }
-
-        /* ========== 列表视图 ========== */
-        .ss-svg-list { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; padding: 0 !important; list-style: none !important; }
-        .ss-svg-item {
-            display: flex !important; align-items: center !important; padding: 12px 14px !important; border: 1px solid var(--ss-border) !important;
-            border-radius: 12px !important; transition: var(--ss-transition) !important; gap: 12px !important;
-            background: var(--ss-glass-item) !important; margin: 0 !important; width: 100% !important;
+        .svg-meta {
+            color: #6e6e73;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
         }
-        .ss-svg-item:hover { background: var(--ss-glass-hover) !important; border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-sm) !important; }
-        .ss-svg-checkbox {
-            width: 18px !important; height: 18px !important; cursor: pointer !important; accent-color: var(--ss-primary) !important; flex-shrink: 0 !important;
-            margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important;
+        .svg-meta span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 80px;
         }
-
-        /* ========== 预览尺寸 ========== */
-        .ss-preview { display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 10px !important; background: var(--ss-glass-alt) !important; background-image: linear-gradient(45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(-45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ss-border-light) 75%), linear-gradient(-45deg, transparent 75%, var(--ss-border-light) 75%) !important; background-size: 12px 12px !important; background-position: 0 0, 0 6px, 6px -6px, -6px 0px !important; border: 1px solid var(--ss-border) !important; flex-shrink: 0 !important; margin: 0 !important; overflow: hidden !important; }
-        .ss-preview[data-size="small"] { width: 40px !important; height: 40px !important; }
-        .ss-preview[data-size="medium"] { width: 52px !important; height: 52px !important; }
-        .ss-preview[data-size="large"] { width: 72px !important; height: 72px !important; }
-        .ss-preview svg { max-width: 80% !important; max-height: 80% !important; display: block !important; }
-        .ss-preview[data-size="large"] svg { max-width: 80% !important; max-height: 80% !important; display: block !important; }
-
-        .ss-svg-info { flex-grow: 1 !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
-        .ss-svg-name { font-size: 14px !important; color: var(--ss-text) !important; font-weight: 500 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; margin: 0 !important; padding: 0 !important; line-height: 1.4 !important; }
-        .ss-svg-meta { font-size: 11px !important; color: var(--ss-text-muted) !important; margin-top: 2px !important; display: flex !important; gap: 6px !important; padding: 0 !important; }
-        .ss-svg-tag { display: inline-block !important; padding: 2px 8px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 600 !important; margin: 0 !important; }
-        .ss-svg-tag-size { background: var(--ss-primary-bg) !important; color: var(--ss-primary) !important; }
-        .ss-svg-tag-dim { background: var(--ss-success-bg) !important; color: var(--ss-success) !important; }
-
-        .ss-item-actions { display: flex !important; gap: 4px !important; flex-shrink: 0 !important; margin: 0 !important; padding: 0 !important; }
-        .ss-item-btn {
-            width: 30px !important; height: 30px !important; border: 1px solid var(--ss-border) !important; border-radius: 50% !important;
-            background: var(--ss-glass-item) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important;
-            transition: var(--ss-transition) !important; color: var(--ss-text-secondary) !important; padding: 0 !important; margin: 0 !important;
-            -webkit-appearance: none !important; appearance: none !important; flex-shrink: 0 !important;
+        .item-download-btn {
+            padding: 5px 10px;
+            background: #e74c3c;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+            transition: background 0.2s;
         }
-        .ss-item-btn:hover { background: var(--ss-primary) !important; color: #fff !important; border-color: var(--ss-primary) !important; transform: scale(1.08) !important; }
-        .ss-item-btn svg { width: 14px !important; height: 14px !important; display: block !important; }
-
-        /* ========== 网格视图 ========== */
-        .ss-svg-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; gap: 12px !important; margin: 0 !important; padding: 0 !important; list-style: none !important; }
-        .ss-grid-card {
-            border: 1px solid var(--ss-border) !important; border-radius: 12px !important; padding: 10px !important;
-            background: var(--ss-glass-item) !important; transition: var(--ss-transition) !important; cursor: pointer !important; position: relative !important; margin: 0 !important;
+        .item-download-btn:hover {background: #c0392b;}
+        .overlay {display: none;position: fixed;top: 0;left: 0;width: 100%;height: 100%;background: rgba(0,0,0,0.5);z-index: 9999;}
+        
+        #imagePreviewModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: ${CONFIG.previewZoom.background};
+            z-index: 100001;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
         }
-        .ss-grid-card:hover { border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-md) !important; transform: translateY(-3px) !important; background: var(--ss-glass-hover) !important; }
-        .ss-grid-card .ss-grid-preview {
-            width: 100% !important; aspect-ratio: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important;
-            background: var(--ss-glass-alt) !important; background-image: linear-gradient(45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(-45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ss-border-light) 75%), linear-gradient(-45deg, transparent 75%, var(--ss-border-light) 75%) !important; background-size: 12px 12px !important; background-position: 0 0, 0 6px, 6px -6px, -6px 0px !important; border: 1px solid var(--ss-border) !important; border-radius: 10px !important; margin-bottom: 6px !important; overflow: hidden !important;
+        .preview-container {
+            position: relative;
+            width: ${CONFIG.previewZoom.maxWidth};
+            height: ${CONFIG.previewZoom.maxHeight};
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
-        .ss-grid-card .ss-grid-preview svg { max-width: 75% !important; max-height: 75% !important; display: block !important; }
-        .ss-grid-card .ss-grid-name { font-size: 12px !important; color: var(--ss-text) !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-weight: 500 !important; margin: 0 !important; padding: 0 !important; }
-        .ss-grid-card .ss-grid-meta { font-size: 10px !important; color: var(--ss-text-muted) !important; margin-top: 2px !important; padding: 0 !important; }
-        .ss-grid-card .ss-grid-checkbox { position: absolute !important; top: 4px !important; left: 4px !important; width: 16px !important; height: 16px !important; accent-color: var(--ss-primary) !important; z-index: 1 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; }
-        .ss-grid-card .ss-grid-actions { position: absolute !important; top: 4px !important; right: 4px !important; display: flex !important; gap: 3px !important; opacity: 0 !important; transition: var(--ss-transition) !important; margin: 0 !important; padding: 0 !important; }
-        .ss-grid-card:hover .ss-grid-actions { opacity: 1 !important; }
-        .ss-grid-card .ss-item-btn { width: 26px !important; height: 26px !important; }
-
-        /* ========== 下拉菜单 ========== */
-        .ss-dropdown {
-            position: absolute !important; bottom: 100% !important; right: 0 !important; margin-bottom: 6px !important;
-            background: var(--ss-glass) !important; backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important;
-            border: 1px solid var(--ss-glass-border) !important; border-radius: 12px !important;
-            box-shadow: var(--ss-shadow-lg) !important; z-index: 10 !important; overflow: hidden !important; min-width: 170px !important;
-            display: none !important; animation: ss-scaleIn .15s ease !important; padding: 0 !important;
+        .preview-header {
+            width: 100%;
+            height: ${CONFIG.previewZoom.headerHeight};
+            padding: 0 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            box-sizing: border-box;
         }
-        .ss-dropdown.show { display: block !important; }
-        .ss-dropdown-item {
-            display: flex !important; align-items: center !important; gap: 8px !important; padding: 10px 14px !important; cursor: pointer !important;
-            font-size: 13px !important; color: var(--ss-text) !important; transition: var(--ss-transition) !important; white-space: nowrap !important; margin: 0 !important;
+        .preview-title {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: calc(100% - 60px);
         }
-        .ss-dropdown-item:hover { background: var(--ss-glass-hover) !important; color: var(--ss-primary) !important; }
-        .ss-dropdown-item svg { width: 14px !important; height: 14px !important; display: block !important; flex-shrink: 0 !important; }
-        .ss-dropdown-item:first-child { border-radius: 12px 12px 0 0 !important; }
-        .ss-dropdown-item:last-child { border-radius: 0 0 12px 12px !important; }
-        .ss-dropdown-divider { height: 1px !important; background: var(--ss-border) !important; margin: 4px 0 !important; padding: 0 !important; }
-
-        /* ========== 空状态/加载 ========== */
-        .ss-empty, .ss-loading {
-            text-align: center !important; padding: 60px 20px !important; color: var(--ss-text-muted) !important; font-size: 14px !important; margin: 0 !important;
+        .preview-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #6c757d;
+            width: ${CONFIG.previewZoom.closeButtonSize};
+            height: ${CONFIG.previewZoom.closeButtonSize};
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
         }
-        .ss-loading svg { width: 36px !important; height: 36px !important; animation: ss-spin 1s linear infinite !important; margin-bottom: 16px !important; display: inline-block !important; }
-
-        /* ========== Toast 通知 ========== */
-        .ss-toast-container {
-            position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important;
-            z-index: 1000001 !important; display: flex !important; flex-direction: column !important; gap: 8px !important; align-items: center !important; pointer-events: none !important;
-            margin: 0 !important; padding: 0 !important;
+        .preview-close:hover {
+            background: #e9ecef;
+            color: #495057;
         }
-        .ss-toast {
-            padding: 12px 20px !important; border-radius: 12px !important; color: #fff !important; font-size: 14px !important; font-weight: 500 !important;
-            backdrop-filter: var(--ss-blur) !important; -webkit-backdrop-filter: var(--ss-blur) !important; border: 1px solid var(--ss-glass-border) !important;
-            box-shadow: var(--ss-shadow-lg) !important; display: flex !important; align-items: center !important; gap: 8px !important;
-            animation: ss-slideDown .3s ease, ss-fadeOut .4s ease 2.6s forwards !important; max-width: 90vw !important; margin: 0 !important;
+        .preview-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            padding: 20px;
+            box-sizing: border-box;
+            min-height: 0;
         }
-        .ss-toast.success { background: rgba(16,185,129,.82) !important; }
-        .ss-toast.error { background: rgba(239,68,68,.82) !important; }
-        .ss-toast.warning { background: rgba(245,158,11,.82) !important; }
-        .ss-toast.info { background: rgba(99,102,241,.82) !important; }
-
-        /* ========== 动画 ========== */
-        @keyframes ss-scan { to { transform: rotate(360deg); } }
-        @keyframes ss-pulse {
-            0% { box-shadow: 0 0 0 0 rgba(99,102,241,.4), 0 6px 18px rgba(99,102,241,.3), 0 0 0 4px rgba(255,255,255,.1); }
-            70% { box-shadow: 0 0 0 12px rgba(99,102,241,0), 0 6px 18px rgba(99,102,241,.3), 0 0 0 4px rgba(255,255,255,.1); }
-            100% { box-shadow: 0 0 0 0 rgba(99,102,241,0), 0 6px 18px rgba(99,102,241,.3), 0 0 0 4px rgba(255,255,255,.1); }
+        .preview-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
         }
-        @keyframes ss-fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes ss-fadeOut { to { opacity: 0; transform: translateY(-10px); } }
-        @keyframes ss-scaleIn { from { opacity: 0; transform: scale(.95); } to { opacity: 1; transform: scale(1); } }
-        @keyframes ss-slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes ss-spin { to { transform: rotate(360deg); } }
-        `);
+        .preview-svg {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+        }
+        .preview-footer {
+            width: 100%;
+            height: ${CONFIG.previewZoom.footerHeight};
+            padding: 0 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+        .preview-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .preview-download {
+            background: #27ae60;
+            color: white;
+        }
+        .preview-download:hover {
+            background: #219653;
+            transform: translateY(-1px);
+        }
+        .preview-copy {
+            background: #2980b9;
+            color: white;
+        }
+        .preview-copy:hover {
+            background: #2573a7;
+            transform: translateY(-1px);
+        }
+        
+        .loading {text-align: center;padding: 25px;color: #666;}
+        .copy-notification {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #27ae60;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 6px;
+            z-index: 100000;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        @keyframes radar-scan {0% {transform: rotate(0deg);} 100% {transform: rotate(360deg);}}
+        @keyframes pulse {0% {box-shadow: 0 0 0 0 rgba(231,76,60,0.6);} 70% {box-shadow: 0 0 0 12px rgba(231,76,60,0);} 100% {box-shadow: 0 0 0 0 rgba(231,76,60,0);}}
+        .temp-visible-for-scan {display: block !important;visibility: visible !important;opacity: 1 !important;position: absolute !important;top: -9999px !important;left: -9999px !important;width: auto !important;height: auto !important;}
+    `);
+    const radarContainer = document.createElement('div');
+    radarContainer.className = 'radar-container';
+    radarContainer.id = 'radarContainer';
+    
+    const radarButton = document.createElement('div');
+    radarButton.className = 'radar-button';
+    radarButton.id = 'radarButton';
+    radarButton.innerHTML = `
+        <div class="radar-icon">
+            <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.11 21 21 20.1 21 19V5C21 3.9 20.11 3 19 3ZM19 19H5V5H19V19ZM12 12C10.34 12 9 10.66 9 9C9 7.34 10.34 6 12 6C13.66 6 15 7.34 15 9C15 10.66 13.66 12 12 12ZM12 8C11.45 8 11 8.45 11 9C11 9.55 11.45 10 12 10C12.55 10 13 9.55 13 9C13 8.45 12.55 8 12 8Z"/>
+                <path d="M16.59 16.59L13.7 18.65C13.25 18.96 12.63 19 12 19C11.37 19 10.75 18.96 10.3 18.65L7.41 16.59L8.58 14.41L10.54 15.91C10.91 16.15 11.45 16.15 11.82 15.91L16.59 12.59L17.76 14.41L16.59 16.59Z"/>
+            </svg>
+        </div>
+    `;
+    
+    radarContainer.appendChild(radarButton);
+    document.body.appendChild(radarContainer);
+    const svgModal = document.createElement('div');
+    svgModal.id = 'svgSnifferModal';
+    svgModal.innerHTML = `
+        <div class="modal-header">
+            <h2>网页图片资源列表（支持动态加载与智能去重）</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+        <div class="action-bar">
+            <div class="select-all-control">
+                <input type="checkbox" id="selectAll">
+                <label for="selectAll">全选（共<span id="imageCount">0</span>张）</label>
+            </div>
+            <div class="action-buttons">
+                <button class="action-btn download-btn" id="batchDownloadBtn">批量下载</button>
+                <button class="action-btn copy-btn">复制链接</button>
+                <div class="dedupe-control">
+                    <input type="checkbox" id="dedupeToggle" class="dedupe-toggle" ${CONFIG.deduplication.enabled ? 'checked' : ''}>
+                    <label for="dedupeToggle" class="dedupe-label">智能去重</label>
+                </div>
+            </div>
+        </div>
+        <div class="modal-content" id="svgList">
+            <div class="loading">正在扫描页面图片资源（含CSS/隐藏元素/动态加载）...</div>
+        </div>
+    `;
+    document.body.appendChild(svgModal);
+    const imagePreviewModal = document.createElement('div');
+    imagePreviewModal.id = 'imagePreviewModal';
+    imagePreviewModal.innerHTML = `
+        <div class="preview-container">
+            <div class="preview-header">
+                <div class="preview-title" id="previewTitle">图片预览</div>
+                <button class="preview-close">&times;</button>
+            </div>
+            <div class="preview-content" id="previewContent">
+                <div class="loading">加载中...</div>
+            </div>
+            <div class="preview-footer">
+                <button class="preview-btn preview-download" id="previewDownload">下载图片</button>
+                <button class="preview-btn preview-copy" id="previewCopy">复制链接</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(imagePreviewModal);
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    document.body.appendChild(overlay);
+    const copyNotification = document.createElement('div');
+    copyNotification.className = 'copy-notification';
+    document.body.appendChild(copyNotification);
+    let globalImageItems = [];
+    let imageItemCache = new Map();
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+    let dragStartTime = 0;
+    let touchTimer = null;
+    let tempVisibleElements = [];
+    let scrollTimer = null;
+    let lastScrollHeight = document.documentElement.scrollHeight;
+    let isClickDetecting = false;
+    let blobUrlMap = new Map();
+    let currentPreviewItem = null;
+    let imageSignatureMap = new Map();
+    function truncateTo4Bytes(text) {
+        if (!text || typeof text !== 'string') return '';
+        let byteCount = 0;
+        let result = '';
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            const charBytes = /[\u4e00-\u9fa5]/.test(char) ? 2 : 1;
+            if (byteCount + charBytes > CONFIG.infoTruncateLength) break;
+            result += char;
+            byteCount += charBytes;
+            if (byteCount === CONFIG.infoTruncateLength) break;
+        }
+        return result;
     }
-
-    /* ================================================================
-     *  工具函数
-     * ================================================================ */
-    const utils = {
-        svgIcons: {
-            radar: `<svg viewBox="0 0 1024 1024" fill="white"><path d="M512 625.8c-63 0-113.8-51-113.8-113.8s51-113.8 113.8-113.8 113.8 51 113.8 113.8-50.8 113.8-113.8 113.8z m0-165.6c-28.6 0-51.8 23.2-51.8 51.8 0 28.6 23.2 51.8 51.8 51.8 28.6 0 51.8-23.2 51.8-51.8 0-28.6-23.2-51.8-51.8-51.8zM843.2 791.4c-6.6 0-12.8-2-18.6-6.2-13.6-10.4-16.6-29.8-6.2-43.4 50-66.6 76.6-146.2 76.6-229.8s-26.4-163-76.6-229.8c-10.4-13.6-7.4-33.2 6.2-43.4 13.6-10.4 33.2-7.4 43.4 6.2 58.4 77.4 89 169.8 89 267s-30.6 189.6-89 267c-6.2 8.2-15.4 12.4-24.8 12.4zM180.8 791.4c-9.6 0-18.6-4.2-24.8-12.4-58.4-77.4-89-169.8-89-267S97.6 322.4 156 245c10.4-13.6 29.8-16.6 43.4-6.2 13.6 10.4 16.6 29.8 6.2 43.4-50 66.6-76.6 146.2-76.6 229.8s26.4 163 76.6 229.8c10.4 13.6 7.4 33.2-6.2 43.4-5.4 4.2-12 6.2-18.6 6.2zM710.8 692c-6.6 0-12.8-2-18.6-6.2-13.6-10.4-16.6-29.8-6.2-43.4 28.6-37.6 43.4-82.8 43.4-130.4s-15-92.8-43.4-130.4c-10.4-13.6-7.4-33.2 6.2-43.4 13.6-10.4 33.2-7.4 43.4 6.2 36.4 48.8 55.8 106.8 55.8 167.6s-19.4 119.2-55.8 167.6c-6.2 8.4-15.4 12.4-24.8 12.4zM313.4 692c-9.6 0-18.6-4.2-24.8-12.4-36.4-48.8-55.8-106.8-55.8-167.6s19.4-119.2 55.8-167.6c10.4-13.6 29.8-16.6 43.4-6.2 13.6 10.4 16.6 29.8 6.2 43.4-28.6 37.6-43.4 82.8-43.4 130.4s15 92.8 43.4 130.4c10.4 13.6 7.4 33.2-6.2 43.4-5.4 4.2-12 6.2-18.6 6.2z"></path></svg>`,
-            search: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>`,
-            download: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>`,
-            copy: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm2.32-1h4.36A2.32 2.32 0 0 1 13 3.32v4.36A2.32 2.32 0 0 1 10.68 10H9v-.5h1.68A1.82 1.82 0 0 0 12.5 7.68V3.32A1.82 1.82 0 0 0 10.68 1.5H6.32A1.82 1.82 0 0 0 4.5 3.32V4H4v-.68A2.32 2.32 0 0 1 6.32 1z"/><path d="M2 6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6zm2-1a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1H4z"/></svg>`,
-            close: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>`,
-            sun: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0 1a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/></svg>`,
-            moon: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6 .278a.768.768 0 0 1 .08.8.769.769 0 0 1-.8.768 5.5 5.5 0 1 0 5.5 5.5.769.769 0 0 1 .768-.8A.768.768 0 0 1 12.5 6.5 6.5 6.5 0 1 1 6 .278z"/></svg>`,
-            list: `<svg viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z"/></svg>`,
-            grid: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm8 0A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5v-3zm-8 8A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm8 0A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z"/></svg>`,
-            settings: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z"/></svg>`,
-            code: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M10.478 1.547a.5.5 0 1 0-.956-.294l-4 13a.5.5 0 0 0 .956.294l4-13zM4.854 4.146a.5.5 0 0 1 0 .708L1.707 8l3.147 3.146a.5.5 0 0 1-.708.708l-3.5-3.5a.5.5 0 0 1 0-.708l3.5-3.5a.5.5 0 0 1 .708 0zm6.292 0a.5.5 0 0 0 0 .708L14.293 8l-3.147 3.146a.5.5 0 0 1-.708-.708l3.5-3.5a.5.5 0 0 1 0-.708l3.5-3.5z"/></svg>`,
-            zip: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 7.75A1.75 1.75 0 0 1 8.25 6h1.5a1.75 1.75 0 0 1 1.75 1.75v8.5A1.75 1.75 0 0 1 9.75 18h-3.5A1.75 1.75 0 0 1 4.5 16.25v-8.5a1.75 1.75 0 0 1 1.75-1.75h.25V7a.5.5 0 0 1 1 0v.25h.75zM7.5 7.75v.5a.5.5 0 0 0 1 0v-.5a.5.5 0 0 0-1 0z"/></svg>`,
-            optimize: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a.5.5 0 0 1 .4.2l3 4a.5.5 0 0 1-.8.6L8.5 1.5V7a.5.5 0 0 1-1 0V1.5L5.4 4.8a.5.5 0 1 1-.8-.6l3-4A.5.5 0 0 1 8 0zM3 8a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6A.5.5 0 0 1 3 8zm10 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0v-6a.5.5 0 0 1 .5-.5z"/></svg>`,
-            image: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/><path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-2.134-1.786a.5.5 0 0 0-.632 0L9.5 10.5l-2.734-2.286a.5.5 0 0 0-.632 0L1.002 12V3a1 1 0 0 1 1-1h12z"/></svg>`,
-        },
-
-        sanitizeFileName(name) {
-            return name.replace(/[^\w\u4e00-\u9fa5\-\s]/g, '_').replace(/\s+/g, '_').substring(0, CONFIG.maxNameLength).trim() || 'unnamed_svg';
-        },
-
-        formatBytes(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / 1048576).toFixed(2) + ' MB';
-        },
-
-        getSvgSize(svgHtml) {
-            return new Blob([svgHtml]).size;
-        },
-
-        getSvgDimensions(svg) {
-            const w = svg.getAttribute('width') || svg.getAttribute('viewBox')?.split(/\s+/)[2];
-            const h = svg.getAttribute('height') || svg.getAttribute('viewBox')?.split(/\s+/)[3];
-            const rect = svg.getBoundingClientRect();
-            return {
-                width: w ? Math.round(parseFloat(w)) : Math.round(rect.width) || 0,
-                height: h ? Math.round(parseFloat(h)) : Math.round(rect.height) || 0,
-            };
-        },
-
-        detectAutoTheme() {
-            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        },
-
-        getEffectiveTheme() {
-            return state.theme === 'auto' ? utils.detectAutoTheme() : state.theme;
-        },
-
-        minifySvg(svgHtml) {
-            return svgHtml
-                .replace(/<!--[\s\S]*?-->/g, '')
-                .replace(/\s+/g, ' ')
-                .replace(/>\s+</g, '><')
-                .replace(/\s+\/>/g, '/>')
-                .trim();
-        },
-
-        svgToDataUri(svgHtml) {
-            const encoded = encodeURIComponent(svgHtml)
-                .replace(/'/g, "%27")
-                .replace(/"/g, "%22");
-            return `data:image/svg+xml,${encoded}`;
-        },
-
-        svgToBase64(svgHtml) {
-            return btoa(unescape(encodeURIComponent(svgHtml)));
-        },
-
-        svgToReactComponent(svgHtml, name) {
-            const componentName = utils.sanitizeFileName(name)
-                .replace(/[-_\s](.)/g, (_, c) => c.toUpperCase())
-                .replace(/^(.)/, c => c.toUpperCase()) || 'SvgIcon';
-            const reactSvg = svgHtml
-                .replace(/\sclass=/g, ' className=')
-                .replace(/\sfor=/g, ' htmlFor=')
-                .replace(/\sstroke-width=/g, ' strokeWidth=')
-                .replace(/\sstroke-linecap=/g, ' strokeLinecap=')
-                .replace(/\sstroke-linejoin=/g, ' strokeLinejoin=')
-                .replace(/\sfill-rule=/g, ' fillRule=')
-                .replace(/\sclip-rule=/g, ' clipRule=')
-                .replace(/\sxmlns:xlink=/g, ' xmlnsXlink=');
-            return `const ${componentName} = (props) => (\n  ${reactSvg}\n);\n\nexport default ${componentName};`;
-        },
-
-        svgToCssBackground(svgHtml) {
-            const dataUri = utils.svgToDataUri(svgHtml);
-            return `background-image: url("${dataUri}");`;
-        },
-
-        async svgToPng(svgHtml, size = 512) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = size;
-                    canvas.height = size;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, size, size);
-                    canvas.toBlob(blob => {
-                        if (blob) resolve(blob);
-                        else reject(new Error('PNG conversion failed'));
-                    }, 'image/png');
-                };
-                img.onerror = () => reject(new Error('Image load failed'));
-                img.src = utils.svgToDataUri(svgHtml);
+    function completeImageSuffix(fileName, originalFormat) {
+        const extMatch = fileName.match(/\.([^.]+)$/);
+        const hasValidSuffix = extMatch 
+            ? CONFIG.supportFormats.includes(extMatch[1].toLowerCase()) 
+            : false;
+        if (hasValidSuffix) return fileName;
+        const targetFormat = (originalFormat && CONFIG.supportFormats.includes(originalFormat.toLowerCase())) 
+            ? originalFormat.toLowerCase() 
+            : CONFIG.defaultImageFormat;
+        return fileName.endsWith('.') 
+            ? `${fileName}${targetFormat}` 
+            : `${fileName}.${targetFormat}`;
+    }
+    function processSVGForPreview(svgContent) {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgContent, 'image/svg+xml');
+            const svgElement = doc.documentElement;
+            svgElement.removeAttribute('width');
+            svgElement.removeAttribute('height');
+            const viewBox = svgElement.getAttribute('viewBox') || `0 0 ${CONFIG.maxPreviewSize} ${CONFIG.maxPreviewSize}`;
+            svgElement.setAttribute('viewBox', viewBox);
+            svgElement.setAttribute('style', 'width:100%;height:100%;object-fit:contain;');
+            return svgElement.outerHTML;
+        } catch (error) {
+            console.warn('SVG处理失败，使用原始内容:', error);
+            return svgContent;
+        }
+    }
+    function getFileExtension(url) {
+        try {
+            const path = new URL(url).pathname;
+            const lastPart = path.split('/').pop();
+            const extMatch = lastPart.match(/\.([^.]+)$/);
+            return extMatch ? extMatch[1].toLowerCase() : '';
+        } catch {
+            return '';
+        }
+    }
+    function getImageName(url, altText) {
+        if (altText && altText.trim()) return altText.trim();
+        try {
+            const path = new URL(url).pathname;
+            const fileName = path.split('/').pop().split('?')[0].split('#')[0];
+            return fileName || `未知图片-${Date.now().toString().slice(-6)}`;
+        } catch {
+            return `未知图片-${Date.now().toString().slice(-6)}`;
+        }
+    }
+    function normalizeUrl(url) {
+        try {
+            const urlObj = new URL(url, window.location.href);
+            const paramsToRemove = ['v', 'version', 'ts', 'timestamp', 't', 'time', 'width', 'height', 'size'];
+            paramsToRemove.forEach(param => {
+                if (urlObj.searchParams.has(param)) {
+                    urlObj.searchParams.delete(param);
+                }
             });
-        },
-    };
-
-    /* ================================================================
-     *  SVG 收集器 — 去重 + 尺寸检测 + 智能命名
-     * ================================================================ */
-    const svgCollector = {
-        collect() {
-            const svgElements = document.querySelectorAll('svg');
-            const seen = new Set();
-            const items = [];
-
-            svgElements.forEach((svg, index) => {
-                const html = svg.outerHTML;
-                // Deduplicate by content hash (first 200 chars + length)
-                const hash = html.length + ':' + html.substring(0, 200);
-                if (seen.has(hash)) return;
-                // Skip tiny SVGs (likely icons < 10px or hidden)
-                const rect = svg.getBoundingClientRect();
-                if (rect.width === 0 && rect.height === 0) {
-                    const vb = svg.getAttribute('viewBox');
-                    if (!vb) return;
+            return urlObj.href;
+        } catch {
+            return url;
+        }
+    }
+    async function simpleHash(arrayBuffer) {
+        const hashBuffer = await crypto.subtle.digest('SHA-1', arrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+    }
+    async function generateContentSignature(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const contentLength = response.headers.get('content-length');
+            if (contentLength && parseInt(contentLength) > CONFIG.deduplication.maxFileSizeForCheck) {
+                return 'oversized';
+            }
+            
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const hash = await simpleHash(arrayBuffer);
+            return `content-${hash}`;
+        } catch (error) {
+            return `error-${error.message}`;
+        }
+    }
+    function normalizeSVGContent(svgContent) {
+        if (!svgContent) return '';
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(svgContent, 'image/svg+xml');
+            const svgElement = doc.documentElement;
+            
+            const attributesToRemove = ['id', 'class', 'style'];
+            attributesToRemove.forEach(attr => {
+                if (svgElement.hasAttribute(attr)) {
+                    svgElement.removeAttribute(attr);
                 }
-                seen.add(hash);
-
-                const name = this.guessName(svg, index);
-                const cloned = svg.cloneNode(true);
-                this.cleanSvg(cloned);
-                const dims = utils.getSvgDimensions(svg);
-                const svgHtml = cloned.outerHTML;
-                const size = utils.getSvgSize(svgHtml);
-
-                items.push({
-                    id: `svg-${index}-${Date.now()}`,
-                    name,
-                    svg: svgHtml,
-                    size,
-                    width: dims.width,
-                    height: dims.height,
-                    index,
-                });
             });
-
-            return items;
-        },
-
-        guessName(svg, index) {
-            // Try aria-label or title
-            const ariaLabel = svg.getAttribute('aria-label');
-            if (ariaLabel) return ariaLabel.trim();
-            const titleEl = svg.querySelector('title');
-            if (titleEl && titleEl.textContent.trim()) return titleEl.textContent.trim();
-            // Try id
-            const id = svg.getAttribute('id');
-            if (id) return id.replace(/[-_]/g, ' ').trim();
-            // Try class
-            const cls = svg.getAttribute('class');
-            if (cls) {
-                const meaningful = cls.split(/\s+/).find(c => c.length > 2 && !c.startsWith('ss-'));
-                if (meaningful) return meaningful.replace(/[-_]/g, ' ');
-            }
-            // Try parent context
-            let parent = svg.parentElement;
-            while (parent && parent !== document.body) {
-                const nameEl = parent.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"], [alt]');
-                if (nameEl) {
-                    const text = nameEl.getAttribute('alt') || nameEl.textContent.trim();
-                    if (text && text.length < 80) return text.substring(0, CONFIG.maxNameLength);
+            
+            const paths = svgElement.querySelectorAll('path');
+            paths.forEach(path => {
+                if (path.hasAttribute('d')) {
+                    const d = path.getAttribute('d')
+                        .replace(/\s+/g, ' ')
+                        .replace(/([a-zA-Z])\s+/g, '$1')
+                        .trim();
+                    path.setAttribute('d', d);
                 }
-                parent = parent.parentElement;
+            });
+            
+            return svgElement.outerHTML;
+        } catch (error) {
+            console.warn('SVG标准化失败，使用原始内容:', error);
+            return svgContent;
+        }
+    }
+    async function generateImageSignature(imgItem) {
+        const urlSignature = normalizeUrl(imgItem.url);
+        
+        if (CONFIG.deduplication.checkContent && 
+            !imgItem.url.startsWith('blob:') && 
+            !imgItem.url.startsWith('data:')) {
+            try {
+                const contentSignature = await generateContentSignature(imgItem.url);
+                return `${urlSignature}|${contentSignature}`;
+            } catch (error) {
+                console.warn('内容签名生成失败，使用URL签名:', error);
             }
-            return `SVG ${index + 1}`;
-        },
-
-        cleanSvg(svg) {
-            svg.removeAttribute('onclick');
-            svg.removeAttribute('onmouseover');
-            svg.removeAttribute('onmouseout');
-            svg.removeAttribute('onload');
-            // Remove script tags inside SVG
-            svg.querySelectorAll('script').forEach(s => s.remove());
-        },
-    };
-
-    /* ================================================================
-     *  下载管理器
-     * ================================================================ */
-    const downloadManager = {
-        downloadSingle(item, format = 'svg') {
-            const cleanName = utils.sanitizeFileName(item.name);
-
-            if (format === 'svg') {
-                this.downloadBlob(new Blob([`<?xml version="1.0" encoding="UTF-8"?>${item.svg}`], { type: 'image/svg+xml;charset=utf-8' }), `${cleanName}.svg`);
-            } else if (format === 'minified') {
-                const minified = utils.minifySvg(item.svg);
-                this.downloadBlob(new Blob([`<?xml version="1.0" encoding="UTF-8"?>${minified}`], { type: 'image/svg+xml;charset=utf-8' }), `${cleanName}.min.svg`);
-            } else if (format === 'png') {
-                utils.svgToPng(item.svg, 512).then(blob => {
-                    this.downloadBlob(blob, `${cleanName}.png`);
-                    toast.show(`PNG导出成功: ${cleanName}.png`, 'success');
-                }).catch(() => toast.show('PNG转换失败，可能含跨域资源', 'error'));
-            }
-        },
-
-        downloadZip(items, format = 'svg') {
-            const zip = new JSZip();
-            const usedNames = new Set();
-
-            items.forEach(item => {
-                let name = utils.sanitizeFileName(item.name);
-                let fileName = `${name}.${format === 'minified' ? 'min.svg' : format === 'png' ? 'png' : 'svg'}`;
-                // Avoid duplicate filenames
-                if (usedNames.has(fileName)) {
-                    fileName = `${name}_${item.id.slice(-4)}.${format === 'minified' ? 'min.svg' : format === 'png' ? 'png' : 'svg'}`;
-                }
-                usedNames.add(fileName);
-
-                let content;
-                if (format === 'minified') {
-                    content = `<?xml version="1.0" encoding="UTF-8"?>${utils.minifySvg(item.svg)}`;
+        }
+        
+        return urlSignature;
+    }
+    async function checkAndRemoveDuplicates(newImageItems) {
+        if (!CONFIG.deduplication.enabled) {
+            return newImageItems;
+        }
+        const uniqueItems = [];
+        const seenSignatures = new Set();
+        
+        for (const imgItem of newImageItems) {
+            try {
+                let signature;
+                
+                if (imgItem.format === 'svg' && imgItem.svgContent) {
+                    const normalizedContent = normalizeSVGContent(imgItem.svgContent);
+                    signature = await simpleHash(new TextEncoder().encode(normalizedContent));
+                    signature = `svg-${signature}`;
                 } else {
-                    content = `<?xml version="1.0" encoding="UTF-8"?>${item.svg}`;
+                    signature = await generateImageSignature(imgItem);
                 }
-                zip.file(fileName, content);
-            });
-
-            zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
-                .then(content => {
-                    const ts = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-');
-                    const zipName = `svg_collection_${ts}.zip`;
-                    this.downloadBlob(content, zipName);
-                    toast.show(`批量下载成功: ${zipName} (${items.length}个)`, 'success');
-                })
-                .catch(() => {
-                    toast.show('创建压缩包失败，尝试逐个下载', 'error');
-                    items.slice(0, 3).forEach(i => this.downloadSingle(i, format));
-                });
-        },
-
-        downloadBlob(blob, fileName) {
-            try {
-                saveAs(blob, fileName);
-            } catch {
-                const url = URL.createObjectURL(blob);
-                state.blobUrls.push(url);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = fileName;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                    state.blobUrls = state.blobUrls.filter(u => u !== url);
-                }, 100);
+                
+                if (!seenSignatures.has(signature)) {
+                    seenSignatures.add(signature);
+                    imageSignatureMap.set(imgItem.id, signature);
+                    uniqueItems.push(imgItem);
+                } else {
+                    console.log('跳过重复图片:', imgItem.name, imgItem.url);
+                }
+            } catch (error) {
+                console.warn('去重检查失败，保留图片:', imgItem.name, error);
+                uniqueItems.push(imgItem);
             }
-        },
-
-        copyContent(content, label) {
-            try {
-                GM_setClipboard(content, 'text');
-                toast.show(`已复制: ${label}`, 'success');
-            } catch {
-                const ta = document.createElement('textarea');
-                ta.value = content;
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                toast.show(`已复制: ${label}`, 'success');
-            }
-        },
-
-        clearBlobUrls() {
-            state.blobUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
-            state.blobUrls = [];
-        },
-    };
-
-    /* ================================================================
-     *  Toast 通知系统
-     * ================================================================ */
-    const toast = {
-        container: null,
-        init() {
-            this.container = document.createElement('div');
-            this.container.className = 'ss-toast-container';
-            document.body.appendChild(this.container);
-        },
-        show(message, type = 'info') {
-            if (!this.container) this.init();
-            const el = document.createElement('div');
-            el.className = `ss-toast ${type}`;
-            el.textContent = message;
-            this.container.appendChild(el);
-            // Limit toasts
-            while (this.container.children.length > CONFIG.maxToasts) {
-                this.container.removeChild(this.container.firstChild);
-            }
-            setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, CONFIG.toastDuration);
-        },
-    };
-
-    /* ================================================================
-     *  UI 构建
-     * ================================================================ */
-    const ui = {
-        root: null,
-        radar: null,
-        radarBtn: null,
-        badge: null,
-        overlay: null,
-        modal: null,
-        searchInput: null,
-        sortSelect: null,
-        selectAllCheckbox: null,
-        contentEl: null,
-        statsEl: null,
-        copyDropdown: null,
-
-        build() {
-            this.root = document.createElement('div');
-            this.root.className = 'svg-sniffer-root';
-            this.root.dataset.theme = utils.getEffectiveTheme();
-            document.body.appendChild(this.root);
-
-            this.buildRadar();
-            this.buildOverlay();
-            this.buildModal();
-            this.buildToast();
-        },
-
-        buildRadar() {
-            this.radar = document.createElement('div');
-            this.radar.className = 'ss-radar-container';
-            this.radar.id = 'ss-radar';
-
-            this.radarBtn = document.createElement('div');
-            this.radarBtn.className = 'ss-radar-button';
-            this.radarBtn.innerHTML = utils.svgIcons.radar;
-
-            this.badge = document.createElement('div');
-            this.badge.className = 'ss-badge';
-            this.badge.style.setProperty('display', 'none', 'important');
-
-            this.radar.appendChild(this.radarBtn);
-            this.radar.appendChild(this.badge);
-            this.root.appendChild(this.radar);
-        },
-
-        buildOverlay() {
-            this.overlay = document.createElement('div');
-            this.overlay.className = 'ss-overlay';
-            this.root.appendChild(this.overlay);
-        },
-
-        buildModal() {
-            this.modal = document.createElement('div');
-            this.modal.className = 'ss-modal';
-            this.modal.innerHTML = `
-                <div class="ss-modal-header">
-                    <h2>${utils.svgIcons.radar} SVG资源嗅探器</h2>
-                    <div class="ss-header-actions">
-                        <button class="ss-icon-btn" id="ss-theme-toggle" title="切换主题">${utils.svgIcons.sun}</button>
-                        <button class="ss-icon-btn" id="ss-close-btn" title="关闭">${utils.svgIcons.close}</button>
+        }
+        
+        const removedCount = newImageItems.length - uniqueItems.length;
+        if (removedCount > 0) {
+            showNotification(`已自动过滤 ${removedCount} 张重复图片`, 'info');
+        }
+        
+        return uniqueItems;
+    }
+    function createImageItemElement(item) {
+        const itemElement = document.createElement('div');
+        itemElement.className = 'svg-item';
+        
+        const truncatedTitle = item.name;
+        const fullName = item.originalName || truncatedTitle;
+        const fullFormat = item.originalFormat || CONFIG.defaultImageFormat;
+        const fullType = item.originalType || item.type;
+        const completedFileName = completeImageSuffix(fullName, fullFormat);
+        
+        let previewHtml = '';
+        if (item.format === 'svg' && item.svgContent) {
+            previewHtml = item.svgContent;
+        } else {
+            previewHtml = `<img src="${item.preview}" alt="${fullName}" loading="lazy" onError="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiByeD0iMTUiIGZpbGw9IiNmNGY0ZjQiLz4KPHBhdGggZD0iTTIwIDI1QzIwIDI1IDIyIDIyIDI1IDIyQzI4IDIyIDMwIDI1IDMwIDI1QzMwIDI1IDI4IDI4IDI1IDI4QzIyIDI4IDIwIDI1IDIwIDI1WiIgc3Ryb2tlPSIjNzc3IiBzdHJva2Utd2lkdGg9IjIiLz4KPHBhdGggZD0iTTMwIDI1QzMwIDI1IDI4IDI4IDI1IDI4QzIyIDI4IDIwIDI1IDIwIDI1QzIwIDI1IDIyIDIyIDI1IDIyQzI4IDIyIDMwIDI1IDMwIDI1WiIgc3Ryb2tlPSIjNzc3IiBzdHJva2Utd2lkdGg9IjIiLz4KPHBhdGggZD0iTTI1IDMwQzI1IDMwIDI1IDM1IDI1IDM1QzI1IDM1IDI1IDMwIDI1IDMwWiIgc3Ryb2tlPSIjNzc3IiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+Cg=='">`;
+        }
+        
+        itemElement.innerHTML = `
+            <div style="display: flex; align-items: center; min-width: 0; gap: 10px;">
+                <input type="checkbox" class="svg-checkbox" data-id="${item.id}" checked>
+                <div class="svg-preview" data-img-id="${item.id}">${previewHtml}</div>
+                <div class="svg-info">
+                    <div class="svg-name" title="文件名：${completedFileName}">${truncatedTitle}</div>
+                    <div class="svg-meta">
+                        <span title="格式：${fullFormat || CONFIG.defaultImageFormat}">格式: ${item.format}</span>
+                        <span title="类型：${fullType}">类型: ${item.type}</span>
                     </div>
                 </div>
-                <div class="ss-toolbar">
-                    <div class="ss-search-box">
-                        ${utils.svgIcons.search}
-                        <input type="text" id="ss-search" placeholder="搜索SVG名称..." />
-                    </div>
-                    <select class="ss-select" id="ss-sort">
-                        <option value="position">按位置排序</option>
-                        <option value="name">按名称排序</option>
-                        <option value="size-desc">按大小(大→小)</option>
-                        <option value="size-asc">按大小(小→大)</option>
-                    </select>
-                    <select class="ss-select" id="ss-preview-size">
-                        <option value="small">小预览</option>
-                        <option value="medium">中预览</option>
-                        <option value="large">大预览</option>
-                    </select>
-                    <div class="ss-view-toggle">
-                        <button data-view="list" class="${state.viewMode === 'list' ? 'active' : ''}">${utils.svgIcons.list} 列表</button>
-                        <button data-view="grid" class="${state.viewMode === 'grid' ? 'active' : ''}">${utils.svgIcons.grid} 网格</button>
-                    </div>
-                </div>
-                <div class="ss-stats" id="ss-stats"></div>
-                <div class="ss-modal-content" id="ss-content">
-                    <div class="ss-loading">${utils.svgIcons.radar}<br>正在扫描页面SVG资源...</div>
-                </div>
-                <div class="ss-action-bar">
-                    <label class="ss-select-all-control">
-                        <input type="checkbox" id="ss-select-all"> 全选
-                    </label>
-                    <div class="ss-action-buttons">
-                        <div style="position: relative; display: inline-flex;">
-                            <button class="ss-btn ss-btn-secondary" id="ss-copy-btn">${utils.svgIcons.copy} 复制</button>
-                            <div class="ss-dropdown" id="ss-copy-dropdown">
-                                <div class="ss-dropdown-item" data-copy="svg">复制 SVG 源码</div>
-                                <div class="ss-dropdown-item" data-copy="minified">复制压缩 SVG</div>
-                                <div class="ss-dropdown-item" data-copy="datauri">复制 Data URI</div>
-                                <div class="ss-dropdown-item" data-copy="base64">复制 Base64</div>
-                                <div class="ss-dropdown-item" data-copy="react">复制 React 组件</div>
-                                <div class="ss-dropdown-item" data-copy="css">复制 CSS 背景</div>
-                            </div>
-                        </div>
-                        <div style="position: relative; display: inline-flex;">
-                            <button class="ss-btn ss-btn-success" id="ss-download-btn">${utils.svgIcons.download} 下载</button>
-                            <div class="ss-dropdown" id="ss-download-dropdown">
-                                <div class="ss-dropdown-item" data-dl="svg">${utils.svgIcons.download} 下载 SVG</div>
-                                <div class="ss-dropdown-item" data-dl="minified">${utils.svgIcons.optimize} 下载压缩 SVG</div>
-                                <div class="ss-dropdown-item" data-dl="png">${utils.svgIcons.image} 下载 PNG (512px)</div>
-                                <div class="ss-dropdown-item" data-dl="zip">${utils.svgIcons.zip} 打包 ZIP</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            this.root.appendChild(this.modal);
-
-            this.searchInput = this.modal.querySelector('#ss-search');
-            this.sortSelect = this.modal.querySelector('#ss-sort');
-            this.selectAllCheckbox = this.modal.querySelector('#ss-select-all');
-            this.contentEl = this.modal.querySelector('#ss-content');
-            this.statsEl = this.modal.querySelector('#ss-stats');
-            this.copyDropdown = this.modal.querySelector('#ss-copy-dropdown');
-            this.previewSizeSelect = this.modal.querySelector('#ss-preview-size');
-
-            // Restore saved settings
-            this.previewSizeSelect.value = state.previewSize;
-        },
-
-        buildToast() {
-            toast.init();
-        },
-
-        updateBadge(count) {
-            if (count > 0) {
-                this.badge.textContent = count > 99 ? '99+' : count;
-                this.badge.style.setProperty('display', 'flex', 'important');
-            } else {
-                this.badge.style.setProperty('display', 'none', 'important');
+            </div>
+            <button class="item-download-btn" data-img-id="${item.id}" title="下载 ${completedFileName}">下载</button>
+        `;
+        const previewElement = itemElement.querySelector('.svg-preview');
+        previewElement.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const imgId = e.currentTarget.dataset.imgId;
+            const imgItem = imageItemCache.get(imgId);
+            if (imgItem) {
+                showImagePreview(imgItem);
             }
-        },
-
-        updateStats(total, filtered, totalSize) {
-            this.statsEl.innerHTML = `
-                <div class="ss-stat-pill">共 <strong>${total}</strong> 个</div>
-                <div class="ss-stat-pill">显示 <strong>${filtered}</strong> 个</div>
-                <div class="ss-stat-pill">总大小 <strong>${utils.formatBytes(totalSize)}</strong></div>
-            `;
-        },
-
-        setTheme(theme) {
-            state.theme = theme;
-            GM_setValue(STORAGE_KEYS.theme, theme);
-            this.root.dataset.theme = utils.getEffectiveTheme();
-            const btn = this.modal.querySelector('#ss-theme-toggle');
-            if (btn) btn.innerHTML = utils.getEffectiveTheme() === 'dark' ? utils.svgIcons.sun : utils.svgIcons.moon;
-        },
-
-        toggleTheme() {
-            const current = utils.getEffectiveTheme();
-            this.setTheme(current === 'dark' ? 'light' : 'dark');
-        },
-    };
-
-    /* ================================================================
-     *  列表渲染器
-     * ================================================================ */
-    const renderer = {
-        render() {
-            const items = controller.getFilteredItems();
-            if (items.length === 0) {
-                ui.contentEl.innerHTML = `<div class="ss-empty">暂无SVG资源</div>`;
-                return;
+        });
+        const itemDownloadBtn = itemElement.querySelector('.item-download-btn');
+        itemDownloadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const imgId = e.currentTarget.dataset.imgId;
+            const imgItem = imageItemCache.get(imgId);
+            if (imgItem) {
+                downloadImage(imgItem, imgItem.originalName, imgItem.originalFormat);
             }
-
-            if (state.viewMode === 'grid') {
-                this.renderGrid(items);
-            } else {
-                this.renderList(items);
+        });
+        return itemElement;
+    }
+    function showImagePreview(imgItem) {
+        currentPreviewItem = imgItem;
+        const modal = document.getElementById('imagePreviewModal');
+        const title = document.getElementById('previewTitle');
+        const content = document.getElementById('previewContent');
+        const downloadBtn = document.getElementById('previewDownload');
+        const copyBtn = document.getElementById('previewCopy');
+        const closeBtn = modal.querySelector('.preview-close');
+        const completedFileName = completeImageSuffix(imgItem.originalName || imgItem.name, imgItem.originalFormat);
+        title.textContent = completedFileName;
+        content.innerHTML = '<div class="loading">加载中...</div>';
+        modal.style.display = 'flex';
+        
+        // 修复：正确定义预览内容，移除原错误的imgInfo变量引用
+        let previewContent = '';
+        if (imgItem.format === 'svg' && imgItem.svgContent) {
+            const processedSvg = processSVGForPreview(imgItem.svgContent);
+            previewContent = `<div class="preview-svg">${processedSvg}</div>`;
+        } else {
+            previewContent = `<img class="preview-image" src="${imgItem.url}" alt="${completedFileName}" onload="this.style.opacity='1'" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjZjRmNGY0Ii8+CjxwYXRoIGQ9Ik04MCA4MEM4MCA4MCA4OCA3MCAxMDAgNzBDMTEyIDcwIDEyMCA4MCAxMjAgODBDMTIwIDgwIDExMiA5MCAxMDAgOTBDODggOTAgODAgODAgODAgODBaIiBzdHJva2U9IiM3NzciIHN0cm9rZS13aWR0aD0iNCIvPgo8cGF0aCBkPSJNMTIwIDgwQzEyMCA4MCAxMTIgOTAgMTAwIDkwQzg4IDkwIDgwIDgwIDgwIDgwQzgwIDgwIDg4IDcwIDEwMCA3MEMxMTIgNzAgMTIwIDgwIDEyMCA4MFoiIHN0cm9rZT0iIzc3NyIgc3Ryb2tlLXdpZHRoPSI0Ii8+CjxwYXRoIGQ9Ik0xMDAgMTIwQzEwMCAxMjAgMTAwIDE0MCAxMDAgMTQwQzEwMCAxNDAgMTAwIDEyMCAxMDAgMTIwWiIgc3Ryb2tlPSIjNzc3IiBzdHJva2Utd2lkdGg9IjQiLz4KPC9zdmc+Cg=='" style="opacity:0;transition:opacity 0.3s">`;
+        }
+        content.innerHTML = previewContent;
+        
+        downloadBtn.onclick = () => {
+            downloadImage(imgItem, imgItem.originalName, imgItem.originalFormat);
+        };
+        
+        // 修复：优化复制逻辑，补充异常捕获，确保URL正确传递
+        previewCopy.onclick = async () => {
+    if (!currentPreviewItem || !currentPreviewItem.url) {
+        showNotification('复制失败：图片URL不存在', 'error');
+        return;
+    }
+    
+    try {
+        let urlToCopy = currentPreviewItem.url;
+        
+        // 对于SVG内容，创建blob URL
+        if (currentPreviewItem.format === 'svg' && currentPreviewItem.svgContent) {
+            const svgBlob = new Blob([currentPreviewItem.svgContent], { type: 'image/svg+xml' });
+            urlToCopy = createManagedBlobUrl(svgBlob);
+        }
+        
+        // 使用更可靠的复制方法
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(urlToCopy);
+        } else {
+            // 使用备用方法
+            const textArea = document.createElement('textarea');
+            textArea.value = urlToCopy;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (!successful) {
+                throw new Error('execCommand 复制失败');
             }
-            this.bindItemEvents();
-        },
-
-        renderList(items) {
-            ui.contentEl.innerHTML = `<div class="ss-svg-list"></div>`;
-            const listEl = ui.contentEl.querySelector('.ss-svg-list');
-
-            items.forEach(item => {
-                const el = document.createElement('div');
-                el.className = 'ss-svg-item';
-                el.dataset.id = item.id;
-                el.innerHTML = `
-                    <input type="checkbox" class="ss-svg-checkbox" data-id="${item.id}" checked>
-                    <div class="ss-preview" data-size="${state.previewSize}">${item.svg}</div>
-                    <div class="ss-svg-info">
-                        <div class="ss-svg-name" title="${item.name}">${item.name}</div>
-                        <div class="ss-svg-meta">
-                            <span class="ss-svg-tag ss-svg-tag-size">${utils.formatBytes(item.size)}</span>
-                            <span class="ss-svg-tag ss-svg-tag-dim">${item.width}×${item.height}</span>
-                        </div>
-                    </div>
-                    <div class="ss-item-actions">
-                        <button class="ss-item-btn" data-action="download" data-id="${item.id}" title="下载">${utils.svgIcons.download}</button>
-                        <button class="ss-item-btn" data-action="copy" data-id="${item.id}" title="复制">${utils.svgIcons.copy}</button>
-                    </div>
-                `;
-                listEl.appendChild(el);
-            });
-        },
-
-        renderGrid(items) {
-            ui.contentEl.innerHTML = `<div class="ss-svg-grid"></div>`;
-            const gridEl = ui.contentEl.querySelector('.ss-svg-grid');
-
-            items.forEach(item => {
-                const el = document.createElement('div');
-                el.className = 'ss-grid-card';
-                el.dataset.id = item.id;
-                el.innerHTML = `
-                    <input type="checkbox" class="ss-grid-checkbox" data-id="${item.id}" checked>
-                    <div class="ss-grid-preview">${item.svg}</div>
-                    <div class="ss-grid-name" title="${item.name}">${item.name}</div>
-                    <div class="ss-grid-meta">${utils.formatBytes(item.size)} · ${item.width}×${item.height}</div>
-                    <div class="ss-grid-actions">
-                        <button class="ss-item-btn" data-action="download" data-id="${item.id}" title="下载">${utils.svgIcons.download}</button>
-                        <button class="ss-item-btn" data-action="copy" data-id="${item.id}" title="复制">${utils.svgIcons.copy}</button>
-                    </div>
-                `;
-                gridEl.appendChild(el);
-            });
-        },
-
-        bindItemEvents() {
-            ui.contentEl.querySelectorAll('[data-action="download"]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const item = state.cache.get(btn.dataset.id);
-                    if (item) downloadManager.downloadSingle(item, 'svg');
-                });
-            });
-            ui.contentEl.querySelectorAll('[data-action="copy"]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const item = state.cache.get(btn.dataset.id);
-                    if (item) {
-                        downloadManager.copyContent(item.svg, item.name);
-                    }
-                });
-            });
-        },
-    };
-
-    /* ================================================================
-     *  控制器 — 搜索/排序/选择
-     * ================================================================ */
-    const controller = {
-        getFilteredItems() {
-            let items = [...state.svgItems];
-
-            // Filter
-            if (state.currentFilter) {
-                const q = state.currentFilter.toLowerCase();
-                items = items.filter(i => i.name.toLowerCase().includes(q));
+        }
+        
+        showNotification('图片链接已成功复制到剪贴板', 'success');
+    } catch (error) {
+        console.error('预览窗口复制链接失败:', error);
+        showNotification('复制失败，请重试', 'error');
+    }
+};
+        
+        closeBtn.onclick = () => {
+            modal.style.display = 'none';
+            currentPreviewItem = null;
+        };
+        
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+                currentPreviewItem = null;
             }
-
-            // Sort
-            switch (state.currentSort) {
-                case 'name':
-                    items.sort((a, b) => a.name.localeCompare(b.name, 'zh'));
-                    break;
-                case 'size-desc':
-                    items.sort((a, b) => b.size - a.size);
-                    break;
-                case 'size-asc':
-                    items.sort((a, b) => a.size - b.size);
-                    break;
-                default: // position — keep original order
-                    items.sort((a, b) => a.index - b.index);
+        };
+        
+        // 修复：确保键盘事件正确绑定与移除
+        const handleEscape = function(e) {
+            if (e.key === 'Escape') {
+                modal.style.display = 'none';
+                currentPreviewItem = null;
+                document.removeEventListener('keydown', handleEscape);
             }
-
-            state.filteredItems = items;
-            return items;
-        },
-
-        getSelectedItems() {
-            const checkboxes = ui.contentEl.querySelectorAll((state.viewMode === 'grid' ? '.ss-grid-checkbox' : '.ss-svg-checkbox') + ':checked');
-            const selected = [];
-            checkboxes.forEach(cb => {
-                const item = state.cache.get(cb.dataset.id);
-                if (item) selected.push(item);
-            });
-            return selected;
-        },
-
-        refresh() {
-            renderer.render();
-            this.updateStats();
-            this.updateSelectAllState();
-        },
-
-        updateStats() {
-            const total = state.svgItems.length;
-            const filtered = state.filteredItems.length;
-            const totalSize = state.svgItems.reduce((sum, i) => sum + i.size, 0);
-            ui.updateBadge(total);
-            ui.updateStats(total, filtered, totalSize);
-        },
-
-        updateSelectAllState() {
-            const checkboxes = ui.contentEl.querySelectorAll(state.viewMode === 'grid' ? '.ss-grid-checkbox' : '.ss-svg-checkbox');
-            const checked = ui.contentEl.querySelectorAll((state.viewMode === 'grid' ? '.ss-grid-checkbox' : '.ss-svg-checkbox') + ':checked');
-            ui.selectAllCheckbox.checked = checkboxes.length > 0 && checkboxes.length === checked.length;
-            ui.selectAllCheckbox.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
-        },
-    };
-
-    /* ================================================================
-     *  拖拽管理器
-     * ================================================================ */
-    const dragManager = {
-        init() {
-            const domain = location.hostname.replace(/\./g, '-');
-            const savedPos = GM_getValue(STORAGE_KEYS.position(domain));
-            if (savedPos) {
-                ui.radar.style.left = `${savedPos.x}px`;
-                ui.radar.style.top = `${savedPos.y}px`;
-            } else {
-                ui.radar.style.right = `${CONFIG.positionOffset}px`;
-                ui.radar.style.bottom = `${CONFIG.positionOffset}px`;
-            }
-
-            ui.radar.addEventListener('mousedown', (e) => this.start(e));
-            ui.radar.addEventListener('touchstart', (e) => this.start(e), { passive: false });
-        },
-
-        start(e) {
-            const cx = e.clientX || e.touches[0].clientX;
-            const cy = e.clientY || e.touches[0].clientY;
-            const cs = window.getComputedStyle(ui.radar);
-            state.startLeft = parseInt(cs.left) || 0;
-            state.startTop = parseInt(cs.top) || 0;
-
-            if (cs.right !== 'auto') {
-                state.startLeft = window.innerWidth - parseInt(cs.right) - CONFIG.buttonSize;
-                ui.radar.style.right = 'auto';
-                ui.radar.style.left = `${state.startLeft}px`;
-            }
-
-            state.startX = cx;
-            state.startY = cy;
-            state.dragStartTime = Date.now();
-            state.isDragging = false;
-
-            if (e.type === 'touchstart') {
-                e.preventDefault();
-                state.touchTimer = setTimeout(() => {
-                    state.isDragging = true;
-                    ui.radar.style.transition = 'none';
-                }, CONFIG.touchDelay);
-            }
-
-            document.addEventListener('mousemove', this._move = (e) => this.move(e));
-            document.addEventListener('touchmove', this._moveT = (e) => this.move(e), { passive: false });
-            document.addEventListener('mouseup', this._end = () => this.end());
-            document.addEventListener('touchend', this._endT = () => this.end());
-        },
-
-        move(e) {
-            const cx = e.clientX || e.touches[0].clientX;
-            const cy = e.clientY || e.touches[0].clientY;
-            const dx = cx - state.startX;
-            const dy = cy - state.startY;
-
-            if (!state.isDragging) {
-                if (e.type === 'touchmove') return;
-                if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
-                state.isDragging = true;
-                ui.radar.style.transition = 'none';
-            }
-
-            e.preventDefault();
-            ui.radar.style.left = `${state.startLeft + dx}px`;
-            ui.radar.style.top = `${state.startTop + dy}px`;
-        },
-
-        end() {
-            if (state.touchTimer) { clearTimeout(state.touchTimer); state.touchTimer = null; }
-            document.removeEventListener('mousemove', this._move);
-            document.removeEventListener('touchmove', this._moveT);
-            document.removeEventListener('mouseup', this._end);
-            document.removeEventListener('touchend', this._endT);
-
-            if (!state.isDragging) {
-                modalManager.show();
-                return;
-            }
-
-            state.isDragging = false;
-            ui.radar.style.transition = '';
-
-            const domain = location.hostname.replace(/\./g, '-');
-            const rect = ui.radar.getBoundingClientRect();
-            GM_setValue(STORAGE_KEYS.position(domain), { x: rect.left, y: rect.top });
-        },
-    };
-
-    /* ================================================================
-     *  模态框管理器
-     * ================================================================ */
-    const modalManager = {
-        show() {
-            ui.contentEl.innerHTML = `<div class="ss-loading">${utils.svgIcons.radar}<br>正在扫描页面SVG资源...</div>`;
-            ui.modal.style.setProperty('display', 'flex', 'important');
-            ui.overlay.style.setProperty('display', 'block', 'important');
-
-            setTimeout(() => {
+        };
+        document.addEventListener('keydown', handleEscape);
+    }
+    async function detectNewImages() {
+        const modal = document.getElementById('svgSnifferModal');
+        const svgList = document.getElementById('svgList');
+        const imageCountEl = document.getElementById('imageCount');
+        if (modal.style.display !== 'flex') return;
+        const processedUrls = new Set(globalImageItems.map(item => item.url));
+        const newImageItems = [];
+        tempShowHiddenElements();
+        try {
+            const imgElements = document.querySelectorAll('img');
+            for (const img of imgElements) {
                 try {
-                    const items = svgCollector.collect();
-                    state.svgItems = items;
-                    state.cache.clear();
-                    items.forEach(i => state.cache.set(i.id, i));
-
-                    if (items.length === 0) {
-                        ui.contentEl.innerHTML = `<div class="ss-empty">暂无SVG资源</div>`;
-                        controller.updateStats();
-                        return;
+                    let imgUrl = img.src || img.dataset.src || img.dataset.original || img.currentSrc;
+                    if (!imgUrl || processedUrls.has(imgUrl) || imgUrl.startsWith('data:')) continue;
+                    
+                    const fullUrl = new URL(imgUrl, window.location.href).href;
+                    const originalFormat = getFileExtension(fullUrl).toLowerCase();
+                    if (!CONFIG.supportFormats.includes(originalFormat) && originalFormat) continue;
+                    if (processedUrls.has(fullUrl)) continue;
+                    
+                    const originalName = getImageName(fullUrl, img.alt);
+                    const truncatedName = truncateTo4Bytes(originalName);
+                    const truncatedFormat = truncateTo4Bytes(originalFormat || CONFIG.defaultImageFormat);
+                    
+                    let svgContent = '';
+                    if (originalFormat === 'svg') {
+                        try {
+                            const svgResponse = await fetch(fullUrl);
+                            if (svgResponse.ok) svgContent = await svgResponse.text();
+                        } catch (svgErr) {
+                            console.warn('获取新SVG内容失败:', svgErr);
+                        }
                     }
-                    controller.refresh();
-                } catch (err) {
-                    ui.contentEl.innerHTML = `<div class="ss-empty">扫描出错: ${err.message}</div>`;
+                    const imgInfo = await new Promise((resolve) => {
+                        if (img.complete) {
+                            resolve({
+                                id: `dynamic-img-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                url: fullUrl,
+                                name: truncatedName,
+                                format: truncatedFormat,
+                                width: img.naturalWidth || img.width || '未知',
+                                height: img.naturalHeight || img.height || '未知',
+                                type: 'dynamic-img',
+                                preview: fullUrl,
+                                originalName: originalName,
+                                originalFormat: originalFormat,
+                                svgContent: svgContent
+                            });
+                        } else {
+                            img.onload = () => {
+                                resolve({
+                                    id: `dynamic-img-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                    url: fullUrl,
+                                    name: truncatedName,
+                                    format: truncatedFormat,
+                                    width: img.naturalWidth || img.width || '未知',
+                                    height: img.naturalHeight || img.height || '未知',
+                                    type: 'dynamic-img',
+                                    preview: fullUrl,
+                                    originalName: originalName,
+                                    originalFormat: originalFormat,
+                                    svgContent: svgContent
+                                });
+                            };
+                            img.onerror = () => resolve(null);
+                        }
+                    });
+                    if (imgInfo) {
+                        processedUrls.add(imgUrl);
+                        newImageItems.push(imgInfo);
+                    }
+                } catch (e) {
+                    console.warn('动态采集<img>标签失败:', e);
                 }
-            }, CONFIG.scanDelay);
-        },
-
-        hide() {
-            ui.modal.style.setProperty('display', 'none', 'important');
-            ui.overlay.style.setProperty('display', 'none', 'important');
-            downloadManager.clearBlobUrls();
-        },
-    };
-
-    /* ================================================================
-     *  事件绑定
-     * ================================================================ */
-    function setupEvents() {
-        // Close
-        ui.modal.querySelector('#ss-close-btn').addEventListener('click', () => modalManager.hide());
-        ui.overlay.addEventListener('click', () => modalManager.hide());
-
-        // Theme toggle
-        ui.modal.querySelector('#ss-theme-toggle').addEventListener('click', () => ui.toggleTheme());
-
-        // Search
-        ui.searchInput.addEventListener('input', (e) => {
-            state.currentFilter = e.target.value.trim();
-            controller.refresh();
+            }
+            const elementsWithBg = document.querySelectorAll('*');
+            for (const el of elementsWithBg) {
+                try {
+                    const bgStyle = window.getComputedStyle(el).backgroundImage;
+                    if (!bgStyle || bgStyle === 'none' || processedUrls.has(bgStyle)) continue;
+                    const bgUrls = bgStyle.match(/url\(["']?([^"']+)["']?\)/g);
+                    if (!bgUrls) continue;
+                    
+                    for (const bgUrl of bgUrls) {
+                        try {
+                            const match = bgUrl.match(/url\(["']?([^"']+)["']?\)/);
+                            if (!match || !match[1]) continue;
+                            let imgUrl = match[1];
+                            if (processedUrls.has(imgUrl)) continue;
+                            
+                            const fullUrl = new URL(imgUrl, window.location.href).href;
+                            const originalFormat = getFileExtension(fullUrl).toLowerCase();
+                            
+                            let svgContent = '';
+                            if (originalFormat === 'svg') {
+                                try {
+                                    const svgResponse = await fetch(fullUrl);
+                                    if (svgResponse.ok) svgContent = await svgResponse.text();
+                                } catch (svgErr) {
+                                    console.warn('获取动态背景SVG内容失败:', svgErr);
+                                }
+                            }
+                            
+                            const originalName = `动态背景图-${el.tagName.toLowerCase()}-${Date.now().toString().slice(-4)}`;
+                            const truncatedName = truncateTo4Bytes(originalName);
+                            const truncatedFormat = truncateTo4Bytes(originalFormat || CONFIG.defaultImageFormat);
+                            const truncatedType = truncateTo4Bytes('动态背景');
+                            
+                            const imgInfo = {
+                                id: `dynamic-bg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                url: fullUrl,
+                                name: truncatedName,
+                                format: truncatedFormat,
+                                width: '动态背景',
+                                height: '动态背景',
+                                type: truncatedType,
+                                preview: fullUrl,
+                                originalName: originalName,
+                                originalFormat: originalFormat,
+                                originalType: '动态背景图',
+                                svgContent: svgContent
+                            };
+                            processedUrls.add(imgUrl);
+                            newImageItems.push(imgInfo);
+                        } catch (e) {
+                            console.warn('动态采集背景图失败:', e);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('处理动态背景图样式失败:', e);
+                }
+            }
+            if (newImageItems.length > 0) {
+                const uniqueNewItems = await checkAndRemoveDuplicates(newImageItems);
+                const finalNewItems = uniqueNewItems.filter(newItem => {
+                    return !globalImageItems.some(existingItem => 
+                        imageSignatureMap.get(existingItem.id) === imageSignatureMap.get(newItem.id)
+                    );
+                });
+                
+                if (finalNewItems.length > 0) {
+                    globalImageItems.push(...finalNewItems);
+                    finalNewItems.forEach(item => {
+                        imageItemCache.set(item.id, item);
+                    });
+                    imageCountEl.textContent = globalImageItems.length;
+                    const fragment = document.createDocumentFragment();
+                    finalNewItems.forEach(item => {
+                        fragment.appendChild(createImageItemElement(item));
+                    });
+                    svgList.appendChild(fragment);
+                    showNotification(`发现新图片：${finalNewItems.length}张`, 'success');
+                }
+            }
+            lastScrollHeight = document.documentElement.scrollHeight;
+        } catch (error) {
+            console.error('动态图片采集失败:', error);
+            showNotification('动态图片采集失败', 'error');
+        } finally {
+            restoreHiddenElements();
+        }
+    }
+    function handleScroll() {
+        clearTimeout(scrollTimer);
+        scrollTimer = setTimeout(() => {
+            const currentScrollHeight = document.documentElement.scrollHeight;
+            if (currentScrollHeight > lastScrollHeight) {
+                detectNewImages();
+            }
+        }, CONFIG.scrollCheckInterval);
+    }
+    function handleClick(e) {
+        if (e.target.closest('#radarContainer') || e.target.closest('#svgSnifferModal')) {
+            return;
+        }
+        const isLoadButton = CONFIG.clickLoadSelectors.some(selector => {
+            return e.target.closest(selector);
         });
-
-        // Sort
-        ui.sortSelect.addEventListener('change', (e) => {
-            state.currentSort = e.target.value;
-            controller.refresh();
+        if (isLoadButton && !isClickDetecting) {
+            isClickDetecting = true;
+            setTimeout(async () => {
+                try {
+                    await detectNewImages();
+                } finally {
+                    isClickDetecting = false;
+                }
+            }, CONFIG.clickDetectDelay);
+        }
+    }
+    function initDynamicLoadListeners() {
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        document.addEventListener('click', handleClick, true);
+    }
+    function createManagedBlobUrl(blob) {
+        const blobUrl = URL.createObjectURL(blob);
+        const now = Date.now();
+        blobUrlMap.set(blobUrl, now);
+        if (blobUrlMap.size > CONFIG.maxBlobUrlCount) {
+            const sortedUrls = Array.from(blobUrlMap.entries()).sort((a, b) => a[1] - b[1]);
+            const urlsToClean = sortedUrls.slice(0, blobUrlMap.size - CONFIG.maxBlobUrlCount);
+            
+            urlsToClean.forEach(([url]) => {
+                cleanupSingleBlobUrl(url);
+            });
+            if (CONFIG.blobCleanupNotification) {
+                showNotification(`Blob URL超限，已清理${urlsToClean.length}个历史URL`, 'info');
+            }
+        }
+        return blobUrl;
+    }
+    function cleanupSingleBlobUrl(url) {
+        if (blobUrlMap.has(url)) {
+            try {
+                URL.revokeObjectURL(url);
+                blobUrlMap.delete(url);
+            } catch (error) {
+                console.warn('清理Blob URL失败:', url, error);
+            }
+        }
+    }
+    function cleanupBlobUrls() {
+        blobUrlMap.forEach((_, url) => {
+            cleanupSingleBlobUrl(url);
         });
-
-        // Preview size
-        ui.previewSizeSelect.addEventListener('change', (e) => {
-            state.previewSize = e.target.value;
-            GM_setValue(STORAGE_KEYS.previewSize, state.previewSize);
-            controller.refresh();
+        blobUrlMap.clear();
+        if (CONFIG.blobCleanupNotification) {
+            showNotification('已清理所有Blob URL', 'info');
+        }
+    }
+    function collectBasicImages() {
+        const images = [];
+        const imgElements = document.querySelectorAll('img');
+        imgElements.forEach((img, index) => {
+            const src = img.src || img.dataset.src || img.currentSrc;
+            if (src && !src.startsWith('data:')) {
+                const truncatedName = truncateTo4Bytes(img.alt || '未命名图片');
+                const originalFormat = getFileExtension(src).toLowerCase();
+                const format = truncateTo4Bytes(originalFormat || CONFIG.defaultImageFormat);
+                
+                images.push({
+                    id: `basic-img-${index}`,
+                    url: src,
+                    name: truncatedName,
+                    format: format,
+                    width: img.naturalWidth || img.width || '未知',
+                    height: img.naturalHeight || img.height || '未知',
+                    type: 'img-tag',
+                    preview: src,
+                    element: img,
+                    originalName: img.alt || '未命名图片',
+                    originalFormat: originalFormat,
+                    svgContent: ''
+                });
+            }
         });
-
-        // View toggle
-        ui.modal.querySelectorAll('.ss-view-toggle button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                state.viewMode = btn.dataset.view;
-                GM_setValue(STORAGE_KEYS.viewMode, state.viewMode);
-                ui.modal.querySelectorAll('.ss-view-toggle button').forEach(b => b.classList.toggle('active', b === btn));
-                controller.refresh();
+        return images;
+    }
+    async function collectImagesFromCss(cssUrl) {
+        const imageUrls = [];
+        try {
+            const response = await fetch(cssUrl, {
+                headers: { 'Accept': 'text/css,*/*;q=0.1' },
+                credentials: 'same-origin'
+            });
+            if (!response.ok) throw new Error(`CSS请求失败: ${response.status}`);
+            
+            const cssText = await response.text();
+            const bgUrlRegex = /background-image\s*:\s*url\(["']?([^"']+)["']?\)/gi;
+            let match;
+            while ((match = bgUrlRegex.exec(cssText)) !== null) {
+                if (match[1]) {
+                    const fullUrl = new URL(match[1], cssUrl).href;
+                    const ext = getFileExtension(fullUrl).toLowerCase();
+                    if (CONFIG.supportFormats.includes(ext)) {
+                        imageUrls.push(fullUrl);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('采集CSS中的图片失败:', cssUrl, e);
+        }
+        return imageUrls;
+    }
+    async function collectAllCssResources() {
+        const cssUrls = [];
+        const linkElements = document.querySelectorAll('link[rel="stylesheet"]');
+        linkElements.forEach(link => {
+            const href = link.getAttribute('href');
+            if (href) cssUrls.push(new URL(href, window.location.href).href);
+        });
+        const styleElements = document.querySelectorAll('style');
+        styleElements.forEach(style => {
+            const bgUrlRegex = /background-image\s*:\s*url\(["']?([^"']+)["']?\)/gi;
+            let match;
+            while ((match = bgUrlRegex.exec(style.textContent)) !== null) {
+                if (match[1]) {
+                    const fullUrl = new URL(match[1], window.location.href).href;
+                    const ext = getFileExtension(fullUrl).toLowerCase();
+                    if (CONFIG.supportFormats.includes(ext)) {
+                        cssUrls.push(`inline:${fullUrl}`);
+                    }
+                }
+            }
+        });
+        const allImageUrls = [];
+        for (const cssUrl of cssUrls) {
+            if (cssUrl.startsWith('inline:')) {
+                allImageUrls.push(cssUrl.replace('inline:', ''));
+            } else {
+                const imagesFromCss = await collectImagesFromCss(cssUrl);
+                allImageUrls.push(...imagesFromCss);
+            }
+        }
+        return allImageUrls;
+    }
+    async function collectImages() {
+        const imageItems = [];
+        const processedUrls = new Set();
+        let cssImageUrls = [];
+        const basicImages = collectBasicImages();
+        basicImages.forEach(img => {
+            if (!processedUrls.has(img.url)) {
+                processedUrls.add(img.url);
+                imageItems.push(img);
+            }
+        });
+        try {
+            cssImageUrls = await collectAllCssResources();
+        } catch (e) {
+            console.warn('CSS图片采集异常:', e);
+        }
+        tempShowHiddenElements();
+        try {
+            const imgElements = document.querySelectorAll('img');
+            for (const img of imgElements) {
+                try {
+                    let imgUrl = img.src || img.dataset.src || img.dataset.original || img.currentSrc;
+                    if (!imgUrl || processedUrls.has(imgUrl) || imgUrl.startsWith('data:')) continue;
+                    
+                    const fullUrl = new URL(imgUrl, window.location.href).href;
+                    const originalFormat = getFileExtension(fullUrl).toLowerCase();
+                    if (!CONFIG.supportFormats.includes(originalFormat) && originalFormat) continue;
+                    if (processedUrls.has(fullUrl)) continue;
+                    
+                    const originalName = getImageName(fullUrl, img.alt);
+                    const truncatedName = truncateTo4Bytes(originalName);
+                    const truncatedFormat = truncateTo4Bytes(originalFormat || CONFIG.defaultImageFormat);
+                    
+                    let svgContent = '';
+                    if (originalFormat === 'svg') {
+                        try {
+                            const svgResponse = await fetch(fullUrl);
+                            if (svgResponse.ok) svgContent = await svgResponse.text();
+                        } catch (svgErr) {
+                            console.warn('获取SVG原始内容失败:', svgErr);
+                        }
+                    }
+                    const imgInfo = await new Promise((resolve) => {
+                        const timer = setTimeout(() => {
+                            resolve({
+                                id: `img-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                url: fullUrl,
+                                name: truncatedName,
+                                format: truncatedFormat,
+                                width: img.width || '未知',
+                                height: img.height || '未知',
+                                type: 'img-tag',
+                                preview: fullUrl,
+                                originalName: originalName,
+                                originalFormat: originalFormat,
+                                svgContent: svgContent
+                            });
+                        }, CONFIG.loadTimeout);
+                        
+                        if (img.complete) {
+                            clearTimeout(timer);
+                            resolve({
+                                id: `img-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                url: fullUrl,
+                                name: truncatedName,
+                                format: truncatedFormat,
+                                width: img.naturalWidth || img.width || '未知',
+                                height: img.naturalHeight || img.height || '未知',
+                                type: 'img-tag',
+                                preview: fullUrl,
+                                originalName: originalName,
+                                originalFormat: originalFormat,
+                                svgContent: svgContent
+                            });
+                        } else {
+                            img.onload = () => {
+                                clearTimeout(timer);
+                                resolve({
+                                    id: `img-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                    url: fullUrl,
+                                    name: truncatedName,
+                                    format: truncatedFormat,
+                                    width: img.naturalWidth || img.width || '未知',
+                                    height: img.naturalHeight || img.height || '未知',
+                                    type: 'img-tag',
+                                    preview: fullUrl,
+                                    originalName: originalName,
+                                    originalFormat: originalFormat,
+                                    svgContent: svgContent
+                                });
+                            };
+                            img.onerror = () => {
+                                clearTimeout(timer);
+                                resolve(null);
+                            };
+                        }
+                    });
+                    if (imgInfo) {
+                        processedUrls.add(imgUrl);
+                        imageItems.push(imgInfo);
+                    }
+                } catch (e) {
+                    console.warn('采集<img>标签失败:', e);
+                }
+            }
+            const elementsWithBg = document.querySelectorAll('*');
+            for (const el of elementsWithBg) {
+                try {
+                    const bgStyle = window.getComputedStyle(el).backgroundImage;
+                    if (!bgStyle || bgStyle === 'none' || processedUrls.has(bgStyle)) continue;
+                    const bgUrls = bgStyle.match(/url\(["']?([^"']+)["']?\)/g);
+                    if (!bgUrls) continue;
+                    
+                    for (const bgUrl of bgUrls) {
+                        try {
+                            const match = bgUrl.match(/url\(["']?([^"']+)["']?\)/);
+                            if (!match || !match[1]) continue;
+                            let imgUrl = match[1];
+                            if (processedUrls.has(imgUrl)) continue;
+                            
+                            const fullUrl = new URL(imgUrl, window.location.href).href;
+                            const originalFormat = getFileExtension(fullUrl).toLowerCase();
+                            
+                            let svgContent = '';
+                            if (originalFormat === 'svg') {
+                                try {
+                                    const svgResponse = await fetch(fullUrl);
+                                    if (svgResponse.ok) svgContent = await svgResponse.text();
+                                } catch (svgErr) {
+                                    console.warn('获取背景SVG内容失败:', svgErr);
+                                }
+                            }
+                            
+                            const originalName = `背景图-${el.tagName.toLowerCase()}-${Date.now().toString().slice(-4)}`;
+                            const truncatedName = truncateTo4Bytes(originalName);
+                            const truncatedFormat = truncateTo4Bytes(originalFormat || CONFIG.defaultImageFormat);
+                            const truncatedType = truncateTo4Bytes('背景图');
+                            
+                            const imgInfo = {
+                                id: `bg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                                url: fullUrl,
+                                name: truncatedName,
+                                format: truncatedFormat,
+                                width: '背景图',
+                                height: '背景图',
+                                type: truncatedType,
+                                preview: fullUrl,
+                                originalName: originalName,
+                                originalFormat: originalFormat,
+                                originalType: '背景图',
+                                svgContent: svgContent
+                            };
+                            processedUrls.add(imgUrl);
+                            imageItems.push(imgInfo);
+                        } catch (e) {
+                            console.warn('采集背景图失败:', e);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('处理背景图样式失败:', e);
+                }
+            }
+            for (const imgUrl of cssImageUrls) {
+                try {
+                    if (!imgUrl || processedUrls.has(imgUrl)) continue;
+                    const fullUrl = new URL(imgUrl, window.location.href).href;
+                    const originalFormat = getFileExtension(fullUrl).toLowerCase();
+                    
+                    let svgContent = '';
+                    if (originalFormat === 'svg') {
+                        try {
+                            const svgResponse = await fetch(fullUrl);
+                            if (svgResponse.ok) svgContent = await svgResponse.text();
+                        } catch (svgErr) {
+                            console.warn('获取CSS SVG内容失败:', svgErr);
+                        }
+                    }
+                    
+                    const originalName = `CSS图片-${Date.now().toString().slice(-4)}`;
+                    const truncatedName = truncateTo4Bytes(originalName);
+                    const truncatedFormat = truncateTo4Bytes(originalFormat || CONFIG.defaultImageFormat);
+                    const truncatedType = truncateTo4Bytes('CSS图片');
+                    
+                    const imgInfo = {
+                        id: `css-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                        url: fullUrl,
+                        name: truncatedName,
+                        format: truncatedFormat,
+                        width: 'CSS引用',
+                        height: 'CSS引用',
+                        type: truncatedType,
+                        preview: fullUrl,
+                        originalName: originalName,
+                        originalFormat: originalFormat,
+                        originalType: 'CSS图片',
+                        svgContent: svgContent
+                    };
+                    processedUrls.add(imgUrl);
+                    imageItems.push(imgInfo);
+                } catch (e) {
+                    console.warn('采集CSS图片失败:', e);
+                }
+            }
+            const svgElements = document.querySelectorAll('svg');
+            for (const svg of svgElements) {
+                try {
+                    const svgId = `svg-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                    const svgContent = svg.outerHTML;
+                    const processedSvgContent = processSVGForPreview(svgContent);
+                    const svgBlob = new Blob([svgContent], { type: 'image/svg+xml' });
+                    const svgUrl = createManagedBlobUrl(svgBlob);
+                    
+                    const originalName = `SVG图片-${Date.now().toString().slice(-4)}`;
+                    const truncatedName = truncateTo4Bytes(originalName);
+                    const truncatedFormat = truncateTo4Bytes('svg');
+                    const truncatedType = truncateTo4Bytes('SVG标签');
+                    
+                    const imgInfo = {
+                        id: svgId,
+                        url: svgUrl,
+                        name: truncatedName,
+                        format: truncatedFormat,
+                        width: svg.naturalWidth || svg.width.baseVal.value || '自适应',
+                        height: svg.naturalHeight || svg.height.baseVal.value || '自适应',
+                        type: truncatedType,
+                        preview: svgUrl,
+                        svgContent: svgContent,
+                        originalName: originalName,
+                        originalFormat: 'svg',
+                        originalType: 'SVG标签'
+                    };
+                    imageItems.push(imgInfo);
+                } catch (e) {
+                    console.warn('采集SVG标签失败:', e);
+                }
+            }
+        } catch (e) {
+            console.error('图片采集主流程异常:', e);
+        } finally {
+            restoreHiddenElements();
+        }
+        return await checkAndRemoveDuplicates(imageItems);
+    }
+    function initRadarButton() {
+        const domain = location.hostname.replace(/\./g, '-');
+        const positionKey = `radarPosition_${domain}`;
+        
+        const savedPosition = GM_getValue(positionKey);
+        if (savedPosition) {
+            radarContainer.style.left = `${savedPosition.x}px`;
+            radarContainer.style.top = `${savedPosition.y}px`;
+        } else {
+            radarContainer.style.right = `${CONFIG.positionOffset}px`;
+            radarContainer.style.bottom = `${CONFIG.positionOffset}px`;
+        }
+        
+        radarContainer.addEventListener('mousedown', startDrag);
+        radarContainer.addEventListener('touchstart', startDrag, { passive: false });
+        
+        radarButton.addEventListener('click', (e) => {
+            if (!isDragging && Date.now() - dragStartTime > CONFIG.touchDelay) {
+                showImageList();
+            }
+        });
+    }
+    function startDrag(e) {
+        e.preventDefault();
+        const clientX = e.clientX || e.touches[0].clientX;
+        const clientY = e.clientY || e.touches[0].clientY;
+        
+        const computedStyle = window.getComputedStyle(radarContainer);
+        startLeft = parseInt(computedStyle.left) || 0;
+        startTop = parseInt(computedStyle.top) || 0;
+        
+        if (computedStyle.right !== 'auto') {
+            const rightPos = parseInt(computedStyle.right);
+            startLeft = window.innerWidth - rightPos - CONFIG.buttonSize;
+            radarContainer.style.right = 'auto';
+            radarContainer.style.left = `${startLeft}px`;
+        }
+        
+        startX = clientX;
+        startY = clientY;
+        dragStartTime = Date.now();
+        
+        if (e.type === 'touchstart') {
+            touchTimer = setTimeout(() => {
+                isDragging = true;
+                radarContainer.style.transition = 'none';
+            }, CONFIG.touchDelay);
+        } else {
+            isDragging = true;
+            radarContainer.style.transition = 'none';
+        }
+        
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('touchmove', drag, { passive: false });
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
+    }
+    function drag(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        const clientX = e.clientX || e.touches[0].clientX;
+        const clientY = e.clientY || e.touches[0].clientY;
+        
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+        radarContainer.style.left = `${startLeft + dx}px`;
+        radarContainer.style.top = `${startTop + dy}px`;
+        radarContainer.style.right = 'auto';
+    }
+    function endDrag(e) {
+        if (touchTimer) {
+            clearTimeout(touchTimer);
+            touchTimer = null;
+        }
+        
+        if (!isDragging) {
+            if (Date.now() - dragStartTime < CONFIG.touchDelay) {
+                showImageList();
+            }
+            return;
+        }
+        
+        isDragging = false;
+        radarContainer.style.transition = '';
+        
+        document.removeEventListener('mousemove', drag);
+        document.removeEventListener('touchmove', drag);
+        document.removeEventListener('mouseup', endDrag);
+        document.removeEventListener('touchend', endDrag);
+        
+        const domain = location.hostname.replace(/\./g, '-');
+        const positionKey = `radarPosition_${domain}`;
+        const rect = radarContainer.getBoundingClientRect();
+        GM_setValue(positionKey, {
+            x: rect.left,
+            y: rect.top
+        });
+    }
+    function tempShowHiddenElements() {
+        tempVisibleElements = [];
+        const hiddenSelectors = [
+            'div[style*="display:none"]',
+            'div[style*="visibility:hidden"]',
+            'div[style*="opacity:0"]',
+            '.errorpage[style*="display:none"]',
+            '[class*="hidden"]',
+            '[hidden]'
+        ];
+        hiddenSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+                const originalStyle = {
+                    display: el.style.display,
+                    visibility: el.style.visibility,
+                    opacity: el.style.opacity,
+                    position: el.style.position,
+                    top: el.style.top,
+                    left: el.style.left,
+                    width: el.style.width,
+                    height: el.style.height,
+                    className: el.className
+                };
+                tempVisibleElements.push({ el, originalStyle });
+                el.classList.add('temp-visible-for-scan');
+                el.style.display = '';
+                el.style.visibility = '';
+                el.style.opacity = '';
             });
         });
-
-        // Select all
-        ui.selectAllCheckbox.addEventListener('change', (e) => {
-            const selector = state.viewMode === 'grid' ? '.ss-grid-checkbox' : '.ss-svg-checkbox';
-            ui.contentEl.querySelectorAll(selector).forEach(cb => { cb.checked = e.target.checked; });
+    }
+    function restoreHiddenElements() {
+        tempVisibleElements.forEach(({ el, originalStyle }) => {
+            el.classList.remove('temp-visible-for-scan');
+            el.style.display = originalStyle.display;
+            el.style.visibility = originalStyle.visibility;
+            el.style.opacity = originalStyle.opacity;
+            el.style.position = originalStyle.position;
+            el.style.top = originalStyle.top;
+            el.style.left = originalStyle.left;
+            el.style.width = originalStyle.width;
+            el.style.height = originalStyle.height;
+            el.className = originalStyle.className;
         });
-
-        // Copy dropdown
-        const copyBtn = ui.modal.querySelector('#ss-copy-btn');
-        const copyDropdown = ui.copyDropdown;
-        copyBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            copyDropdown.classList.toggle('show');
-            ui.modal.querySelector('#ss-download-dropdown').classList.remove('show');
-        });
-        copyDropdown.addEventListener('click', (e) => {
-            const item = e.target.closest('.ss-dropdown-item');
-            if (!item) return;
-            copyDropdown.classList.remove('show');
-            const selected = controller.getSelectedItems();
-            if (selected.length === 0) { toast.show('请至少选择一个SVG', 'warning'); return; }
-            const type = item.dataset.copy;
-            let content = '', label = '';
-            if (selected.length === 1) {
-                const svgItem = selected[0];
-                switch (type) {
-                    case 'svg': content = svgItem.svg; label = `${svgItem.name} (SVG源码)`; break;
-                    case 'minified': content = utils.minifySvg(svgItem.svg); label = `${svgItem.name} (压缩SVG)`; break;
-                    case 'datauri': content = utils.svgToDataUri(svgItem.svg); label = `${svgItem.name} (Data URI)`; break;
-                    case 'base64': content = utils.svgToBase64(svgItem.svg); label = `${svgItem.name} (Base64)`; break;
-                    case 'react': content = utils.svgToReactComponent(svgItem.svg, svgItem.name); label = `${svgItem.name} (React组件)`; break;
-                    case 'css': content = utils.svgToCssBackground(svgItem.svg); label = `${svgItem.name} (CSS背景)`; break;
-                }
-            } else {
-                content = selected.map(s => {
-                    switch (type) {
-                        case 'svg': return s.svg;
-                        case 'minified': return utils.minifySvg(s.svg);
-                        case 'datauri': return utils.svgToDataUri(s.svg);
-                        case 'base64': return utils.svgToBase64(s.svg);
-                        case 'react': return utils.svgToReactComponent(s.svg, s.name);
-                        case 'css': return utils.svgToCssBackground(s.svg);
-                    }
-                }).join('\n\n');
-                label = `${selected.length}个SVG (${type})`;
+        tempVisibleElements = [];
+    }
+    async function showImageList() {
+        const modal = document.getElementById('svgSnifferModal');
+        const svgList = document.getElementById('svgList');
+        const imageCountEl = document.getElementById('imageCount');
+        
+        svgList.innerHTML = '<div class="loading">正在扫描页面图片资源（含CSS/隐藏元素/动态加载/智能去重）...</div>';
+        modal.style.display = 'flex';
+        overlay.style.display = 'block';
+        
+        try {
+            const imageItems = await collectImages();
+            globalImageItems = imageItems;
+            imageItemCache.clear();
+            imageSignatureMap.clear();
+            imageCountEl.textContent = imageItems.length;
+            imageItems.forEach(item => {
+                imageItemCache.set(item.id, item);});
+            
+            if (imageItems.length === 0) {
+                svgList.innerHTML = '<div class="loading">没有找到任何图片资源（已尝试采集隐藏元素、CSS和动态加载）</div>';
+                return;
             }
-            downloadManager.copyContent(content, label);
-        });
-
-        // Download dropdown
-        const dlBtn = ui.modal.querySelector('#ss-download-btn');
-        const dlDropdown = ui.modal.querySelector('#ss-download-dropdown');
-        dlBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            dlDropdown.classList.toggle('show');
-            copyDropdown.classList.remove('show');
-        });
-        dlDropdown.addEventListener('click', (e) => {
-            const item = e.target.closest('.ss-dropdown-item');
-            if (!item) return;
-            dlDropdown.classList.remove('show');
-            const selected = controller.getSelectedItems();
-            if (selected.length === 0) { toast.show('请至少选择一个SVG', 'warning'); return; }
-            const format = item.dataset.dl;
-            if (format === 'zip') {
-                downloadManager.downloadZip(selected, 'svg');
-            } else if (selected.length === 1) {
-                downloadManager.downloadSingle(selected[0], format);
-            } else {
-                downloadManager.downloadZip(selected, format);
-            }
-        });
-
-        // Close dropdowns on outside click
-        document.addEventListener('click', () => {
-            copyDropdown.classList.remove('show');
-            dlDropdown.classList.remove('show');
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (ui.modal.style.display === 'none' || !ui.modal.style.display) return;
-            if (e.key === 'Escape') { modalManager.hide(); }
-            if (e.ctrlKey && e.key === 'f') { e.preventDefault(); ui.searchInput.focus(); }
-            if (e.ctrlKey && e.key === 'a') {
-                e.preventDefault();
-                ui.selectAllCheckbox.checked = true;
-                ui.selectAllCheckbox.dispatchEvent(new Event('change'));
-            }
-        });
-
-        // Cleanup on unload
-        window.addEventListener('beforeunload', () => downloadManager.clearBlobUrls());
-
-        // Auto theme detection
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-            if (state.theme === 'auto') ui.root.dataset.theme = utils.getEffectiveTheme();
-        });
+            
+            svgList.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+            imageItems.forEach(item => {
+                fragment.appendChild(createImageItemElement(item));
+            });
+            svgList.appendChild(fragment);
+            setupModalEvents();
+        } catch (error) {
+            console.error('扫描图片失败:', error);
+            svgList.innerHTML = '<div class="loading">扫描失败，请刷新页面重试</div>';
+        }
     }
 
-    /* ================================================================
-     *  初始化
-     * ================================================================ */
-    function init() {
-        injectStyles();
-        ui.build();
-        dragManager.init();
-        setupEvents();
-
-        // Quick scan for badge count
+    function setupModalEvents() {
+    const modal = document.getElementById('svgSnifferModal');
+    const closeBtn = modal.querySelector('.close-btn');
+    const overlay = document.querySelector('.overlay');
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const batchDownloadBtn = document.getElementById('batchDownloadBtn');
+    const copyBtn = modal.querySelector('.copy-btn');
+    const dedupeToggle = document.getElementById('dedupeToggle');
+    
+    closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+        overlay.style.display = 'none';
+        cleanupBlobUrls();
+    });
+    
+    overlay.addEventListener('click', () => {
+        modal.style.display = 'none';
+        overlay.style.display = 'none';
+        cleanupBlobUrls();
+    });
+    
+    selectAllCheckbox.addEventListener('change', (e) => {
+        const checkboxes = modal.querySelectorAll('.svg-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = e.target.checked;
+        });
+    });
+    
+    batchDownloadBtn.addEventListener('click', () => {
+        const checkboxes = modal.querySelectorAll('.svg-checkbox:checked');
+        const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.id);
+        const selectedItems = selectedIds.map(id => imageItemCache.get(id)).filter(Boolean);
+        
+        if (selectedItems.length === 0) {
+            alert('请至少选择一张图片');
+            return;
+        }
+        
+        if (selectedItems.length === 1) {
+            const item = selectedItems[0];
+            downloadImage(item, item.originalName, item.originalFormat);
+        } else {
+            downloadMultipleImages(selectedItems);
+        }
+    });
+    
+    // 修复列表面板复制链接功能
+    copyBtn.addEventListener('click', async () => {
+    const checkboxes = modal.querySelectorAll('.svg-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.id);
+    const selectedItems = selectedIds.map(id => imageItemCache.get(id)).filter(Boolean);
+    
+    if (selectedItems.length === 0) {
+        showNotification('请至少选择一张图片', 'warning');
+        return;
+    }
+    
+    try {
+        // 收集所有选中的图片URL
+        const urls = selectedItems.map(item => {
+            // 对于SVG内容，需要特殊处理
+            if (item.format === 'svg' && item.svgContent) {
+                // 创建blob URL用于SVG
+                const svgBlob = new Blob([item.svgContent], { type: 'image/svg+xml' });
+                const blobUrl = createManagedBlobUrl(svgBlob);
+                return blobUrl;
+            }
+            return item.url;
+        });
+        
+        const urlsText = urls.join('\n');
+        
+        // 使用更可靠的复制方法
+        if (navigator.clipboard && window.isSecureContext) {
+            // 使用现代 Clipboard API
+            await navigator.clipboard.writeText(urlsText);
+        } else {
+            // 使用备用方法
+            const textArea = document.createElement('textarea');
+            textArea.value = urlsText;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (!successful) {
+                throw new Error('execCommand 复制失败');
+            }
+        }
+        
+        showNotification(`成功复制 ${selectedItems.length} 个图片链接到剪贴板`, 'success');
+        
+    } catch (error) {
+        console.error('复制链接失败:', error);
+        showNotification('复制失败，请手动选择链接', 'error');
+        
+        // 提供备选方案：显示链接让用户手动复制
+        const urlsText = selectedItems.map(item => item.url).join('\n');
+        const tempTextArea = document.createElement('textarea');
+        tempTextArea.value = urlsText;
+        tempTextArea.style.width = '300px';
+        tempTextArea.style.height = '150px';
+        tempTextArea.style.position = 'fixed';
+        tempTextArea.style.top = '50%';
+        tempTextArea.style.left = '50%';
+        tempTextArea.style.transform = 'translate(-50%, -50%)';
+        tempTextArea.style.zIndex = '1000000';
+        document.body.appendChild(tempTextArea);
+        
         setTimeout(() => {
-            const count = document.querySelectorAll('svg').length;
-            ui.updateBadge(count);
-        }, 500);
+            tempTextArea.select();
+            setTimeout(() => {
+                document.body.removeChild(tempTextArea);
+            }, 3000);
+        }, 100);
+    }
+});
+
+    if (dedupeToggle) {
+        dedupeToggle.addEventListener('change', (e) => {
+            CONFIG.deduplication.enabled = e.target.checked;
+            showNotification(`智能去重 ${e.target.checked ? '已启用' : '已禁用'}`, 'info');
+        });
+    }
+}
+
+    function downloadImage(imgItem, originalName, originalFormat) {
+        const baseName = originalName || imgItem.name;
+        const completedFileName = completeImageSuffix(baseName, originalFormat);
+        
+        if (completedFileName.endsWith('.svg') && imgItem.svgContent) {
+            try {
+                const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>${imgItem.svgContent}`;
+                const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+                saveAs(blob, completedFileName);
+                showNotification(`下载成功: ${completedFileName}`, 'success');
+                return;
+            } catch (svgErr) {
+                console.warn('SVG专属下载失败，尝试备用方案:', svgErr);
+            }
+        }
+        
+        const mimeType = completedFileName.endsWith('.svg') 
+            ? 'image/svg+xml' 
+            : `image/${completedFileName.split('.').pop().toLowerCase()}`;
+        
+        GM_download({
+            url: imgItem.url,
+            name: completedFileName,
+            mimetype: mimeType,
+            onload: () => {
+                showNotification(`下载成功: ${completedFileName}`, 'success');
+            },
+            onerror: (e) => {
+                console.error('下载失败:', e);
+                showNotification(`下载失败: ${completedFileName}`, 'error');
+            }
+        });
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
+    async function downloadMultipleImages(selectedItems) {
+        const zip = new JSZip();
+        let downloadedCount = 0;
+        const totalCount = selectedItems.length;
+        
+        for (const imgItem of selectedItems) {
+            try {
+                const baseName = imgItem.originalName || imgItem.name;
+                const originalFormat = imgItem.originalFormat || '';
+                const completedFileName = completeImageSuffix(baseName, originalFormat);
+                
+                if (completedFileName.endsWith('.svg') && imgItem.svgContent) {
+                    const svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>${imgItem.svgContent}`;
+                    zip.file(completedFileName, svgContent);
+                    downloadedCount++;
+                    continue;
+                }
+                
+                const response = await fetch(imgItem.url);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const blob = await response.blob();
+                zip.file(completedFileName, blob);
+                downloadedCount++;
+            } catch (error) {
+                const errBaseName = imgItem.originalName || imgItem.name;
+                const errFileName = completeImageSuffix(`${errBaseName}_加载失败`, 'txt');
+                zip.file(errFileName, `图片加载失败: ${imgItem.url}\n错误原因: ${error.message}`);
+                console.error(`下载失败 ${errBaseName}:`, error);
+            }
+        }
+        
+        if (downloadedCount === 0) {
+            alert('所有图片下载失败');
+            return;
+        }
+        
+        try {
+            const content = await zip.generateAsync({ 
+                type: 'blob',
+                compression: 'DEFLATE',
+                compressionOptions: { level: 6 }
+            });
+            const zipFileName = `网页图片_${location.hostname}_${new Date().toISOString().slice(0, 10)}.zip`;
+            saveAs(content, zipFileName);
+            
+            showNotification(`批量下载成功: ${zipFileName}（共${downloadedCount}/${totalCount}个）`, 'success');
+            if (downloadedCount < totalCount) {
+                alert(`部分图片下载失败，成功下载 ${downloadedCount}/${totalCount} 个资源`);
+            }
+        } catch (error) {
+            console.error('创建ZIP失败:', error);
+            showNotification('创建ZIP文件失败', 'error');
+            alert('创建ZIP文件失败');
+        }
     }
+
+    function showNotification(message, type = 'info') {
+        const colors = {
+            info: '#3498db',
+            success: '#27ae60',
+            warning: '#f39c12',
+            error: '#e74c3c'
+        };
+        
+        copyNotification.textContent = message;
+        copyNotification.style.backgroundColor = colors[type] || colors.info;
+        copyNotification.style.opacity = '1';
+        
+        setTimeout(() => {
+            copyNotification.style.opacity = '0';
+        }, 3000);
+    }
+
+    window.addEventListener('beforeunload', () => {
+        cleanupBlobUrls();
+        window.removeEventListener('scroll', handleScroll);
+        document.removeEventListener('click', handleClick, true);
+        clearTimeout(scrollTimer);
+        if (touchTimer) clearTimeout(touchTimer);
+    });
+
+    function initAllFeatures() {
+        initRadarButton();
+        initDynamicLoadListeners();
+    }
+
+    initAllFeatures();
 })();
