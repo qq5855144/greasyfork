@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.1
+// @version      v2.1.2
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -3349,10 +3349,6 @@ const domHandler = {
                 display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center; flex-wrap: wrap;
                 padding-bottom: 10px; border-bottom: 2px solid var(--pk-gradient); border-image: var(--pk-gradient) 1;
             }
-            .pk-nav-filter {
-                width: 100%; max-width: 360px; margin: 0 auto 16px; display: block;
-                padding: 9px 16px; font-size: 13px; border-radius: var(--pk-radius); margin-bottom: 16px;
-            }
             .pk-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 8px; }
             @media (max-width: 480px) { .pk-categories { grid-template-columns: 1fr; gap: 10px; } }
             @media (max-width: 768px) { .pk-categories { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; } }
@@ -3415,21 +3411,21 @@ const domHandler = {
             .pk-save-btn.pk-active { opacity: 1; pointer-events: auto; background: var(--pk-warning); box-shadow: 0 4px 12px rgba(245,158,11,.3); }
             .pk-list-section { flex: 1; overflow: auto; padding: 0 24px; box-sizing: border-box; display: flex; flex-direction: column; }
             .pk-list-title { color: var(--pk-text); margin: 18px 0; font-weight: 700; font-size: 16px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
-            .pk-engine-list { flex: 1; overflow-y: auto; overflow-x: hidden; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); padding-bottom: 16px; box-sizing: border-box; }
+            .pk-engine-list { flex: 1; overflow-y: auto; overflow-x: hidden; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); padding-bottom: 16px; box-sizing: border-box; }
             @media (max-width: 480px) { .pk-engine-list { grid-template-columns: 1fr; } }
             .pk-engine-card {
-                display: flex; align-items: center; padding: 14px 16px; background: var(--pk-surface);
+                display: flex; align-items: center; padding: 12px 14px; background: var(--pk-surface);
                 border: 2px solid var(--pk-border); border-radius: var(--pk-radius); transition: all .3s ease;
-                cursor: grab; min-height: 64px; box-sizing: border-box;
+                cursor: grab; min-height: 60px; box-sizing: border-box; min-width: 0; overflow: hidden;
             }
             .pk-engine-card:hover { transform: translateY(-2px); box-shadow: var(--pk-shadow-lg); border-color: var(--pk-primary-light); }
             .pk-engine-card.pk-active { border-color: var(--pk-success); background: var(--pk-gradient-soft); }
-            .pk-engine-card input[type="checkbox"] { margin-right: 14px; transform: scale(1.3); accent-color: var(--pk-primary); cursor: pointer; }
-            .pk-engine-icon { width: 44px; height: 28px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-right: 14px; border: 1px solid var(--pk-border); border-radius: 6px; flex-shrink: 0; }
-            .pk-engine-info { flex-grow: 1; min-width: 0; }
-            .pk-engine-name { font-weight: 700; color: var(--pk-text); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
-            .pk-engine-url { font-size: .8em; color: var(--pk-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .pk-engine-actions { display: flex; gap: 6px; flex-shrink: 0; }
+            .pk-engine-card input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); accent-color: var(--pk-primary); cursor: pointer; flex-shrink: 0; }
+            .pk-engine-icon { width: 36px; height: 24px; background-size: contain; background-repeat: no-repeat; background-position: center; margin-right: 10px; border: 1px solid var(--pk-border); border-radius: 5px; flex-shrink: 0; }
+            .pk-engine-info { flex-grow: 1; min-width: 0; overflow: hidden; }
+            .pk-engine-name { font-weight: 700; color: var(--pk-text); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+            .pk-engine-url { font-size: 12px; color: var(--pk-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .pk-engine-actions { display: flex; gap: 6px; flex-shrink: 0; margin-left: 8px; }
             .pk-delete-btn { padding: 8px; border: none; background: var(--pk-danger); color: #fff; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .25s ease; }
             .pk-delete-btn:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(239,68,68,.3); }
 
@@ -3910,13 +3906,6 @@ const searchOverlay = {
         navTitle.innerHTML = utils.createInlineSVG('globe') + ' 常用网站导航';
         navigationSection.appendChild(navTitle);
 
-        // Navigation filter input
-        const navFilter = document.createElement("input");
-        navFilter.type = "text";
-        navFilter.placeholder = "搜索网站名称...";
-        navFilter.className = 'pk-search-input pk-nav-filter';
-        navFilter.setAttribute('aria-label', '筛选网站');
-
         const categoriesContainer = document.createElement("div");
         categoriesContainer.className = 'pk-categories';
 
@@ -3926,12 +3915,11 @@ const searchOverlay = {
                 sites: [
                     { name: "MT论坛", url: "https://bbs.binmt.cc" },
                     { name: "吾爱破解", url: "https://www.52pojie.cn" },
-                    { name: "看雪论坛", url: "https://bbs.pediy.com" },
+                    { name: "看雪论坛", url: "https://bbs.kanxue.com" },
                     { name: "飘云阁", url: "https://www.chinapyg.com" },
-                    { name: "卡饭论坛", url: "https://www.kafan.cn" },
                     { name: "绿盟科技社区", url: "https://www.nsfocus.net" },
-                    { name: "乌云漏洞平台", url: "https://wooyun.x10sec.org" },
-                    { name: "渗透测试论坛", url: "https://www.hetianlab.com" },
+                    { name: "先知社区", url: "https://xz.aliyun.com" },
+                    { name: "安全客", url: "https://www.anquanke.com" },
                     { name: "XDA Developers", url: "https://forum.xda-developers.com" },
                     { name: "Reddit ReverseEngineering", url: "https://www.reddit.com/r/ReverseEngineering" },
                     { name: "CrackWatch", url: "https://www.reddit.com/r/CrackWatch" }
@@ -3948,25 +3936,27 @@ const searchOverlay = {
                     { name: "果核剥壳", url: "https://www.ghxi.com" },
                     { name: "大眼仔旭", url: "https://www.dayanzai.me" },
                     { name: "ZD423", url: "https://www.zdfans.com" },
-                    { name: "软件缘", url: "https://www.appcgn.com" },
                     { name: "小众软件", url: "https://www.appinn.com" },
-                    { name: "Rutor", url: "http://rutor.info" },
+                    { name: "异星软件", url: "https://www.yxdown.com" },
                     { name: "RuTracker", url: "https://rutracker.org" }
                 ]
             },
             {
                 title: "🤖 AI工具",
                 sites: [
-                    { name: "ChatGPT", url: "https://chat.openai.com" },
-                    { name: "deepseek", url: "https://www.deepseek.com/" },
+                    { name: "ChatGPT", url: "https://chatgpt.com" },
+                    { name: "DeepSeek", url: "https://www.deepseek.com/" },
                     { name: "Claude", url: "https://claude.ai" },
                     { name: "文心一言", url: "https://yiyan.baidu.com" },
                     { name: "豆包", url: "https://www.doubao.com/chat/" },
                     { name: "讯飞星火", url: "https://xinghuo.xfyun.cn" },
                     { name: "智谱清言", url: "https://chatglm.cn" },
+                    { name: "Kimi", url: "https://kimi.moonshot.cn" },
+                    { name: "通义千问", url: "https://tongyi.aliyun.com" },
                     { name: "Midjourney", url: "https://www.midjourney.com" },
                     { name: "Stable Diffusion", url: "https://stability.ai" },
-                    { name: "Notion AI", url: "https://www.notion.so" }
+                    { name: "Groq", url: "https://groq.com" },
+                    { name: "Poe", url: "https://poe.com" }
                 ]
             },
             {
@@ -3978,12 +3968,13 @@ const searchOverlay = {
                     { name: "YouTube", url: "https://www.youtube.com" },
                     { name: "Netflix", url: "https://www.netflix.com" },
                     { name: "低端影视", url: "https://ddys.tv" },
-                    { name: "NT动漫", url: "https://ntdm8.com/" },
-                    { name: "AGE动漫", url: "https://m.agedm.io/#/" },
-                    { name: "樱花动漫", url: "https://www.yhdm.io" },
+                    { name: "NT动漫", url: "https://www.ntdm9.com/" },
+                    { name: "AGE动漫", url: "https://www.agemys.org/" },
+                    { name: "樱花动漫", url: "https://www.yhdmp.cc" },
                     { name: "腾讯视频", url: "https://v.qq.com" },
                     { name: "爱奇艺", url: "https://www.iqiyi.com" },
                     { name: "芒果TV", url: "https://www.mgtv.com" },
+                    { name: "优酷", url: "https://www.youku.com" },
                     { name: "1905电影网", url: "https://www.1905.com" }
                 ]
             },
@@ -3999,10 +3990,11 @@ const searchOverlay = {
                     { name: "草料二维码", url: "https://cli.im" },
                     { name: "石墨文档", url: "https://shimo.im" },
                     { name: "腾讯文档", url: "https://docs.qq.com" },
-                    { name: "讯飞听见", url: "https://www.iflyrec.com" },
+                    { name: "飞书文档", url: "https://www.feishu.cn" },
                     { name: "Figma", url: "https://www.figma.com" },
                     { name: "Excalidraw", url: "https://excalidraw.com" },
-                    { name: "Photopea", url: "https://www.photopea.com" }
+                    { name: "Photopea", url: "https://www.photopea.com" },
+                    { name: "TempMail", url: "https://temp-mail.org" }
                 ]
             },
             {
@@ -4017,9 +4009,10 @@ const searchOverlay = {
                     { name: "腾讯课堂", url: "https://ke.qq.com" },
                     { name: "可汗学院", url: "https://www.khanacademy.org" },
                     { name: "中国大学MOOC", url: "https://www.icourse163.org" },
-                    { name: "Library Genesis", url: "http://libgen.is" },
-                    { name: "Z-Library", url: "https://z-lib.is" },
-                    { name: "Sci-Hub", url: "https://sci-hub.se" }
+                    { name: "Library Genesis", url: "https://libgen.is" },
+                    { name: "Z-Library", url: "https://z-lib.org" },
+                    { name: "Sci-Hub", url: "https://sci-hub.se" },
+                    { name: "OALib", url: "https://www.oalib.com" }
                 ]
             },
             {
@@ -4032,10 +4025,10 @@ const searchOverlay = {
                     { name: "饿了么", url: "https://www.ele.me" },
                     { name: "苏宁易购", url: "https://www.suning.com" },
                     { name: "唯品会", url: "https://www.vip.com" },
-                    { name: "闲鱼", url: "https://2.taobao.com" },
-                    { name: "盒马鲜生", url: "https://www.hemaxiansheng.com" },
-                    { name: "亚马逊", url: "https://www.amazon.cn" },
-                    { name: "当当网", url: "https://www.dangdang.com" }
+                    { name: "闲鱼", url: "https://www.goofish.com" },
+                    { name: "盒马鲜生", url: "https://www.hemaapp.com" },
+                    { name: "当当网", url: "https://www.dangdang.com" },
+                    { name: "1688", url: "https://www.1688.com" }
                 ]
             },
             {
@@ -4068,8 +4061,7 @@ const searchOverlay = {
                     { name: "荔枝FM", url: "https://www.lizhi.fm" },
                     { name: "蜻蜓FM", url: "https://www.qingting.fm" },
                     { name: "Bandcamp", url: "https://bandcamp.com" },
-                    { name: "SoundCloud", url: "https://soundcloud.com" },
-                    { name: "Audius", url: "https://audius.co" }
+                    { name: "SoundCloud", url: "https://soundcloud.com" }
                 ]
             },
             {
@@ -4081,19 +4073,18 @@ const searchOverlay = {
                     { name: "CSDN", url: "https://www.csdn.net" },
                     { name: "开源中国", url: "https://www.oschina.net" },
                     { name: "GitHub", url: "https://github.com" },
-                    { name: "GitLab", url: "https://about.gitlab.com" },
+                    { name: "GitLab", url: "https://gitlab.com" },
                     { name: "Stack Overflow", url: "https://stackoverflow.com" },
-                    { name: "华为开发者联盟", url: "https://developer.huawei.com" },
-                    { name: "小米开发者平台", url: "https://dev.mi.com" },
                     { name: "阿里开发者社区", url: "https://developer.aliyun.com" },
-                    { name: "腾讯云开发者社区", url: "https://cloud.tencent.com/developer" }
+                    { name: "腾讯云开发者社区", url: "https://cloud.tencent.com/developer" },
+                    { name: "Gitee", url: "https://gitee.com" }
                 ]
             },
             {
                 title: "🎮 游戏区",
                 sites: [
                     { name: "Steam", url: "https://store.steampowered.com" },
-                    { name: "Epic Games", url: "https://www.epicgames.com" },
+                    { name: "Epic Games", url: "https://store.epicgames.com" },
                     { name: "GOG", url: "https://www.gog.com" },
                     { name: "3DMGAME", url: "https://www.3dmgame.com" },
                     { name: "游民星空", url: "https://www.gamersky.com" },
@@ -4109,14 +4100,14 @@ const searchOverlay = {
                 sites: [
                     { name: "FreeBuf", url: "https://www.freebuf.com" },
                     { name: "安全客", url: "https://www.anquanke.com" },
-                    { name: "SecWiki", url: "https://www.sec-wiki.com" },
+                    { name: "先知社区", url: "https://xz.aliyun.com" },
                     { name: "HackerOne", url: "https://www.hackerone.com" },
                     { name: "Bugcrowd", url: "https://www.bugcrowd.com" },
                     { name: "Exploit Database", url: "https://www.exploit-db.com" },
-                    { name: "Metasploit", url: "https://www.metasploit.com" },
                     { name: "Kali Linux", url: "https://www.kali.org" },
                     { name: "OWASP", url: "https://owasp.org" },
-                    { name: "SANS Institute", url: "https://www.sans.org" }
+                    { name: "SANS Institute", url: "https://www.sans.org" },
+                    { name: "Vulhub", url: "https://vulhub.org" }
                 ]
             },
             {
@@ -4127,7 +4118,6 @@ const searchOverlay = {
                     { name: "APKMirror", url: "https://www.apkmirror.com" },
                     { name: "F-Droid", url: "https://f-droid.org" },
                     { name: "Aptoide", url: "https://www.aptoide.com" },
-                    { name: "豌豆荚", url: "https://www.wandoujia.com" },
                     { name: "应用宝", url: "https://sj.qq.com" },
                     { name: "小米应用商店", url: "https://app.mi.com" },
                     { name: "华为应用市场", url: "https://appgallery.huawei.com" },
@@ -4140,13 +4130,13 @@ const searchOverlay = {
                     { name: "CodePen", url: "https://codepen.io" },
                     { name: "JSFiddle", url: "https://jsfiddle.net" },
                     { name: "Replit", url: "https://replit.com" },
-                    { name: "Glitch", url: "https://glitch.com" },
                     { name: "CodeSandbox", url: "https://codesandbox.io" },
                     { name: "Postman", url: "https://www.postman.com" },
                     { name: "Swagger", url: "https://swagger.io" },
                     { name: "JSON Formatter", url: "https://jsonformatter.org" },
                     { name: "RegExr", url: "https://regexr.com" },
-                    { name: "DevDocs", url: "https://devdocs.io" }
+                    { name: "DevDocs", url: "https://devdocs.io" },
+                    { name: "GitHub Gist", url: "https://gist.github.com" }
                 ]
             },
             {
@@ -4169,13 +4159,12 @@ const searchOverlay = {
                 sites: [
                     { name: "Kaggle", url: "https://www.kaggle.com" },
                     { name: "天池大数据", url: "https://tianchi.aliyun.com" },
-                    { name: "和鲸社区", url: "https://www.kesci.com" },
+                    { name: "和鲸社区", url: "https://www.heywhale.com" },
                     { name: "Data.gov", url: "https://www.data.gov" },
                     { name: "Google Dataset", url: "https://datasetsearch.research.google.com" },
                     { name: "UCI数据集", url: "https://archive.ics.uci.edu" },
                     { name: "国家统计局", url: "https://www.stats.gov.cn" },
-                    { name: "世界银行数据", url: "https://data.worldbank.org" },
-                    { name: "GitHub数据集", url: "https://github.com/awesomedata/awesome-public-datasets" }
+                    { name: "世界银行数据", url: "https://data.worldbank.org" }
                 ]
             }
         ];
@@ -4204,31 +4193,6 @@ const searchOverlay = {
             categoryElements.push({ element: categoryElement, title: category.title, sites: category.sites });
         });
 
-        // Navigation filter functionality
-        navFilter.addEventListener('input', () => {
-            const filter = navFilter.value.trim().toLowerCase();
-            categoryElements.forEach(cat => {
-                const titleMatch = cat.title.toLowerCase().includes(filter);
-                const siteMatch = cat.sites.some(s => s.name.toLowerCase().includes(filter));
-                if (!filter || titleMatch || siteMatch) {
-                    cat.element.style.display = '';
-                    if (filter) {
-                        // Highlight matching sites, hide non-matching
-                        const links = cat.element.querySelectorAll('.pk-site-link');
-                        links.forEach((link, i) => {
-                            link.style.display = (!filter || cat.sites[i].name.toLowerCase().includes(filter) || titleMatch) ? '' : 'none';
-                        });
-                    } else {
-                        const links = cat.element.querySelectorAll('.pk-site-link');
-                        links.forEach(link => link.style.display = '');
-                    }
-                } else {
-                    cat.element.style.display = 'none';
-                }
-            });
-        });
-
-        navigationSection.appendChild(navFilter);
         navigationSection.appendChild(categoriesContainer);
 
         // Assemble
