@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         网页图片采集器 Pro
 // @namespace    http://tampermonkey.net/
-// @version      v2.1
+// @version      v2.2
 // @description  支持动态加载、智能去重、大图预览的网页图片下载工具 | 七彩毛玻璃UI
 // @author       YourName
 // @match        *://*/*
@@ -2057,6 +2057,7 @@
     const Draggable = {
         container: null,
         isDragging: false,
+        hasMoved: false,
         startX: 0, startY: 0, startLeft: 0, startTop: 0,
         dragStartTime: 0,
         touchTimer: null,
@@ -2070,6 +2071,7 @@
         },
 
         startDrag(e) {
+            if (e.target.closest && e.target.closest('.rainbow-fab-badge')) return;
             e.preventDefault();
             const clientX = e.clientX || e.touches[0].clientX;
             const clientY = e.clientY || e.touches[0].clientY;
@@ -2085,6 +2087,7 @@
             this.startX = clientX;
             this.startY = clientY;
             this.dragStartTime = Date.now();
+            this.hasMoved = false;
             const self = this;
             if (e.type === 'touchstart') {
                 this.touchTimer = setTimeout(() => {
@@ -2103,6 +2106,7 @@
 
         _dragHandler(e) {
             if (!Draggable.isDragging) return;
+            Draggable.hasMoved = true;
             e.preventDefault();
             const clientX = e.clientX || e.touches[0].clientX;
             const clientY = e.clientY || e.touches[0].clientY;
@@ -2121,6 +2125,10 @@
                     Draggable.onClickCallback();
                 }
                 return;
+            }
+            // 如果没移动，视为点击
+            if (!Draggable.hasMoved) {
+                Draggable.onClickCallback();
             }
             Draggable.isDragging = false;
             Draggable.container.style.transition = '';
@@ -2246,12 +2254,6 @@
 
         _initFabEvents() {
             Draggable.init(this.fabElements.container, () => this.showModal());
-            // 也支持点击按钮（短按）
-            this.fabElements.button.addEventListener('click', (e) => {
-                if (!Draggable.isDragging && Date.now() - Draggable.dragStartTime > CONFIG.touchDelay) {
-                    this.showModal();
-                }
-            });
         },
 
         _initModalEvents() {
