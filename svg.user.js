@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         网页图片采集器 Pro
 // @namespace    http://tampermonkey.net/
-// @version      v2.0
+// @version      v2.1
 // @description  支持动态加载、智能去重、大图预览的网页图片下载工具 | 七彩毛玻璃UI
 // @author       YourName
 // @match        *://*/*
@@ -22,12 +22,12 @@
 
     // ==================== 配置模块 ====================
     const CONFIG = {
-        buttonSize: 44,
+        buttonSize: 36,
         zIndex: 99999,
-        positionOffset: 25,
+        positionOffset: 20,
         touchDelay: 300,
         supportFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff', 'ico', 'avif'],
-        maxPreviewSize: 56,
+        maxPreviewSize: 48,
         loadTimeout: 5000,
         infoTruncateLength: 4,
         panelSafeMargin: '16px',
@@ -110,9 +110,9 @@
         .rainbow-fab::before {
             content: '';
             position: absolute;
-            inset: -3px;
+            inset: -2px;
             border-radius: 50%;
-            padding: 3px;
+            padding: 2px;
             background: conic-gradient(
                 from 0deg,
                 #ff6b6b, #ff9f43, #feca57, #54a0ff,
@@ -166,8 +166,8 @@
             transform: scale(0.94);
         }
         .rainbow-fab-icon {
-            width: 24px;
-            height: 24px;
+            width: 18px;
+            height: 18px;
             position: relative;
             z-index: 2;
             display: flex;
@@ -181,22 +181,22 @@
         }
         .rainbow-fab-badge {
             position: absolute;
-            top: -4px;
-            right: -4px;
-            min-width: 18px;
-            height: 18px;
-            border-radius: 9px;
+            top: -3px;
+            right: -3px;
+            min-width: 16px;
+            height: 16px;
+            border-radius: 8px;
             background: linear-gradient(135deg, #ff6b6b, #ff9f43);
             color: #fff;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 700;
             display: none;
             align-items: center;
             justify-content: center;
-            padding: 0 5px;
+            padding: 0 4px;
             z-index: 10;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            border: 2px solid rgba(255,255,255,0.4);
+            border: 1.5px solid rgba(255,255,255,0.4);
             backdrop-filter: blur(4px);
             -webkit-backdrop-filter: blur(4px);
         }
@@ -303,37 +303,10 @@
             font-size: 13px !important;
             letter-spacing: 0.5px;
         }
-        .modal-header-actions {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .header-btn {
-            background: rgba(255,255,255,0.18);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: #fff;
-            font-size: 11px !important;
-            cursor: pointer;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.25s;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-        }
-        .header-btn:hover {
-            background: rgba(255,255,255,0.32);
-            transform: scale(1.1);
-            box-shadow: 0 0 12px rgba(255,255,255,0.3);
-        }
         .close-btn {
             background: rgba(255,255,255,0.15);
             border: 1px solid rgba(255,255,255,0.3);
             color: #fff;
-            font-size: 16px !important;
             cursor: pointer;
             width: 32px;
             height: 32px;
@@ -344,6 +317,9 @@
             transition: all 0.25s;
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
+        }
+        .close-btn svg {
+            pointer-events: none;
         }
         .close-btn:hover {
             background: rgba(255,255,255,0.35);
@@ -448,9 +424,6 @@
             border-bottom: 1px solid rgba(0,0,0,0.05);
             flex-shrink: 0;
         }
-        .search-bar.hidden {
-            display: none;
-        }
         .search-input {
             flex: 1;
             padding: 6px 12px;
@@ -507,9 +480,15 @@
             transition: all 0.2s;
             font-size: 10px;
         }
+        .view-btn svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
         .view-btn.active {
             background: linear-gradient(135deg, rgba(255,107,107,0.3), rgba(255,159,67,0.3));
             border-color: rgba(255,107,107,0.4);
+            color: #ff6b6b;
         }
 
         /* ===== 内容区 ===== */
@@ -763,7 +742,6 @@
         .preview-close {
             background: rgba(255,255,255,0.15);
             border: 1px solid rgba(255,255,255,0.3);
-            font-size: 22px;
             cursor: pointer;
             color: #fff;
             width: ${CONFIG.previewZoom.closeButtonSize};
@@ -776,6 +754,9 @@
             flex-shrink: 0;
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
+        }
+        .preview-close svg {
+            pointer-events: none;
         }
         .preview-close:hover {
             background: rgba(255,255,255,0.35);
@@ -804,6 +785,67 @@
             max-width: 100%;
             max-height: 100%;
             border-radius: 10px;
+        }
+        .preview-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.35);
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s;
+            z-index: 5;
+            font-size: 18px;
+            pointer-events: auto;
+        }
+        .preview-nav:hover {
+            background: rgba(255,255,255,0.35);
+            transform: translateY(-50%) scale(1.1);
+            box-shadow: 0 0 16px rgba(255,255,255,0.25);
+        }
+        .preview-nav:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+        .preview-nav.prev {
+            left: 12px;
+        }
+        .preview-nav.next {
+            right: 12px;
+        }
+        .preview-nav svg {
+            width: 20px;
+            height: 20px;
+            fill: #fff;
+        }
+        .preview-nav.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+            cursor: default;
+        }
+        .preview-counter {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            z-index: 5;
+            pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.2);
         }
         .preview-footer {
             width: 100%;
@@ -1242,9 +1284,11 @@
             button.innerHTML = `
                 <div class="rainbow-fab-inner">
                     <div class="rainbow-fab-icon">
-                        <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M19 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.11 21 21 20.1 21 19V5C21 3.9 20.11 3 19 3ZM19 19H5V5H19V19ZM12 12C10.34 12 9 10.66 9 9C9 7.34 10.34 6 12 6C13.66 6 15 7.34 15 9C15 10.66 13.66 12 12 12ZM12 8C11.45 8 11 8.45 11 9C11 9.55 11.45 10 12 10C12.55 10 13 9.55 13 9C13 8.45 12.55 8 12 8Z"/>
-                            <path d="M16.59 16.59L13.7 18.65C13.25 18.96 12.63 19 12 19C11.37 19 10.75 18.96 10.3 18.65L7.41 16.59L8.58 14.41L10.54 15.91C10.91 16.15 11.45 16.15 11.82 15.91L16.59 12.59L17.76 14.41L16.59 16.59Z"/>
+                        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M512 955.3408c-243.712 0-442.0096-198.2976-442.0096-442.0096S268.288 71.2704 512 71.2704s442.0096 198.2976 442.0096 442.0096-198.2976 442.0608-442.0096 442.0608z m0-802.1504c-198.5536 0-360.0896 161.536-360.0896 360.0896s161.536 360.0896 360.0896 360.0896 360.0896-161.536 360.0896-360.0896S710.5536 153.1904 512 153.1904z" fill="#4385F5"/>
+                            <path d="M512 513.3312m-213.6064 0a213.6064 213.6064 0 1 0 427.2128 0 213.6064 213.6064 0 1 0-427.2128 0Z" fill="#D9FFEC"/>
+                            <path d="M486.6048 686.7456c-112.5888 0-204.1856-91.5968-204.1856-204.2368 0-112.5888 91.5968-204.1856 204.1856-204.1856 112.5888 0 204.2368 91.5968 204.2368 204.1856-0.0512 112.64-91.648 204.2368-204.2368 204.2368z m0-331.6224c-70.2464 0-127.3856 57.1392-127.3856 127.3856s57.1392 127.4368 127.3856 127.4368 127.4368-57.1392 127.4368-127.4368-57.1904-127.3856-127.4368-127.3856z" fill="#34A853"/>
+                            <path d="M703.232 733.6448a38.2976 38.2976 0 0 1-27.5456-11.6224l-86.4768-88.9344c-14.7968-15.2064-14.4384-39.5264 0.768-54.3232 15.2064-14.7968 39.5264-14.4384 54.3232 0.768l86.4768 88.9344c14.7968 15.2064 14.4384 39.5264-0.768 54.3232a38.50752 38.50752 0 0 1-26.7776 10.8544z" fill="#34A853"/>
                         </svg>
                     </div>
                 </div>
@@ -1262,11 +1306,12 @@
                 <div class="modal-header">
                     <h2>网页图片资源列表</h2>
                     <div class="modal-header-actions">
-                        <button class="header-btn" id="toggleSearchBtn" title="搜索/筛选">&#128269;</button>
-                        <button class="close-btn">&times;</button>
+                        <button class="close-btn">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
                     </div>
                 </div>
-                <div class="search-bar hidden" id="searchBar">
+                <div class="search-bar" id="searchBar">
                     <input type="text" class="search-input" id="searchInput" placeholder="搜索图片名称...">
                     <select class="sort-select" id="sortSelect">
                         <option value="default">默认排序</option>
@@ -1280,8 +1325,12 @@
                         ${CONFIG.supportFormats.map(f => `<option value="${f}">${f.toUpperCase()}</option>`).join('')}
                     </select>
                     <div class="view-toggle">
-                        <button class="view-btn active" id="listViewBtn" title="列表视图">&#9776;</button>
-                        <button class="view-btn" id="gridViewBtn" title="网格视图">&#9638;</button>
+                        <button class="view-btn active" id="listViewBtn" title="列表视图">
+                            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="3" rx="1"/><rect x="3" y="10.5" width="18" height="3" rx="1"/><rect x="3" y="17" width="18" height="3" rx="1"/></svg>
+                        </button>
+                        <button class="view-btn" id="gridViewBtn" title="网格视图">
+                            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+                        </button>
                     </div>
                 </div>
                 <div class="action-bar">
@@ -1314,10 +1363,19 @@
                 <div class="preview-container">
                     <div class="preview-header">
                         <div class="preview-title" id="previewTitle">图片预览</div>
-                        <button class="preview-close">&times;</button>
+                        <button class="preview-close">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
                     </div>
                     <div class="preview-content" id="previewContent">
                         <div class="loading">加载中...</div>
+                        <button class="preview-nav prev" id="previewPrev" title="上一张">
+                            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <button class="preview-nav next" id="previewNext" title="下一张">
+                            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </button>
+                        <div class="preview-counter" id="previewCounter">1 / 1</div>
                     </div>
                     <div class="preview-footer">
                         <button class="preview-btn preview-download" id="previewDownload">下载图片</button>
@@ -1756,6 +1814,11 @@
 
     // ==================== UI渲染模块 ====================
     const UIRenderer = {
+        _visibleItems: [],
+
+        getVisibleItems() {
+            return this._visibleItems;
+        },
         createImageItemElement(item) {
             const itemElement = document.createElement('div');
             itemElement.className = 'svg-item';
@@ -1792,7 +1855,11 @@
                 e.stopPropagation();
                 const imgId = e.currentTarget.dataset.imgId;
                 const imgItem = App.imageItemCache.get(imgId);
-                if (imgItem) PreviewModal.show(imgItem);
+                if (imgItem) {
+                    const visibleItems = UIRenderer.getVisibleItems();
+                    const idx = visibleItems.findIndex(it => it.id === imgId);
+                    PreviewModal.show(imgItem, visibleItems, idx >= 0 ? idx : 0);
+                }
             });
 
             const itemDownloadBtn = itemElement.querySelector('.item-download-btn');
@@ -1807,6 +1874,7 @@
         },
 
         renderImageList(items, imageItemCache) {
+            this._visibleItems = items;
             const svgList = document.getElementById('svgList');
             svgList.innerHTML = '';
             if (items.length === 0) {
@@ -1865,6 +1933,8 @@
     // ==================== 预览弹窗模块 ====================
     const PreviewModal = {
         currentItem: null,
+        currentIndex: -1,
+        imageList: [],
         modal: null,
         escapeHandler: null,
 
@@ -1885,16 +1955,67 @@
                     await Clipboard.copyUrls([this.currentItem]);
                 }
             });
+            document.getElementById('previewPrev').addEventListener('click', () => this.navigate(-1));
+            document.getElementById('previewNext').addEventListener('click', () => this.navigate(1));
         },
 
-        show(imgItem) {
+        navigate(direction) {
+            if (this.imageList.length === 0) return;
+            const newIndex = this.currentIndex + direction;
+            if (newIndex < 0 || newIndex >= this.imageList.length) return;
+            this.show(this.imageList[newIndex], this.imageList, newIndex);
+        },
+
+        updateNavButtons() {
+            const prevBtn = document.getElementById('previewPrev');
+            const nextBtn = document.getElementById('previewNext');
+            const counter = document.getElementById('previewCounter');
+            if (this.imageList.length <= 1) {
+                prevBtn.classList.add('disabled');
+                nextBtn.classList.add('disabled');
+                counter.style.display = 'none';
+            } else {
+                if (this.currentIndex <= 0) prevBtn.classList.add('disabled');
+                else prevBtn.classList.remove('disabled');
+                if (this.currentIndex >= this.imageList.length - 1) nextBtn.classList.add('disabled');
+                else nextBtn.classList.remove('disabled');
+                counter.style.display = 'block';
+                counter.textContent = `${this.currentIndex + 1} / ${this.imageList.length}`;
+            }
+        },
+
+        show(imgItem, imageList, index) {
+            if (imageList) {
+                this.imageList = imageList;
+                this.currentIndex = index !== undefined ? index : imageList.indexOf(imgItem);
+            } else {
+                this.imageList = [imgItem];
+                this.currentIndex = 0;
+            }
             this.currentItem = imgItem;
             const title = document.getElementById('previewTitle');
             const content = document.getElementById('previewContent');
             const completedFileName = Utils.completeImageSuffix(imgItem.originalName || imgItem.name, imgItem.originalFormat);
             title.textContent = completedFileName;
-            content.innerHTML = '<div class="loading">加载中...</div>';
+
+            // 保留导航按钮，只替换加载内容
+            const loadingEl = content.querySelector('.loading');
+            if (!loadingEl) {
+                const existingLoading = document.createElement('div');
+                existingLoading.className = 'loading';
+                // 清除除了 nav 按钮和 counter 之外的内容
+                const navPrev = content.querySelector('.preview-nav.prev');
+                const navNext = content.querySelector('.preview-nav.next');
+                const counter = content.querySelector('.preview-counter');
+                content.innerHTML = '';
+                content.appendChild(existingLoading);
+                content.appendChild(navPrev);
+                content.appendChild(navNext);
+                content.appendChild(counter);
+            }
+
             this.modal.style.display = 'flex';
+            this.updateNavButtons();
 
             let previewContent = '';
             if (imgItem.format === 'svg' && imgItem.svgContent) {
@@ -1903,12 +2024,19 @@
             } else {
                 previewContent = `<img class="preview-image" src="${imgItem.url}" alt="${completedFileName}" onload="this.style.opacity='1'" style="opacity:0;transition:opacity 0.3s">`;
             }
-            content.innerHTML = previewContent;
+
+            const loadingEl2 = content.querySelector('.loading');
+            if (loadingEl2) loadingEl2.remove();
+            const insertBefore = content.querySelector('.preview-nav.prev');
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = previewContent;
+            const previewEl = wrapper.firstElementChild;
+            content.insertBefore(previewEl, insertBefore);
 
             this.escapeHandler = (e) => {
-                if (e.key === 'Escape') {
-                    this.hide();
-                }
+                if (e.key === 'Escape') this.hide();
+                if (e.key === 'ArrowLeft') this.navigate(-1);
+                if (e.key === 'ArrowRight') this.navigate(1);
             };
             document.addEventListener('keydown', this.escapeHandler);
         },
@@ -1916,6 +2044,8 @@
         hide() {
             this.modal.style.display = 'none';
             this.currentItem = null;
+            this.imageList = [];
+            this.currentIndex = -1;
             if (this.escapeHandler) {
                 document.removeEventListener('keydown', this.escapeHandler);
                 this.escapeHandler = null;
@@ -2078,15 +2208,16 @@
             // 键盘快捷键
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && this.mainModal.style.display === 'flex') {
-                    this.hideModal();
+                    const previewModal = document.getElementById('imagePreviewModal');
+                    if (previewModal && previewModal.style.display === 'flex') {
+                        PreviewModal.hide();
+                    } else {
+                        this.hideModal();
+                    }
                 }
                 if (e.ctrlKey && e.key === 'f' && this.mainModal.style.display === 'flex') {
                     e.preventDefault();
-                    const searchBar = document.getElementById('searchBar');
-                    searchBar.classList.toggle('hidden');
-                    if (!searchBar.classList.contains('hidden')) {
-                        document.getElementById('searchInput').focus();
-                    }
+                    document.getElementById('searchInput').focus();
                 }
             });
 
@@ -2168,20 +2299,11 @@
         },
 
         _initSearchBar() {
-            const toggleBtn = document.getElementById('toggleSearchBtn');
-            const searchBar = document.getElementById('searchBar');
             const searchInput = document.getElementById('searchInput');
             const sortSelect = document.getElementById('sortSelect');
             const formatFilter = document.getElementById('formatFilter');
             const listViewBtn = document.getElementById('listViewBtn');
             const gridViewBtn = document.getElementById('gridViewBtn');
-
-            toggleBtn.addEventListener('click', () => {
-                searchBar.classList.toggle('hidden');
-                if (!searchBar.classList.contains('hidden')) {
-                    searchInput.focus();
-                }
-            });
 
             const applyFilters = Utils.debounce(() => {
                 const filtered = UIRenderer.applyFilterAndSort(
