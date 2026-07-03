@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SVG嗅探器增强版
 // @namespace    http://tampermonkey.net/
-// @version      2.0.3
+// @version      2.0.4
 // @description  扫描、预览、下载网页中的SVG图片 | 支持去重/搜索/排序/多格式导出(PNG/DataURI/React/Base64)/压缩/暗色模式
 // @author       晚风知我意
 // @match        *://*/*
@@ -770,7 +770,7 @@
 
             this.badge = document.createElement('div');
             this.badge.className = 'ss-badge';
-            this.badge.style.display = 'none';
+            this.badge.style.setProperty('display', 'none', 'important');
 
             this.radar.appendChild(this.radarBtn);
             this.radar.appendChild(this.badge);
@@ -868,9 +868,9 @@
         updateBadge(count) {
             if (count > 0) {
                 this.badge.textContent = count > 99 ? '99+' : count;
-                this.badge.style.display = 'flex';
+                this.badge.style.setProperty('display', 'flex', 'important');
             } else {
-                this.badge.style.display = 'none';
+                this.badge.style.setProperty('display', 'none', 'important');
             }
         },
 
@@ -1144,8 +1144,8 @@
     const modalManager = {
         show() {
             ui.contentEl.innerHTML = `<div class="ss-loading">${utils.svgIcons.radar}<br>正在扫描页面SVG资源...</div>`;
-            ui.modal.style.display = 'block';
-            ui.overlay.style.display = 'block';
+            ui.modal.style.setProperty('display', 'flex', 'important');
+            ui.overlay.style.setProperty('display', 'block', 'important');
 
             setTimeout(() => {
                 try {
@@ -1167,8 +1167,8 @@
         },
 
         hide() {
-            ui.modal.style.display = 'none';
-            ui.overlay.style.display = 'none';
+            ui.modal.style.setProperty('display', 'none', 'important');
+            ui.overlay.style.setProperty('display', 'none', 'important');
             downloadManager.clearBlobUrls();
         },
     };
@@ -1293,7 +1293,7 @@
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            if (ui.modal.style.display !== 'block') return;
+            if (ui.modal.style.display === 'none' || !ui.modal.style.display) return;
             if (e.key === 'Escape') { modalManager.hide(); }
             if (e.ctrlKey && e.key === 'f') { e.preventDefault(); ui.searchInput.focus(); }
             if (e.ctrlKey && e.key === 'a') {
