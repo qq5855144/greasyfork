@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         聚合搜索引擎切换导航 + GitHub增强(移动端优化)
 // @namespace    http://tampermonkey.net/
-// @version      v2.1.3
+// @version      v2.1.4
 // @author       晚风知我意
 // @match        *://*/*
 // @grant        unsafeWindow
@@ -3257,14 +3257,19 @@ const domHandler = {
             .${CLASS_NAMES.ENGINE_BUTTON}:focus, .${CLASS_NAMES.ENGINE_BUTTON}.selected {
                 border: 2px dashed #2196F3; background-color: #f0f8ff;
             }
-            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAG_OVER} {
-                border: 2px solid #6366f1; background-color: #eef2ff; transform: scale(1.08);
-            }
-            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAGGING} {
-                opacity: .4; transform: scale(.92); cursor: grabbing;
-            }
             .${CLASS_NAMES.ENGINE_BUTTON}[draggable="true"] { cursor: grab; }
             .${CLASS_NAMES.ENGINE_BUTTON}[draggable="false"] { cursor: default; }
+            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAGGING} {
+                opacity: .3; transform: scale(.92); cursor: grabbing;
+            }
+            .${CLASS_NAMES.ENGINE_BUTTON}.${CLASS_NAMES.DRAG_OVER} {
+                border: 2px solid #6366f1; background-color: #eef2ff; transform: scale(1.1);
+            }
+            .pk-drop-indicator {
+                width: 3px; height: 32px; background: #6366f1; border-radius: 2px;
+                flex-shrink: 0; margin: 2px 1px; animation: pulse 0.6s ease infinite;
+                box-shadow: 0 0 8px rgba(99,102,241,.5);
+            }
             .${CLASS_NAMES.ENGINE_CARD} { transition: all .3s ease; }
 
             /* ========== 动画 ========== */
@@ -3646,16 +3651,64 @@ const domHandler = {
         const container = document.querySelector(`.${CLASS_NAMES.ENGINE_DISPLAY}`);
         if (!container) return;
         const buttons = container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`);
+        let draggingButton = null;
+        let dropIndicator = null;
+        let currentTarget = null;
+
+        // Ensure drop indicator element exists
+        const getDropIndicator = () => {
+            if (!dropIndicator) {
+                dropIndicator = document.createElement('div');
+                dropIndicator.className = 'pk-drop-indicator';
+            }
+            return dropIndicator;
+        };
+
+        // Calculate which button the cursor is hovering over and where to insert
+        const getInsertTarget = (clientX) => {
+            const btns = Array.from(container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}:not(.${CLASS_NAMES.DRAGGING})`));
+            for (const btn of btns) {
+                const rect = btn.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+                if (clientX < midX) {
+                    return { target: btn, position: 'before' };
+                }
+            }
+            // Cursor is past the last button
+            if (btns.length > 0) {
+                return { target: btns[btns.length - 1], position: 'after' };
+            }
+            return null;
+        };
+
+        // Update visual indicator during drag
+        const updateIndicator = (clientX) => {
+            // Remove previous highlight
+            container.querySelectorAll(`.${CLASS_NAMES.DRAG_OVER}`).forEach(el => el.classList.remove(CLASS_NAMES.DRAG_OVER));
+            const indicator = getDropIndicator();
+            if (indicator.parentNode) indicator.remove();
+
+            const result = getInsertTarget(clientX);
+            if (!result) return;
+
+            result.target.classList.add(CLASS_NAMES.DRAG_OVER);
+            currentTarget = result;
+
+            if (result.position === 'before') {
+                container.insertBefore(indicator, result.target);
+            } else {
+                container.insertBefore(indicator, result.target.nextSibling);
+            }
+        };
+
         buttons.forEach(button => {
             button.draggable = true;
-            button.style.cursor = 'grab';
 
             button.addEventListener('dragstart', (e) => {
+                draggingButton = button;
                 button.classList.add(CLASS_NAMES.DRAGGING);
-                button.style.cursor = 'grabbing';
                 e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', button.getAttribute('url'));
-                // Create a clean drag image (no tilt)
+                e.dataTransfer.setData('text/plain', button.getAttribute('url') || '');
                 try {
                     const dragImg = button.cloneNode(true);
                     dragImg.style.cssText = 'position:fixed; top:-9999px; left:-9999px; opacity:0.85; transform:none; border:2px solid #6366f1; border-radius:8px;';
@@ -3667,48 +3720,55 @@ const domHandler = {
 
             button.addEventListener('dragend', () => {
                 button.classList.remove(CLASS_NAMES.DRAGGING);
-                button.style.cursor = 'grab';
-                // Clean up any residual drag-over states
                 container.querySelectorAll(`.${CLASS_NAMES.DRAG_OVER}`).forEach(el => el.classList.remove(CLASS_NAMES.DRAG_OVER));
+                const indicator = getDropIndicator();
+                if (indicator.parentNode) indicator.remove();
+                draggingButton = null;
+                currentTarget = null;
                 utils.saveButtonOrder();
             });
+        });
 
-            button.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-            });
+        // Container-level drag tracking — works across buttons AND gaps
+        container.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (draggingButton) {
+                updateIndicator(e.clientX);
+            }
+        });
 
-            button.addEventListener('dragenter', (e) => {
-                e.preventDefault();
-                if (button.classList.contains(CLASS_NAMES.DRAGGING)) return;
-                button.classList.add(CLASS_NAMES.DRAG_OVER);
-            });
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!draggingButton || !currentTarget) {
+                const indicator = getDropIndicator();
+                if (indicator.parentNode) indicator.remove();
+                return;
+            }
+            const { target, position } = currentTarget;
+            if (target === draggingButton) return;
+            if (position === 'before') {
+                container.insertBefore(draggingButton, target);
+            } else {
+                container.insertBefore(draggingButton, target.nextSibling);
+            }
+            if (navigator.vibrate) navigator.vibrate(15);
+            utils.markUnsavedChanges();
+            // Cleanup
+            container.querySelectorAll(`.${CLASS_NAMES.DRAG_OVER}`).forEach(el => el.classList.remove(CLASS_NAMES.DRAG_OVER));
+            const indicator = getDropIndicator();
+            if (indicator.parentNode) indicator.remove();
+            currentTarget = null;
+        });
 
-            button.addEventListener('dragleave', (e) => {
-                // Only remove if leaving the button itself, not entering a child
-                if (!button.contains(e.relatedTarget)) {
-                    button.classList.remove(CLASS_NAMES.DRAG_OVER);
-                }
-            });
-
-            button.addEventListener('drop', (e) => {
-                e.preventDefault();
-                button.classList.remove(CLASS_NAMES.DRAG_OVER);
-                const draggingButton = document.querySelector(`.${CLASS_NAMES.DRAGGING}`);
-                if (draggingButton && draggingButton !== button) {
-                    const buttonsArray = Array.from(container.querySelectorAll(`.${CLASS_NAMES.ENGINE_BUTTON}`));
-                    const draggedIndex = buttonsArray.indexOf(draggingButton);
-                    const targetIndex = buttonsArray.indexOf(button);
-                    if (draggedIndex < targetIndex) {
-                        container.insertBefore(draggingButton, button.nextSibling);
-                    } else {
-                        container.insertBefore(draggingButton, button);
-                    }
-                    // Haptic feedback on supported devices
-                    if (navigator.vibrate) navigator.vibrate(15);
-                    utils.markUnsavedChanges();
-                }
-            });
+        // Also support dragleave on container to clean up when leaving entirely
+        container.addEventListener('dragleave', (e) => {
+            // Only clean up if leaving the container itself
+            if (!container.contains(e.relatedTarget)) {
+                container.querySelectorAll(`.${CLASS_NAMES.DRAG_OVER}`).forEach(el => el.classList.remove(CLASS_NAMES.DRAG_OVER));
+                const indicator = getDropIndicator();
+                if (indicator.parentNode) indicator.remove();
+            }
         });
     },
 
