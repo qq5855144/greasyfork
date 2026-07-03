@@ -13,7 +13,7 @@
 // @grant        GM_download
 // @require      https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js
-// @icon         https://cdn-icons-png.flaticon.com/512/149/149071.png
+// @icon         https://raw.githubusercontent.com/qq5855144/greasyfork/main/download.svg
 // @license      MIT
 // @downloadURL https://update.greasyfork.org/scripts/544921/SVG%E5%97%85%E6%8E%A2%E5%99%A8.user.js
 // @updateURL https://update.greasyfork.org/scripts/544921/SVG%E5%97%85%E6%8E%A2%E5%99%A8.meta.js
