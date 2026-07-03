@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SVG嗅探器增强版
 // @namespace    http://tampermonkey.net/
-// @version      2.0.1
+// @version      2.0.2
 // @description  扫描、预览、下载网页中的SVG图片 | 支持去重/搜索/排序/多格式导出(PNG/DataURI/React/Base64)/压缩/暗色模式
 // @author       晚风知我意
 // @match        *://*/*
@@ -68,12 +68,12 @@
         GM_addStyle(`
         /* ========== 设计变量 ========== */
         .svg-sniffer-root {
-            --ss-bg: #f0f2f5;
+            --ss-bg: #f8fafc;
             --ss-surface: #ffffff;
-            --ss-surface-alt: #f8f9fa;
-            --ss-surface-hover: #f0f4ff;
-            --ss-text: #1a1a2e;
-            --ss-text-secondary: #64748b;
+            --ss-surface-alt: #f8fafc;
+            --ss-surface-hover: #eef2ff;
+            --ss-text: #0f172a;
+            --ss-text-secondary: #475569;
             --ss-text-muted: #94a3b8;
             --ss-border: #e2e8f0;
             --ss-border-light: #f1f5f9;
@@ -87,26 +87,28 @@
             --ss-warning-bg: #fffbeb;
             --ss-danger: #ef4444;
             --ss-danger-bg: #fef2f2;
-            --ss-shadow-sm: 0 1px 3px rgba(0,0,0,.08);
-            --ss-shadow-md: 0 4px 12px rgba(0,0,0,.1);
-            --ss-shadow-lg: 0 8px 30px rgba(0,0,0,.12);
-            --ss-shadow-xl: 0 20px 60px rgba(0,0,0,.18);
+            --ss-shadow-xs: 0 1px 2px rgba(0,0,0,.04);
+            --ss-shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+            --ss-shadow-md: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -2px rgba(0,0,0,.04);
+            --ss-shadow-lg: 0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.04);
+            --ss-shadow-xl: 0 20px 25px -5px rgba(0,0,0,.1), 0 8px 10px -6px rgba(0,0,0,.04);
+            --ss-radius-sm: 8px;
             --ss-radius: 10px;
             --ss-radius-lg: 14px;
-            --ss-radius-xl: 20px;
-            --ss-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+            --ss-radius-xl: 18px;
+            --ss-gradient: linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #ec4899 100%);
             --ss-transition: .25s cubic-bezier(.4,0,.2,1);
         }
         .svg-sniffer-root[data-theme="dark"] {
-            --ss-bg: #0f172a;
-            --ss-surface: #1e293b;
-            --ss-surface-alt: #334155;
-            --ss-surface-hover: #3730a3;
+            --ss-bg: #0b1120;
+            --ss-surface: #1a2332;
+            --ss-surface-alt: #243044;
+            --ss-surface-hover: #2d3a4f;
             --ss-text: #f1f5f9;
-            --ss-text-secondary: #cbd5e1;
+            --ss-text-secondary: #b4c0d0;
             --ss-text-muted: #94a3b8;
-            --ss-border: #334155;
-            --ss-border-light: #1e293b;
+            --ss-border: #2d3a4f;
+            --ss-border-light: #1a2332;
             --ss-primary: #818cf8;
             --ss-primary-light: #a5b4fc;
             --ss-primary-dark: #6366f1;
@@ -117,10 +119,11 @@
             --ss-warning-bg: #78350f;
             --ss-danger: #f87171;
             --ss-danger-bg: #7f1d1d;
-            --ss-shadow-sm: 0 1px 3px rgba(0,0,0,.3);
-            --ss-shadow-md: 0 4px 12px rgba(0,0,0,.4);
-            --ss-shadow-lg: 0 8px 30px rgba(0,0,0,.5);
-            --ss-shadow-xl: 0 20px 60px rgba(0,0,0,.6);
+            --ss-shadow-xs: 0 1px 2px rgba(0,0,0,.3);
+            --ss-shadow-sm: 0 1px 3px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.25);
+            --ss-shadow-md: 0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px -2px rgba(0,0,0,.3);
+            --ss-shadow-lg: 0 10px 15px -3px rgba(0,0,0,.45), 0 4px 6px -4px rgba(0,0,0,.3);
+            --ss-shadow-xl: 0 20px 25px -5px rgba(0,0,0,.55), 0 8px 10px -6px rgba(0,0,0,.4);
         }
         .svg-sniffer-root *,
         .svg-sniffer-root *::before,
@@ -175,111 +178,119 @@
         @media (max-width: 768px) { .ss-modal { width: 96% !important; max-height: 90vh !important; border-radius: var(--ss-radius-lg) !important; } }
 
         .ss-modal-header {
-            background: var(--ss-gradient) !important; color: #fff !important; padding: 14px 20px !important;
+            background: var(--ss-gradient) !important; color: #fff !important; padding: 16px 24px !important;
             display: flex !important; justify-content: space-between !important; align-items: center !important;
             flex-shrink: 0 !important; margin: 0 !important; border: none !important; width: 100% !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,.05) !important;
         }
         .ss-modal-header h2 {
-            margin: 0 !important; font-size: 1.15rem !important; font-weight: 700 !important;
+            margin: 0 !important; font-size: 1.1rem !important; font-weight: 700 !important; letter-spacing: -0.01em !important;
             display: flex !important; align-items: center !important; gap: 8px !important; color: #fff !important;
             line-height: 1.4 !important; padding: 0 !important;
         }
         .ss-modal-header h2 svg { width: 20px !important; height: 20px !important; flex-shrink: 0 !important; display: block !important; }
         .ss-header-actions { display: flex !important; gap: 6px !important; align-items: center !important; flex-shrink: 0 !important; margin: 0 !important; padding: 0 !important; }
         .ss-icon-btn {
-            width: 32px !important; height: 32px !important; border-radius: 50% !important; border: none !important; cursor: pointer !important;
-            display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(255,255,255,.15) !important;
+            width: 34px !important; height: 34px !important; border-radius: 50% !important; border: none !important; cursor: pointer !important;
+            display: flex !important; align-items: center !important; justify-content: center !important; background: rgba(255,255,255,.12) !important;
             color: #fff !important; transition: var(--ss-transition) !important; padding: 0 !important; margin: 0 !important; flex-shrink: 0 !important;
             -webkit-appearance: none !important; appearance: none !important;
         }
-        .ss-icon-btn:hover { background: rgba(255,255,255,.3) !important; }
+        .ss-icon-btn:hover { background: rgba(255,255,255,.25) !important; transform: scale(1.05) !important; }
         .ss-icon-btn svg { width: 16px !important; height: 16px !important; display: block !important; }
 
         /* ========== 工具栏 ========== */
         .ss-toolbar {
-            display: flex !important; align-items: center !important; gap: 10px !important; padding: 10px 16px !important;
+            display: flex !important; align-items: center !important; gap: 12px !important; padding: 12px 20px !important;
             background: var(--ss-surface-alt) !important; border-bottom: 1px solid var(--ss-border) !important;
             flex-wrap: wrap !important; flex-shrink: 0 !important; margin: 0 !important; width: 100% !important;
         }
         .ss-search-box { flex: 1 1 180px !important; min-width: 120px !important; position: relative !important; margin: 0 !important; padding: 0 !important; }
         .ss-search-box input {
-            width: 100% !important; padding: 8px 12px 8px 34px !important; border: 2px solid var(--ss-border) !important;
+            width: 100% !important; height: 36px !important; padding: 0 12px 0 38px !important; border: 2px solid var(--ss-border) !important;
             border-radius: var(--ss-radius) !important; font-size: 14px !important; color: var(--ss-text) !important;
             background: var(--ss-surface) !important; transition: var(--ss-transition) !important; outline: none !important;
             margin: 0 !important; -webkit-appearance: none !important; appearance: none !important;
-            display: block !important; box-sizing: border-box !important; height: auto !important;
+            display: block !important; box-sizing: border-box !important;
         }
         .ss-search-box input:focus { border-color: var(--ss-primary) !important; box-shadow: 0 0 0 3px rgba(99,102,241,.15) !important; }
         .ss-search-box svg {
-            position: absolute !important; left: 10px !important; top: 50% !important; transform: translateY(-50%) !important;
-            width: 14px !important; height: 14px !important; color: var(--ss-text-muted) !important; pointer-events: none !important; display: block !important;
+            position: absolute !important; left: 12px !important; top: 50% !important; transform: translateY(-50%) !important;
+            width: 15px !important; height: 15px !important; color: var(--ss-text-muted) !important; pointer-events: none !important; display: block !important;
         }
         .ss-select {
-            padding: 7px 10px !important; border: 2px solid var(--ss-border) !important; border-radius: var(--ss-radius) !important;
+            height: 36px !important; padding: 0 10px !important; border: 2px solid var(--ss-border) !important; border-radius: var(--ss-radius-sm) !important;
             font-size: 13px !important; color: var(--ss-text) !important; background: var(--ss-surface) !important;
             cursor: pointer !important; outline: none !important; transition: var(--ss-transition) !important;
             margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important;
-            height: auto !important; flex-shrink: 0 !important;
+            flex-shrink: 0 !important;
         }
         .ss-select:focus { border-color: var(--ss-primary) !important; }
-        .ss-view-toggle { display: flex !important; gap: 2px !important; background: var(--ss-border) !important; border-radius: var(--ss-radius) !important; padding: 2px !important; margin: 0 !important; flex-shrink: 0 !important; }
+        .ss-view-toggle { display: flex !important; gap: 2px !important; background: var(--ss-border) !important; border-radius: var(--ss-radius) !important; padding: 3px !important; margin: 0 !important; flex-shrink: 0 !important; }
         .ss-view-toggle button {
-            padding: 5px 8px !important; border: none !important; border-radius: 7px !important; cursor: pointer !important;
+            height: 30px !important; padding: 0 12px !important; border: none !important; border-radius: 8px !important; cursor: pointer !important;
             background: transparent !important; color: var(--ss-text-secondary) !important; font-size: 12px !important; transition: var(--ss-transition) !important;
             margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; -webkit-appearance: none !important; appearance: none !important;
         }
         .ss-view-toggle button svg { width: 14px !important; height: 14px !important; display: block !important; }
         .ss-view-toggle button.active { background: var(--ss-surface) !important; color: var(--ss-primary) !important; font-weight: 600 !important; box-shadow: var(--ss-shadow-sm) !important; }
 
+        /* ========== 统计栏 ========== */
+        .ss-stats {
+            display: flex !important; gap: 8px !important; padding: 10px 20px !important; background: var(--ss-surface-alt) !important;
+            border-bottom: 1px solid var(--ss-border) !important; font-size: 12px !important; color: var(--ss-text-secondary) !important;
+            flex-shrink: 0 !important; margin: 0 !important; width: 100% !important; flex-wrap: wrap !important; align-items: center !important;
+        }
+        .ss-stat-item { display: flex !important; align-items: center !important; gap: 4px !important; margin: 0 !important; padding: 0 !important; }
+        .ss-stat-item strong { color: var(--ss-primary) !important; font-size: 14px !important; font-weight: 700 !important; }
+        .ss-stat-pill {
+            display: inline-flex !important; align-items: center !important; gap: 4px !important;
+            background: var(--ss-surface) !important; border: 1px solid var(--ss-border) !important;
+            padding: 4px 10px !important; border-radius: 999px !important; font-size: 12px !important;
+            color: var(--ss-text-secondary) !important; margin: 0 !important; white-space: nowrap !important;
+        }
+        .ss-stat-pill strong { color: var(--ss-primary) !important; font-size: 13px !important; font-weight: 700 !important; }
+
         /* ========== 操作栏 ========== */
         .ss-action-bar {
             display: flex !important; justify-content: space-between !important; align-items: center !important;
-            padding: 8px 16px !important; background: var(--ss-surface) !important; border-bottom: 1px solid var(--ss-border) !important;
+            padding: 12px 20px !important; background: var(--ss-surface) !important; border-top: 1px solid var(--ss-border) !important;
             flex-shrink: 0 !important; margin: 0 !important; width: 100% !important; gap: 8px !important;
         }
-        .ss-select-all-control { display: flex !important; align-items: center !important; gap: 8px !important; font-size: 14px !important; color: var(--ss-text-secondary) !important; cursor: pointer !important; margin: 0 !important; padding: 0 !important; flex-shrink: 0 !important; }
+        .ss-select-all-control { display: flex !important; align-items: center !important; gap: 8px !important; font-size: 13px !important; color: var(--ss-text-secondary) !important; cursor: pointer !important; margin: 0 !important; padding: 0 !important; flex-shrink: 0 !important; }
         .ss-select-all-control input {
             width: 18px !important; height: 18px !important; cursor: pointer !important; accent-color: var(--ss-primary) !important;
             margin: 0 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important;
         }
         .ss-action-buttons { display: flex !important; gap: 8px !important; flex-wrap: wrap !important; margin: 0 !important; padding: 0 !important; }
         .ss-btn {
-            padding: 8px 14px !important; border: none !important; border-radius: var(--ss-radius) !important; cursor: pointer !important;
+            height: 36px !important; padding: 0 14px !important; border: none !important; border-radius: var(--ss-radius) !important; cursor: pointer !important;
             font-weight: 600 !important; font-size: 13px !important; transition: var(--ss-transition) !important;
             display: flex !important; align-items: center !important; gap: 5px !important; margin: 0 !important;
             -webkit-appearance: none !important; appearance: none !important; line-height: 1.4 !important; white-space: nowrap !important;
         }
         .ss-btn svg { width: 14px !important; height: 14px !important; display: block !important; flex-shrink: 0 !important; }
         .ss-btn-primary { background: var(--ss-primary) !important; color: #fff !important; }
-        .ss-btn-primary:hover { background: var(--ss-primary-dark) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
+        .ss-btn-primary:hover { background: var(--ss-primary-dark) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; filter: brightness(1.05) !important; }
         .ss-btn-success { background: var(--ss-success) !important; color: #fff !important; }
         .ss-btn-success:hover { filter: brightness(1.1) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
         .ss-btn-secondary { background: var(--ss-surface-alt) !important; color: var(--ss-text) !important; border: 1px solid var(--ss-border) !important; }
-        .ss-btn-secondary:hover { background: var(--ss-surface-hover) !important; border-color: var(--ss-primary) !important; }
+        .ss-btn-secondary:hover { background: var(--ss-surface-hover) !important; border-color: var(--ss-primary) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; filter: brightness(1.02) !important; }
         .ss-btn-danger { background: var(--ss-danger) !important; color: #fff !important; }
-        .ss-btn-danger:hover { filter: brightness(1.1) !important; }
-
-        /* ========== 统计栏 ========== */
-        .ss-stats {
-            display: flex !important; gap: 16px !important; padding: 6px 16px !important; background: var(--ss-surface-alt) !important;
-            border-bottom: 1px solid var(--ss-border) !important; font-size: 12px !important; color: var(--ss-text-secondary) !important;
-            flex-shrink: 0 !important; margin: 0 !important; width: 100% !important;
-        }
-        .ss-stat-item { display: flex !important; align-items: center !important; gap: 4px !important; margin: 0 !important; padding: 0 !important; }
-        .ss-stat-item strong { color: var(--ss-primary) !important; font-size: 14px !important; font-weight: 700 !important; }
+        .ss-btn-danger:hover { filter: brightness(1.1) !important; transform: translateY(-1px) !important; box-shadow: var(--ss-shadow-md) !important; }
 
         /* ========== 内容区 ========== */
-        .ss-modal-content { padding: 12px 16px !important; overflow-y: auto !important; flex: 1 1 auto !important; min-height: 100px !important; max-height: 50vh !important; margin: 0 !important; width: 100% !important; }
-        .ss-modal-content::-webkit-scrollbar { width: 6px; }
-        .ss-modal-content::-webkit-scrollbar-track { background: transparent; }
-        .ss-modal-content::-webkit-scrollbar-thumb { background: var(--ss-border); border-radius: 3px; }
-        .ss-modal-content::-webkit-scrollbar-thumb:hover { background: var(--ss-text-muted); }
+        .ss-modal-content { padding: 16px 20px !important; overflow-y: auto !important; flex: 1 1 auto !important; min-height: 100px !important; max-height: calc(85vh - 280px) !important; margin: 0 !important; width: 100% !important; }
+        .ss-modal-content::-webkit-scrollbar { width: 6px !important; }
+        .ss-modal-content::-webkit-scrollbar-track { background: transparent !important; }
+        .ss-modal-content::-webkit-scrollbar-thumb { background: var(--ss-border) !important; border-radius: 3px !important; }
+        .ss-modal-content::-webkit-scrollbar-thumb:hover { background: var(--ss-text-muted) !important; }
 
         /* ========== 列表视图 ========== */
         .ss-svg-list { display: flex !important; flex-direction: column !important; gap: 8px !important; margin: 0 !important; padding: 0 !important; list-style: none !important; }
         .ss-svg-item {
-            display: flex !important; align-items: center !important; padding: 10px !important; border: 1px solid var(--ss-border) !important;
-            border-radius: var(--ss-radius) !important; transition: var(--ss-transition) !important; gap: 10px !important;
+            display: flex !important; align-items: center !important; padding: 12px 14px !important; border: 1px solid var(--ss-border) !important;
+            border-radius: 12px !important; transition: var(--ss-transition) !important; gap: 12px !important;
             background: var(--ss-surface) !important; margin: 0 !important; width: 100% !important;
         }
         .ss-svg-item:hover { background: var(--ss-surface-hover) !important; border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-sm) !important; }
@@ -289,79 +300,81 @@
         }
 
         /* ========== 预览尺寸 ========== */
-        .ss-preview { display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 8px !important; background: var(--ss-surface-alt) !important; border: 1px solid var(--ss-border) !important; flex-shrink: 0 !important; margin: 0 !important; overflow: hidden !important; }
-        .ss-preview[data-size="small"] { width: 36px !important; height: 36px !important; }
-        .ss-preview[data-size="medium"] { width: 50px !important; height: 50px !important; }
+        .ss-preview { display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 10px !important; background: var(--ss-surface-alt) !important; background-image: linear-gradient(45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(-45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ss-border-light) 75%), linear-gradient(-45deg, transparent 75%, var(--ss-border-light) 75%) !important; background-size: 12px 12px !important; background-position: 0 0, 0 6px, 6px -6px, -6px 0px !important; border: 1px solid var(--ss-border) !important; flex-shrink: 0 !important; margin: 0 !important; overflow: hidden !important; }
+        .ss-preview[data-size="small"] { width: 40px !important; height: 40px !important; }
+        .ss-preview[data-size="medium"] { width: 52px !important; height: 52px !important; }
         .ss-preview[data-size="large"] { width: 72px !important; height: 72px !important; }
-        .ss-preview svg { max-width: 85% !important; max-height: 85% !important; display: block !important; }
-        .ss-preview[data-size="large"] svg { max-width: 90% !important; max-height: 90% !important; display: block !important; }
+        .ss-preview svg { max-width: 80% !important; max-height: 80% !important; display: block !important; }
+        .ss-preview[data-size="large"] svg { max-width: 80% !important; max-height: 80% !important; display: block !important; }
 
         .ss-svg-info { flex-grow: 1 !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; }
         .ss-svg-name { font-size: 14px !important; color: var(--ss-text) !important; font-weight: 500 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; margin: 0 !important; padding: 0 !important; line-height: 1.4 !important; }
         .ss-svg-meta { font-size: 11px !important; color: var(--ss-text-muted) !important; margin-top: 2px !important; display: flex !important; gap: 6px !important; padding: 0 !important; }
-        .ss-svg-tag { display: inline-block !important; padding: 1px 6px !important; border-radius: 4px !important; font-size: 10px !important; font-weight: 600 !important; margin: 0 !important; }
+        .ss-svg-tag { display: inline-block !important; padding: 2px 8px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 600 !important; margin: 0 !important; }
         .ss-svg-tag-size { background: var(--ss-primary-bg) !important; color: var(--ss-primary) !important; }
         .ss-svg-tag-dim { background: var(--ss-success-bg) !important; color: var(--ss-success) !important; }
 
         .ss-item-actions { display: flex !important; gap: 4px !important; flex-shrink: 0 !important; margin: 0 !important; padding: 0 !important; }
         .ss-item-btn {
-            width: 28px !important; height: 28px !important; border: 1px solid var(--ss-border) !important; border-radius: 7px !important;
+            width: 30px !important; height: 30px !important; border: 1px solid var(--ss-border) !important; border-radius: 50% !important;
             background: var(--ss-surface) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important;
             transition: var(--ss-transition) !important; color: var(--ss-text-secondary) !important; padding: 0 !important; margin: 0 !important;
             -webkit-appearance: none !important; appearance: none !important; flex-shrink: 0 !important;
         }
-        .ss-item-btn:hover { background: var(--ss-primary) !important; color: #fff !important; border-color: var(--ss-primary) !important; }
+        .ss-item-btn:hover { background: var(--ss-primary) !important; color: #fff !important; border-color: var(--ss-primary) !important; transform: scale(1.08) !important; }
         .ss-item-btn svg { width: 14px !important; height: 14px !important; display: block !important; }
 
         /* ========== 网格视图 ========== */
-        .ss-svg-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important; gap: 10px !important; margin: 0 !important; padding: 0 !important; list-style: none !important; }
+        .ss-svg-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; gap: 12px !important; margin: 0 !important; padding: 0 !important; list-style: none !important; }
         .ss-grid-card {
-            border: 1px solid var(--ss-border) !important; border-radius: var(--ss-radius) !important; padding: 8px !important;
+            border: 1px solid var(--ss-border) !important; border-radius: 12px !important; padding: 10px !important;
             background: var(--ss-surface) !important; transition: var(--ss-transition) !important; cursor: pointer !important; position: relative !important; margin: 0 !important;
         }
-        .ss-grid-card:hover { border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-md) !important; transform: translateY(-2px) !important; }
+        .ss-grid-card:hover { border-color: var(--ss-primary-light) !important; box-shadow: var(--ss-shadow-md) !important; transform: translateY(-3px) !important; }
         .ss-grid-card .ss-grid-preview {
             width: 100% !important; aspect-ratio: 1 !important; display: flex !important; align-items: center !important; justify-content: center !important;
-            background: var(--ss-surface-alt) !important; border-radius: 8px !important; margin-bottom: 6px !important; overflow: hidden !important;
+            background: var(--ss-surface-alt) !important; background-image: linear-gradient(45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(-45deg, var(--ss-border-light) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ss-border-light) 75%), linear-gradient(-45deg, transparent 75%, var(--ss-border-light) 75%) !important; background-size: 12px 12px !important; background-position: 0 0, 0 6px, 6px -6px, -6px 0px !important; border: 1px solid var(--ss-border) !important; border-radius: 10px !important; margin-bottom: 6px !important; overflow: hidden !important;
         }
-        .ss-grid-card .ss-grid-preview svg { max-width: 80% !important; max-height: 80% !important; display: block !important; }
+        .ss-grid-card .ss-grid-preview svg { max-width: 75% !important; max-height: 75% !important; display: block !important; }
         .ss-grid-card .ss-grid-name { font-size: 12px !important; color: var(--ss-text) !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; font-weight: 500 !important; margin: 0 !important; padding: 0 !important; }
         .ss-grid-card .ss-grid-meta { font-size: 10px !important; color: var(--ss-text-muted) !important; margin-top: 2px !important; padding: 0 !important; }
         .ss-grid-card .ss-grid-checkbox { position: absolute !important; top: 4px !important; left: 4px !important; width: 16px !important; height: 16px !important; accent-color: var(--ss-primary) !important; z-index: 1 !important; -webkit-appearance: auto !important; appearance: auto !important; display: inline-block !important; visibility: visible !important; opacity: 1 !important; }
         .ss-grid-card .ss-grid-actions { position: absolute !important; top: 4px !important; right: 4px !important; display: flex !important; gap: 3px !important; opacity: 0 !important; transition: var(--ss-transition) !important; margin: 0 !important; padding: 0 !important; }
         .ss-grid-card:hover .ss-grid-actions { opacity: 1 !important; }
-        .ss-grid-card .ss-item-btn { width: 24px !important; height: 24px !important; }
+        .ss-grid-card .ss-item-btn { width: 26px !important; height: 26px !important; }
 
         /* ========== 下拉菜单 ========== */
         .ss-dropdown {
-            position: absolute !important; bottom: 100% !important; right: 0 !important; margin-bottom: 4px !important;
-            background: var(--ss-surface) !important; border: 1px solid var(--ss-border) !important; border-radius: var(--ss-radius) !important;
-            box-shadow: var(--ss-shadow-lg) !important; z-index: 10 !important; overflow: hidden !important; min-width: 160px !important;
+            position: absolute !important; bottom: 100% !important; right: 0 !important; margin-bottom: 6px !important;
+            background: var(--ss-surface) !important; border: 1px solid var(--ss-border) !important; border-radius: 12px !important;
+            box-shadow: var(--ss-shadow-lg) !important; z-index: 10 !important; overflow: hidden !important; min-width: 170px !important;
             display: none !important; animation: ss-scaleIn .15s ease !important; padding: 0 !important;
         }
         .ss-dropdown.show { display: block !important; }
         .ss-dropdown-item {
-            display: flex !important; align-items: center !important; gap: 8px !important; padding: 8px 14px !important; cursor: pointer !important;
+            display: flex !important; align-items: center !important; gap: 8px !important; padding: 10px 14px !important; cursor: pointer !important;
             font-size: 13px !important; color: var(--ss-text) !important; transition: var(--ss-transition) !important; white-space: nowrap !important; margin: 0 !important;
         }
         .ss-dropdown-item:hover { background: var(--ss-surface-hover) !important; color: var(--ss-primary) !important; }
         .ss-dropdown-item svg { width: 14px !important; height: 14px !important; display: block !important; flex-shrink: 0 !important; }
-        .ss-dropdown-divider { height: 1px !important; background: var(--ss-border) !important; margin: 2px 0 !important; padding: 0 !important; }
+        .ss-dropdown-item:first-child { border-radius: 12px 12px 0 0 !important; }
+        .ss-dropdown-item:last-child { border-radius: 0 0 12px 12px !important; }
+        .ss-dropdown-divider { height: 1px !important; background: var(--ss-border) !important; margin: 4px 0 !important; padding: 0 !important; }
 
         /* ========== 空状态/加载 ========== */
         .ss-empty, .ss-loading {
-            text-align: center !important; padding: 40px 20px !important; color: var(--ss-text-muted) !important; font-size: 15px !important; margin: 0 !important;
+            text-align: center !important; padding: 60px 20px !important; color: var(--ss-text-muted) !important; font-size: 14px !important; margin: 0 !important;
         }
-        .ss-loading svg { width: 32px !important; height: 32px !important; animation: ss-spin 1s linear infinite !important; margin-bottom: 12px !important; display: inline-block !important; }
+        .ss-loading svg { width: 36px !important; height: 36px !important; animation: ss-spin 1s linear infinite !important; margin-bottom: 16px !important; display: inline-block !important; }
 
         /* ========== Toast 通知 ========== */
         .ss-toast-container {
-            position: fixed !important; top: 20px !important; left: 50% !important; transform: translateX(-50%) !important;
+            position: fixed !important; top: 24px !important; left: 50% !important; transform: translateX(-50%) !important;
             z-index: 1000001 !important; display: flex !important; flex-direction: column !important; gap: 8px !important; align-items: center !important; pointer-events: none !important;
             margin: 0 !important; padding: 0 !important;
         }
         .ss-toast {
-            padding: 10px 20px !important; border-radius: var(--ss-radius) !important; color: #fff !important; font-size: 14px !important; font-weight: 500 !important;
+            padding: 12px 20px !important; border-radius: 12px !important; color: #fff !important; font-size: 14px !important; font-weight: 500 !important;
             box-shadow: var(--ss-shadow-lg) !important; display: flex !important; align-items: center !important; gap: 8px !important;
             animation: ss-slideDown .3s ease, ss-fadeOut .4s ease 2.6s forwards !important; max-width: 90vw !important; margin: 0 !important;
         }
@@ -791,7 +804,7 @@
                         <input type="checkbox" id="ss-select-all"> 全选
                     </label>
                     <div class="ss-action-buttons">
-                        <div style="position: relative;">
+                        <div style="position: relative; display: inline-flex;">
                             <button class="ss-btn ss-btn-secondary" id="ss-copy-btn">${utils.svgIcons.copy} 复制</button>
                             <div class="ss-dropdown" id="ss-copy-dropdown">
                                 <div class="ss-dropdown-item" data-copy="svg">复制 SVG 源码</div>
@@ -802,7 +815,7 @@
                                 <div class="ss-dropdown-item" data-copy="css">复制 CSS 背景</div>
                             </div>
                         </div>
-                        <div style="position: relative;">
+                        <div style="position: relative; display: inline-flex;">
                             <button class="ss-btn ss-btn-success" id="ss-download-btn">${utils.svgIcons.download} 下载</button>
                             <div class="ss-dropdown" id="ss-download-dropdown">
                                 <div class="ss-dropdown-item" data-dl="svg">${utils.svgIcons.download} 下载 SVG</div>
@@ -846,9 +859,9 @@
 
         updateStats(total, filtered, totalSize) {
             this.statsEl.innerHTML = `
-                <div class="ss-stat-item">共 <strong>${total}</strong> 个SVG</div>
-                <div class="ss-stat-item">显示 <strong>${filtered}</strong> 个</div>
-                <div class="ss-stat-item">总大小 <strong>${utils.formatBytes(totalSize)}</strong></div>
+                <div class="ss-stat-pill">共 <strong>${total}</strong> 个</div>
+                <div class="ss-stat-pill">显示 <strong>${filtered}</strong> 个</div>
+                <div class="ss-stat-pill">总大小 <strong>${utils.formatBytes(totalSize)}</strong></div>
             `;
         },
 
@@ -873,7 +886,7 @@
         render() {
             const items = controller.getFilteredItems();
             if (items.length === 0) {
-                ui.contentEl.innerHTML = `<div class="ss-empty">没有找到匹配的SVG资源</div>`;
+                ui.contentEl.innerHTML = `<div class="ss-empty">暂无SVG资源</div>`;
                 return;
             }
 
@@ -1120,7 +1133,7 @@
                     items.forEach(i => state.cache.set(i.id, i));
 
                     if (items.length === 0) {
-                        ui.contentEl.innerHTML = `<div class="ss-empty">没有找到SVG资源</div>`;
+                        ui.contentEl.innerHTML = `<div class="ss-empty">暂无SVG资源</div>`;
                         controller.updateStats();
                         return;
                     }
