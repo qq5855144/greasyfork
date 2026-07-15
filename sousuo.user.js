@@ -3294,7 +3294,7 @@ const domHandler = {
             .${CLASS_NAMES.ENGINE_CONTAINER} {
                 display: flex; position: fixed; bottom: 0; left: 2%; width: 96%;
                 height: 36px; overflow: hidden; justify-content: center; align-items: center;
-                z-index: 1000; background-color: rgba(255,255,255,0); margin-top: 1px;
+                z-index: 2147483647; background-color: rgba(255,255,255,0); margin-top: 1px;
                 transition: all .3s ease; transform: translateY(0); opacity: 1;
                 overflow-y: hidden; overflow-x: visible;
             }
@@ -3689,7 +3689,7 @@ const domHandler = {
             punkJetBox.className = CLASS_NAMES.ENGINE_CONTAINER;
             punkJetBox.style.cssText = `
                 display: flex;
-                z-index: 9999;
+                z-index: 2147483647;
                 position: fixed;
                 transition: all 0.3s ease;
             `;
