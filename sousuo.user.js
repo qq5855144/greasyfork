@@ -3294,11 +3294,24 @@ const domHandler = {
             .${CLASS_NAMES.ENGINE_CONTAINER} {
                 display: flex; position: fixed; bottom: 0; left: 2%; width: 96%;
                 height: 36px; overflow: hidden; justify-content: center; align-items: center;
-                z-index: 2147483647; background-color: rgba(255,255,255,0); margin-top: 1px;
+                z-index: 2147483647 !important; background-color: rgba(255,255,255,0); margin-top: 1px;
                 transition: all .3s ease; transform: translateY(0); opacity: 1;
                 overflow-y: hidden; overflow-x: visible;
             }
             .${CLASS_NAMES.ENGINE_CONTAINER}.hidden { transform: translateY(100%); opacity: 0; }
+
+            /* ========== 降低必应搜索建议列表 z-index ========== */
+            #sa_ul, #sw_as, .sa_bg, .sa_hd, #sa_sb,
+            .b_searchboxForm, .b_searchbox, #sb_form, #sb_form_q,
+            .sa_ims, .sa_tm, .sa_drw,
+            #as_top, .as_top,
+            .b_results > li:first-child,
+            .b_ans, #b_results {
+                z-index: auto !important;
+            }
+            #sa_ul, #sw_as, .sa_bg {
+                z-index: 999 !important;
+            }
             .${CLASS_NAMES.ENGINE_DISPLAY} {
                 display: flex; overflow-x: auto; overflow-y: hidden; white-space: nowrap;
                 height: 100%; gap: 0; flex-grow: 1; scrollbar-width: none; -ms-overflow-style: none;
@@ -3689,7 +3702,7 @@ const domHandler = {
             punkJetBox.className = CLASS_NAMES.ENGINE_CONTAINER;
             punkJetBox.style.cssText = `
                 display: flex;
-                z-index: 2147483647;
+                z-index: 2147483647 !important;
                 position: fixed;
                 transition: all 0.3s ease;
             `;
@@ -3727,6 +3740,14 @@ const domHandler = {
                     hamburgerMenu.hideHamburgerMenu();
                 }
             });
+            // 监听DOM变化，确保引擎栏始终在body末尾（z-index相同时DOM顺序决定层级）
+            const observer = new MutationObserver(() => {
+                const box = document.getElementById("punkjet-search-box");
+                if (box && document.body.lastElementChild !== box) {
+                    document.body.appendChild(box);
+                }
+            });
+            observer.observe(document.body, { childList: true });
             setTimeout(() => this.enableDragAndSort(), DEFAULT_CONFIG.DRAG_SORT_DELAY);
         } catch (error) {
             console.error("添加搜索框失败:", error.message);
