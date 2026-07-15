@@ -2915,8 +2915,7 @@ const STORAGE_KEYS = Object.freeze({
     USER_SEARCH_ENGINES: 'userSearchEngines',
     PUNK_SETUP_SEARCH: 'punk_setup_search',
     LAST_SUCCESSFUL_KEYWORDS: 'last_successful_keywords',
-    CURRENT_INPUT: 'currentInput',
-    ENGINE_BAR_OFFSET: 'engineBarOffset'
+    CURRENT_INPUT: 'currentInput'
 });
 
 const DEFAULT_CONFIG = {
@@ -2927,8 +2926,7 @@ const DEFAULT_CONFIG = {
     SHOW_SEARCH_BOX_DELAY: 10000,
     SCROLL_TIMEOUT_DURATION: 150,
     BAIDU_INPUT_DELAY: 500,
-    DRAG_SORT_DELAY: 500,
-    ENGINE_BAR_OFFSET_DEFAULT: 0
+    DRAG_SORT_DELAY: 500
 };
 
 // ===== 应用状态 =====
@@ -3275,12 +3273,12 @@ const utils = {
         return icons[iconName] || icons['circle'];
     },
 
-    getEngineBarOffset() {
-        return GM_getValue(STORAGE_KEYS.ENGINE_BAR_OFFSET, DEFAULT_CONFIG.ENGINE_BAR_OFFSET_DEFAULT);
-    },
-
-    setEngineBarOffset(value) {
-        GM_setValue(STORAGE_KEYS.ENGINE_BAR_OFFSET, parseInt(value));
+    getKeyboardHeight() {
+        if (window.visualViewport) {
+            const diff = window.innerHeight - window.visualViewport.height;
+            return diff > 0 ? diff : 0;
+        }
+        return 0;
     }
 };
 
@@ -3577,16 +3575,17 @@ const domHandler = {
     updateSearchBoxPosition() {
         const punkJetBox = document.getElementById("punkjet-search-box");
         if (!punkJetBox) return;
-        const offsetValue = utils.getEngineBarOffset();
-        const shouldOffset = document.activeElement && (
-            document.activeElement.tagName === 'INPUT' || 
+        // 通过 visualViewport API 自动检测输入法键盘高度
+        const keyboardHeight = utils.getKeyboardHeight();
+        const isInputFocused = document.activeElement && (
+            document.activeElement.tagName === 'INPUT' ||
             document.activeElement.tagName === 'TEXTAREA'
         ) && !appState.isInteractingWithEngineBar;
-        // 输入框聚焦时（输入法键盘唤醒），自动显示搜索引擎栏并应用偏移
-        if (shouldOffset) {
+        // 输入框聚焦时（输入法键盘唤醒），自动显示搜索引擎栏并定位到键盘上方
+        if (keyboardHeight > 0 || isInputFocused) {
             appState.punkJetBoxVisible = true;
         }
-        punkJetBox.style.bottom = shouldOffset ? `${offsetValue}px` : '0px';
+        punkJetBox.style.bottom = keyboardHeight > 0 ? `${keyboardHeight + 4}px` : '0px';
         punkJetBox.style.left = '2%';
         punkJetBox.style.width = '96%';
         punkJetBox.style.transform = appState.punkJetBoxVisible ? "translateY(0)" : "translateY(100%)";
@@ -3719,6 +3718,10 @@ const domHandler = {
             appState.containerAdded = true;
             this.initScrollListener();
             window.addEventListener('resize', () => this.updateSearchBoxPosition());
+            // 监听 visualViewport 变化以自动检测输入法键盘弹出/收起
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', () => this.updateSearchBoxPosition());
+            }
             document.addEventListener('focusin', () => this.updateSearchBoxPosition());
             document.addEventListener('focusout', () => this.updateSearchBoxPosition());
             document.addEventListener('click', (e) => {
@@ -4527,47 +4530,7 @@ const hamburgerMenu = {
             });
             menu.appendChild(menuItem);
         });
-        const setOffsetButton = document.createElement('button');
-        setOffsetButton.innerHTML = utils.createInlineSVG('sog') + ' 设置底部偏移';
-        setOffsetButton.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 15px;
-            border: none;
-            background: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            color: #2c3e50;
-            transition: all 0.3s ease;
-            text-align: left;
-            margin-top: 5px;
-            outline: none;
-        `;
-        setOffsetButton.addEventListener('mouseenter', () => {
-            setOffsetButton.style.background = 'rgba(52, 152, 219, 0.1)';
-        });
-        setOffsetButton.addEventListener('mouseleave', () => {
-            setOffsetButton.style.background = 'none';
-        });
-        setOffsetButton.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-        });
-        setOffsetButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setOffsetButton.blur();
-            const currentValue = utils.getEngineBarOffset();
-            const userValue = prompt(`请输入搜索栏在输入法弹出时的底部偏移（单位px）：`, currentValue);
-            if (userValue !== null && !isNaN(userValue)) {
-                utils.setEngineBarOffset(userValue);
-                alert(`偏移值已设置为 ${userValue}px`);
-                domHandler.updateSearchBoxPosition();
-            }
-            this.hideHamburgerMenu();
-        });
-        menu.appendChild(setOffsetButton);
+        
         document.body.appendChild(menu);
         return menu;
     },
