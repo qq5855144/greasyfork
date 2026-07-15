@@ -3582,6 +3582,10 @@ const domHandler = {
             document.activeElement.tagName === 'INPUT' || 
             document.activeElement.tagName === 'TEXTAREA'
         ) && !appState.isInteractingWithEngineBar;
+        // 输入框聚焦时（输入法键盘唤醒），自动显示搜索引擎栏并应用偏移
+        if (shouldOffset) {
+            appState.punkJetBoxVisible = true;
+        }
         punkJetBox.style.bottom = shouldOffset ? `${offsetValue}px` : '0px';
         punkJetBox.style.left = '2%';
         punkJetBox.style.width = '96%';
