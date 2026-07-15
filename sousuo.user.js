@@ -2945,7 +2945,8 @@ const appState = {
     touchStartY: null,
     hamburgerMenuOpen: false,
     searchOverlayVisible: false,
-    isInteractingWithEngineBar: false
+    isInteractingWithEngineBar: false,
+    isKeyboardOpen: false
 };
 
 // ===== 可访问性模块 =====
@@ -3575,17 +3576,14 @@ const domHandler = {
     updateSearchBoxPosition() {
         const punkJetBox = document.getElementById("punkjet-search-box");
         if (!punkJetBox) return;
-        // 通过 visualViewport API 自动检测输入法键盘高度
         const keyboardHeight = utils.getKeyboardHeight();
-        const isInputFocused = document.activeElement && (
-            document.activeElement.tagName === 'INPUT' ||
-            document.activeElement.tagName === 'TEXTAREA'
-        ) && !appState.isInteractingWithEngineBar;
-        // 输入框聚焦时（输入法键盘唤醒），自动显示搜索引擎栏并定位到键盘上方
-        if (keyboardHeight > 0 || isInputFocused) {
+        const isOpen = keyboardHeight > 0;
+        // 更新键盘状态，供滚动监听使用
+        appState.isKeyboardOpen = isOpen;
+        if (isOpen) {
             appState.punkJetBoxVisible = true;
         }
-        punkJetBox.style.bottom = keyboardHeight > 0 ? `${keyboardHeight + 4}px` : '0px';
+        punkJetBox.style.bottom = isOpen ? `${keyboardHeight + 1}px` : '0px';
         punkJetBox.style.left = '2%';
         punkJetBox.style.width = '96%';
         punkJetBox.style.transform = appState.punkJetBoxVisible ? "translateY(0)" : "translateY(100%)";
@@ -3871,6 +3869,8 @@ const domHandler = {
             const st = window.pageYOffset || document.documentElement.scrollTop;
             const isInteractingWithSearchBar = document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}:hover`) !== null;
             if (isInteractingWithSearchBar) return;
+            // 输入法键盘打开时，不因滚动隐藏搜索引擎栏
+            if (appState.isKeyboardOpen) return;
             utils.clearAllTimeouts();
             appState.isScrolling = true;
             debounceUtils.debounce('scroll_hide', () => {
@@ -3902,6 +3902,7 @@ const domHandler = {
 
         const handleTouchMove = (e) => {
             if (appState.isInteractingWithEngineBar) return;
+            if (appState.isKeyboardOpen) return;
             if (appState.touchStartY === null) return;
             if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
             const touchY = e.touches[0].clientY;
