@@ -3280,6 +3280,32 @@ const utils = {
             return diff > 0 ? diff : 0;
         }
         return 0;
+    },
+
+    // 检测页面中可见的搜索建议列表，返回其底部距离视口底部的距离
+    getSuggestionListHeight() {
+        // 各搜索引擎的搜索建议列表选择器
+        const selectors = [
+            '#sa_ul', '#sw_as',           // Bing
+            '.erkvQe', '.UUbT9',          // Google
+            '#form_suggest', '.bdsug',    // 百度
+            '#suggest', '.search-suggest', // 通用
+            '[role="listbox"]',           // 通用ARIA
+            '.autocomplete-suggestions',  // 通用
+            '.sa_bg', '.sa_drw'           // Bing 旧版
+        ];
+        for (const sel of selectors) {
+            const el = document.querySelector(sel);
+            if (!el) continue;
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0) continue;
+            const rect = el.getBoundingClientRect();
+            if (rect.height === 0) continue;
+            // 建议列表底部距离视口底部的距离
+            const bottom = window.innerHeight - rect.bottom;
+            return bottom > 0 ? bottom : 0;
+        }
+        return 0;
     }
 };
 
@@ -3576,12 +3602,22 @@ const domHandler = {
             };
             input.addEventListener('input', updateCurrentInput);
             input.addEventListener('change', updateCurrentInput);
+            // 监听输入时搜索建议列表变化，实时更新引擎栏位置
+            input.addEventListener('input', () => {
+                debounceUtils.debounce('suggestion_check', () => {
+                    this.updateSearchBoxPosition();
+                }, 200);
+            });
         };
         document.querySelectorAll(DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR).forEach(setupInputMonitoring);
         const observer = new MutationObserver(() => {
             debounceUtils.debounce('input_monitor_setup', () => {
                 document.querySelectorAll(`${DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR}:not([data-monitored])`).forEach(setupInputMonitoring);
             }, 500);
+            // 建议列表DOM变化时更新引擎栏位置
+            debounceUtils.debounce('suggestion_dom_check', () => {
+                this.updateSearchBoxPosition();
+            }, 200);
         });
         observer.observe(document.body, { childList: true, subtree: true });
     },
@@ -3590,13 +3626,22 @@ const domHandler = {
         const punkJetBox = document.getElementById("punkjet-search-box");
         if (!punkJetBox) return;
         const keyboardHeight = utils.getKeyboardHeight();
+        const suggestionHeight = utils.getSuggestionListHeight();
         const isOpen = keyboardHeight > 0;
         // 更新键盘状态，供滚动监听使用
         appState.isKeyboardOpen = isOpen;
         if (isOpen) {
             appState.punkJetBoxVisible = true;
         }
-        punkJetBox.style.bottom = isOpen ? `${keyboardHeight + 1}px` : '0px';
+        // 优先使用搜索建议列表高度定位（解决狐猴浏览器中建议列表遮挡问题）
+        // 其次使用键盘高度定位
+        let bottomValue = 0;
+        if (suggestionHeight > 0) {
+            bottomValue = suggestionHeight + 1;
+        } else if (isOpen) {
+            bottomValue = keyboardHeight + 1;
+        }
+        punkJetBox.style.bottom = `${bottomValue}px`;
         punkJetBox.style.left = '2%';
         punkJetBox.style.width = '96%';
         punkJetBox.style.transform = appState.punkJetBoxVisible ? "translateY(0)" : "translateY(100%)";
