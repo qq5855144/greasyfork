@@ -2945,8 +2945,7 @@ const appState = {
     touchStartY: null,
     hamburgerMenuOpen: false,
     searchOverlayVisible: false,
-    isInteractingWithEngineBar: false,
-    isKeyboardOpen: false
+    isInteractingWithEngineBar: false
 };
 
 // ===== 可访问性模块 =====
@@ -3273,40 +3272,6 @@ const utils = {
         };
         return icons[iconName] || icons['circle'];
     },
-
-    getKeyboardHeight() {
-        if (window.visualViewport) {
-            const diff = window.innerHeight - window.visualViewport.height;
-            return diff > 0 ? diff : 0;
-        }
-        return 0;
-    },
-
-    // 检测页面中可见的搜索建议列表，返回其底部距离视口底部的距离
-    getSuggestionListHeight() {
-        // 各搜索引擎的搜索建议列表选择器
-        const selectors = [
-            '#sa_ul', '#sw_as',           // Bing
-            '.erkvQe', '.UUbT9',          // Google
-            '#form_suggest', '.bdsug',    // 百度
-            '#suggest', '.search-suggest', // 通用
-            '[role="listbox"]',           // 通用ARIA
-            '.autocomplete-suggestions',  // 通用
-            '.sa_bg', '.sa_drw'           // Bing 旧版
-        ];
-        for (const sel of selectors) {
-            const el = document.querySelector(sel);
-            if (!el) continue;
-            const style = window.getComputedStyle(el);
-            if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0) continue;
-            const rect = el.getBoundingClientRect();
-            if (rect.height === 0) continue;
-            // 建议列表底部距离视口底部的距离
-            const bottom = window.innerHeight - rect.bottom;
-            return bottom > 0 ? bottom : 0;
-        }
-        return 0;
-    }
 };
 
 // ===== DOM操作模块 =====
@@ -3325,19 +3290,6 @@ const domHandler = {
                 overflow-y: hidden; overflow-x: visible;
             }
             .${CLASS_NAMES.ENGINE_CONTAINER}.hidden { transform: translateY(100%); opacity: 0; }
-
-            /* ========== 降低必应搜索建议列表 z-index ========== */
-            #sa_ul, #sw_as, .sa_bg, .sa_hd, #sa_sb,
-            .b_searchboxForm, .b_searchbox, #sb_form, #sb_form_q,
-            .sa_ims, .sa_tm, .sa_drw,
-            #as_top, .as_top,
-            .b_results > li:first-child,
-            .b_ans, #b_results {
-                z-index: auto !important;
-            }
-            #sa_ul, #sw_as, .sa_bg {
-                z-index: 999 !important;
-            }
             .${CLASS_NAMES.ENGINE_DISPLAY} {
                 display: flex; overflow-x: auto; overflow-y: hidden; white-space: nowrap;
                 height: 100%; gap: 0; flex-grow: 1; scrollbar-width: none; -ms-overflow-style: none;
@@ -3602,22 +3554,12 @@ const domHandler = {
             };
             input.addEventListener('input', updateCurrentInput);
             input.addEventListener('change', updateCurrentInput);
-            // 监听输入时搜索建议列表变化，实时更新引擎栏位置
-            input.addEventListener('input', () => {
-                debounceUtils.debounce('suggestion_check', () => {
-                    this.updateSearchBoxPosition();
-                }, 200);
-            });
         };
         document.querySelectorAll(DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR).forEach(setupInputMonitoring);
         const observer = new MutationObserver(() => {
             debounceUtils.debounce('input_monitor_setup', () => {
                 document.querySelectorAll(`${DEFAULT_CONFIG.MONITORED_INPUT_SELECTOR}:not([data-monitored])`).forEach(setupInputMonitoring);
             }, 500);
-            // 建议列表DOM变化时更新引擎栏位置
-            debounceUtils.debounce('suggestion_dom_check', () => {
-                this.updateSearchBoxPosition();
-            }, 200);
         });
         observer.observe(document.body, { childList: true, subtree: true });
     },
@@ -3625,29 +3567,11 @@ const domHandler = {
     updateSearchBoxPosition() {
         const punkJetBox = document.getElementById("punkjet-search-box");
         if (!punkJetBox) return;
-        const keyboardHeight = utils.getKeyboardHeight();
-        const suggestionHeight = utils.getSuggestionListHeight();
-        const isOpen = keyboardHeight > 0 || suggestionHeight > 0;
-        // 更新键盘状态，供滚动/滚轮/触摸监听使用
-        appState.isKeyboardOpen = isOpen;
-        if (isOpen) {
-            appState.punkJetBoxVisible = true;
-        }
-        // 优先使用搜索建议列表高度定位（解决狐猴浏览器中建议列表遮挡问题）
-        // 其次使用键盘高度定位
-        let bottomValue = 0;
-        if (suggestionHeight > 0) {
-            bottomValue = suggestionHeight + 1;
-        } else if (keyboardHeight > 0) {
-            bottomValue = keyboardHeight + 1;
-        }
-        punkJetBox.style.bottom = `${bottomValue}px`;
+        punkJetBox.style.bottom = '0px';
         punkJetBox.style.left = '2%';
         punkJetBox.style.width = '96%';
-        // 键盘或建议列表打开时，强制显示（不依赖 punkJetBoxVisible 状态）
-        const shouldShow = appState.punkJetBoxVisible || isOpen;
-        punkJetBox.style.transform = shouldShow ? "translateY(0)" : "translateY(100%)";
-        punkJetBox.style.opacity = shouldShow ? "1" : "0";
+        punkJetBox.style.transform = appState.punkJetBoxVisible ? "translateY(0)" : "translateY(100%)";
+        punkJetBox.style.opacity = appState.punkJetBoxVisible ? "1" : "0";
     },
 
     createEngineButton(item) {
@@ -3776,25 +3700,11 @@ const domHandler = {
             appState.containerAdded = true;
             this.initScrollListener();
             window.addEventListener('resize', () => this.updateSearchBoxPosition());
-            // 监听 visualViewport 变化以自动检测输入法键盘弹出/收起
-            if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', () => this.updateSearchBoxPosition());
-            }
-            document.addEventListener('focusin', () => this.updateSearchBoxPosition());
-            document.addEventListener('focusout', () => this.updateSearchBoxPosition());
             document.addEventListener('click', (e) => {
                 if (!e.target.closest(`#${CLASS_NAMES.HAMBURGER_MENU}`) && !e.target.closest('.engine-hamburger-button')) {
                     hamburgerMenu.hideHamburgerMenu();
                 }
             });
-            // 监听DOM变化，确保引擎栏始终在body末尾（z-index相同时DOM顺序决定层级）
-            const observer = new MutationObserver(() => {
-                const box = document.getElementById("punkjet-search-box");
-                if (box && document.body.lastElementChild !== box) {
-                    document.body.appendChild(box);
-                }
-            });
-            observer.observe(document.body, { childList: true });
             setTimeout(() => this.enableDragAndSort(), DEFAULT_CONFIG.DRAG_SORT_DELAY);
         } catch (error) {
             console.error("添加搜索框失败:", error.message);
@@ -3937,8 +3847,6 @@ const domHandler = {
             const st = window.pageYOffset || document.documentElement.scrollTop;
             const isInteractingWithSearchBar = document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}:hover`) !== null;
             if (isInteractingWithSearchBar) return;
-            // 输入法键盘打开时，不因滚动隐藏搜索引擎栏
-            if (appState.isKeyboardOpen) return;
             utils.clearAllTimeouts();
             appState.isScrolling = true;
             debounceUtils.debounce('scroll_hide', () => {
@@ -3970,7 +3878,6 @@ const domHandler = {
 
         const handleTouchMove = (e) => {
             if (appState.isInteractingWithEngineBar) return;
-            if (appState.isKeyboardOpen) return;
             if (appState.touchStartY === null) return;
             if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
             const touchY = e.touches[0].clientY;
@@ -3994,8 +3901,6 @@ const domHandler = {
 
         const handleWheel = (e) => {
             if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
-            // 输入法键盘打开时，不因滚轮隐藏搜索引擎栏
-            if (appState.isKeyboardOpen) return;
             setTimeout(() => {
                 const st = window.pageYOffset || document.documentElement.scrollTop;
                 if (st > appState.lastScrollTop && st > 50) {
@@ -4088,8 +3993,6 @@ const domHandler = {
     },
 
     hideSearchBox() {
-        // 输入法键盘打开时，强制保持搜索引擎栏可见
-        if (appState.isKeyboardOpen) return;
         if (appState.punkJetBoxVisible) {
             appState.punkJetBoxVisible = false;
             this.updateSearchBoxPosition();
