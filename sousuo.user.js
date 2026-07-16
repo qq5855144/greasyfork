@@ -2946,7 +2946,8 @@ const appState = {
     hamburgerMenuOpen: false,
     searchOverlayVisible: false,
     isInteractingWithEngineBar: false,
-    isKeyboardOpen: false
+    isKeyboardOpen: false,
+    baselineViewportHeight: null
 };
 
 // ===== 可访问性模块 =====
@@ -3276,9 +3277,26 @@ const utils = {
 
     getKeyboardHeight() {
         if (window.visualViewport) {
-            const diff = window.innerHeight - window.visualViewport.height;
-            if (diff > 0) return diff;
-            // 部分浏览器中 visualViewport.offsetTop 反映键盘推起页面的距离
+            const currentHeight = window.visualViewport.height;
+            // 初始化基线（键盘收起时的 visualViewport 高度）
+            if (appState.baselineViewportHeight === null) {
+                appState.baselineViewportHeight = currentHeight;
+            }
+            // 没有输入框聚焦时，键盘肯定没有弹出，更新基线并返回0
+            const activeEl = document.activeElement;
+            const isInputFocused = activeEl && (
+                activeEl.tagName === 'INPUT' ||
+                activeEl.tagName === 'TEXTAREA' ||
+                activeEl.isContentEditable
+            ) && !appState.isInteractingWithEngineBar;
+            if (!isInputFocused) {
+                appState.baselineViewportHeight = currentHeight;
+                return 0;
+            }
+            // 与基线对比，差值即为键盘高度
+            const diff = appState.baselineViewportHeight - currentHeight;
+            if (diff > 50) return diff;
+            // 回退方案：visualViewport.offsetTop（页面被键盘推起时）
             if (window.visualViewport.offsetTop < 0) {
                 return Math.abs(window.visualViewport.offsetTop);
             }
@@ -3721,10 +3739,31 @@ const domHandler = {
             this.initScrollListener();
             window.addEventListener('resize', () => this.updateSearchBoxPosition());
             if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', () => this.updateSearchBoxPosition());
+                window.visualViewport.addEventListener('resize', () => {
+                    const currentHeight = window.visualViewport.height;
+                    const baseline = appState.baselineViewportHeight;
+                    if (baseline !== null) {
+                        const diff = baseline - currentHeight;
+                        // 小幅度变化（< 100px）= 工具栏变化，更新基线
+                        if (Math.abs(diff) > 0 && Math.abs(diff) < 100) {
+                            appState.baselineViewportHeight = currentHeight;
+                        }
+                    } else {
+                        appState.baselineViewportHeight = currentHeight;
+                    }
+                    this.updateSearchBoxPosition();
+                });
             }
             document.addEventListener('focusin', () => this.updateSearchBoxPosition());
-            document.addEventListener('focusout', () => this.updateSearchBoxPosition());
+            document.addEventListener('focusout', () => {
+                // 延迟更新基线，等待键盘完全收起
+                setTimeout(() => {
+                    if (window.visualViewport) {
+                        appState.baselineViewportHeight = window.visualViewport.height;
+                    }
+                }, 500);
+                this.updateSearchBoxPosition();
+            });
             document.addEventListener('click', (e) => {
                 if (!e.target.closest(`#${CLASS_NAMES.HAMBURGER_MENU}`) && !e.target.closest('.engine-hamburger-button')) {
                     hamburgerMenu.hideHamburgerMenu();
