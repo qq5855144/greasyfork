@@ -3282,17 +3282,6 @@ const utils = {
             if (appState.baselineViewportHeight === null) {
                 appState.baselineViewportHeight = currentHeight;
             }
-            // 没有输入框聚焦时，键盘肯定没有弹出，更新基线并返回0
-            const activeEl = document.activeElement;
-            const isInputFocused = activeEl && (
-                activeEl.tagName === 'INPUT' ||
-                activeEl.tagName === 'TEXTAREA' ||
-                activeEl.isContentEditable
-            ) && !appState.isInteractingWithEngineBar;
-            if (!isInputFocused) {
-                appState.baselineViewportHeight = currentHeight;
-                return 0;
-            }
             // 与基线对比，差值即为键盘高度
             const diff = appState.baselineViewportHeight - currentHeight;
             if (diff > 50) return diff;
@@ -3756,11 +3745,12 @@ const domHandler = {
             }
             document.addEventListener('focusin', () => this.updateSearchBoxPosition());
             document.addEventListener('focusout', () => {
-                // 延迟更新基线，等待键盘完全收起
+                // 延迟更新基线并重新定位，等待键盘完全收起
                 setTimeout(() => {
                     if (window.visualViewport) {
                         appState.baselineViewportHeight = window.visualViewport.height;
                     }
+                    this.updateSearchBoxPosition();
                 }, 500);
                 this.updateSearchBoxPosition();
             });
