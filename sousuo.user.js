@@ -3627,8 +3627,8 @@ const domHandler = {
         if (!punkJetBox) return;
         const keyboardHeight = utils.getKeyboardHeight();
         const suggestionHeight = utils.getSuggestionListHeight();
-        const isOpen = keyboardHeight > 0;
-        // 更新键盘状态，供滚动监听使用
+        const isOpen = keyboardHeight > 0 || suggestionHeight > 0;
+        // 更新键盘状态，供滚动/滚轮/触摸监听使用
         appState.isKeyboardOpen = isOpen;
         if (isOpen) {
             appState.punkJetBoxVisible = true;
@@ -3638,14 +3638,16 @@ const domHandler = {
         let bottomValue = 0;
         if (suggestionHeight > 0) {
             bottomValue = suggestionHeight + 1;
-        } else if (isOpen) {
+        } else if (keyboardHeight > 0) {
             bottomValue = keyboardHeight + 1;
         }
         punkJetBox.style.bottom = `${bottomValue}px`;
         punkJetBox.style.left = '2%';
         punkJetBox.style.width = '96%';
-        punkJetBox.style.transform = appState.punkJetBoxVisible ? "translateY(0)" : "translateY(100%)";
-        punkJetBox.style.opacity = appState.punkJetBoxVisible ? "1" : "0";
+        // 键盘或建议列表打开时，强制显示（不依赖 punkJetBoxVisible 状态）
+        const shouldShow = appState.punkJetBoxVisible || isOpen;
+        punkJetBox.style.transform = shouldShow ? "translateY(0)" : "translateY(100%)";
+        punkJetBox.style.opacity = shouldShow ? "1" : "0";
     },
 
     createEngineButton(item) {
