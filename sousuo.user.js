@@ -3277,7 +3277,11 @@ const utils = {
     getKeyboardHeight() {
         if (window.visualViewport) {
             const diff = window.innerHeight - window.visualViewport.height;
-            return diff > 0 ? diff : 0;
+            if (diff > 0) return diff;
+            // 部分浏览器中 visualViewport.offsetTop 反映键盘推起页面的距离
+            if (window.visualViewport.offsetTop < 0) {
+                return Math.abs(window.visualViewport.offsetTop);
+            }
         }
         return 0;
     }
@@ -3726,6 +3730,14 @@ const domHandler = {
                     hamburgerMenu.hideHamburgerMenu();
                 }
             });
+            // 确保引擎栏始终在body末尾，防止被页面动态添加的元素遮挡
+            const domObserver = new MutationObserver(() => {
+                const box = document.getElementById("punkjet-search-box");
+                if (box && document.body.lastElementChild !== box) {
+                    document.body.appendChild(box);
+                }
+            });
+            domObserver.observe(document.body, { childList: true });
             setTimeout(() => this.enableDragAndSort(), DEFAULT_CONFIG.DRAG_SORT_DELAY);
         } catch (error) {
             console.error("添加搜索框失败:", error.message);
