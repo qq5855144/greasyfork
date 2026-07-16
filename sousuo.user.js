@@ -3992,6 +3992,8 @@ const domHandler = {
 
         const handleWheel = (e) => {
             if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
+            // 输入法键盘打开时，不因滚轮隐藏搜索引擎栏
+            if (appState.isKeyboardOpen) return;
             setTimeout(() => {
                 const st = window.pageYOffset || document.documentElement.scrollTop;
                 if (st > appState.lastScrollTop && st > 50) {
@@ -4084,6 +4086,8 @@ const domHandler = {
     },
 
     hideSearchBox() {
+        // 输入法键盘打开时，强制保持搜索引擎栏可见
+        if (appState.isKeyboardOpen) return;
         if (appState.punkJetBoxVisible) {
             appState.punkJetBoxVisible = false;
             this.updateSearchBoxPosition();
