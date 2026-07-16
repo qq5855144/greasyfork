@@ -2945,7 +2945,8 @@ const appState = {
     touchStartY: null,
     hamburgerMenuOpen: false,
     searchOverlayVisible: false,
-    isInteractingWithEngineBar: false
+    isInteractingWithEngineBar: false,
+    isKeyboardOpen: false
 };
 
 // ===== 可访问性模块 =====
@@ -3272,6 +3273,14 @@ const utils = {
         };
         return icons[iconName] || icons['circle'];
     },
+
+    getKeyboardHeight() {
+        if (window.visualViewport) {
+            const diff = window.innerHeight - window.visualViewport.height;
+            return diff > 0 ? diff : 0;
+        }
+        return 0;
+    }
 };
 
 // ===== DOM操作模块 =====
@@ -3567,11 +3576,18 @@ const domHandler = {
     updateSearchBoxPosition() {
         const punkJetBox = document.getElementById("punkjet-search-box");
         if (!punkJetBox) return;
-        punkJetBox.style.bottom = '0px';
+        const keyboardHeight = utils.getKeyboardHeight();
+        const isOpen = keyboardHeight > 0;
+        appState.isKeyboardOpen = isOpen;
+        if (isOpen) {
+            appState.punkJetBoxVisible = true;
+        }
+        punkJetBox.style.bottom = isOpen ? `${keyboardHeight + 1}px` : '0px';
         punkJetBox.style.left = '2%';
         punkJetBox.style.width = '96%';
-        punkJetBox.style.transform = appState.punkJetBoxVisible ? "translateY(0)" : "translateY(100%)";
-        punkJetBox.style.opacity = appState.punkJetBoxVisible ? "1" : "0";
+        const shouldShow = appState.punkJetBoxVisible || isOpen;
+        punkJetBox.style.transform = shouldShow ? "translateY(0)" : "translateY(100%)";
+        punkJetBox.style.opacity = shouldShow ? "1" : "0";
     },
 
     createEngineButton(item) {
@@ -3700,6 +3716,11 @@ const domHandler = {
             appState.containerAdded = true;
             this.initScrollListener();
             window.addEventListener('resize', () => this.updateSearchBoxPosition());
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', () => this.updateSearchBoxPosition());
+            }
+            document.addEventListener('focusin', () => this.updateSearchBoxPosition());
+            document.addEventListener('focusout', () => this.updateSearchBoxPosition());
             document.addEventListener('click', (e) => {
                 if (!e.target.closest(`#${CLASS_NAMES.HAMBURGER_MENU}`) && !e.target.closest('.engine-hamburger-button')) {
                     hamburgerMenu.hideHamburgerMenu();
@@ -3847,6 +3868,7 @@ const domHandler = {
             const st = window.pageYOffset || document.documentElement.scrollTop;
             const isInteractingWithSearchBar = document.querySelector(`.${CLASS_NAMES.ENGINE_CONTAINER}:hover`) !== null;
             if (isInteractingWithSearchBar) return;
+            if (appState.isKeyboardOpen) return;
             utils.clearAllTimeouts();
             appState.isScrolling = true;
             debounceUtils.debounce('scroll_hide', () => {
@@ -3878,6 +3900,7 @@ const domHandler = {
 
         const handleTouchMove = (e) => {
             if (appState.isInteractingWithEngineBar) return;
+            if (appState.isKeyboardOpen) return;
             if (appState.touchStartY === null) return;
             if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
             const touchY = e.touches[0].clientY;
@@ -3901,6 +3924,7 @@ const domHandler = {
 
         const handleWheel = (e) => {
             if (e.target.closest(`.${CLASS_NAMES.ENGINE_CONTAINER}`)) return;
+            if (appState.isKeyboardOpen) return;
             setTimeout(() => {
                 const st = window.pageYOffset || document.documentElement.scrollTop;
                 if (st > appState.lastScrollTop && st > 50) {
@@ -3993,6 +4017,7 @@ const domHandler = {
     },
 
     hideSearchBox() {
+        if (appState.isKeyboardOpen) return;
         if (appState.punkJetBoxVisible) {
             appState.punkJetBoxVisible = false;
             this.updateSearchBoxPosition();
