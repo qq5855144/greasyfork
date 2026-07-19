@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.0
+// @version      v4.2.1
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -31,8 +31,15 @@
         image: new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'])
     };
 
+    // 常规扩展名检查
+    const imageExtSet = new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico', '.avif', '.tiff', '.tif']);
+    const videoExtSet = new Set(['.mp4', '.flv', '.m3u8', '.avi', '.wmv', '.mov', '.webm', '.mkv', '.ts', '.mpeg']);
+    const audioExtSet = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma']);
+
     function categorizeUrl(url) {
         if (!url || typeof url !== 'string') return;
+        // 跳过空字符串、纯数字ID（无法直接访问的资源标记）
+        if (url.trim() === '') return;
         try {
             const urlObj = new URL(url);
             let type = 'other';
@@ -44,12 +51,46 @@
                 addResource(type, url);
                 return;
             }
-            const ext = urlObj.pathname.substring(urlObj.pathname.lastIndexOf('.')).toLowerCase();
-            if (resourceTypes.video.has(ext)) type = 'video';
-            else if (resourceTypes.audio.has(ext)) type = 'audio';
-            else if (resourceTypes.image.has(ext)) type = 'image';
+            // 检查文件扩展名
+            const path = urlObj.pathname;
+            const dotIdx = path.lastIndexOf('.');
+            if (dotIdx !== -1) {
+                const ext = path.substring(dotIdx).toLowerCase().split('?')[0].split('#')[0];
+                if (imageExtSet.has(ext)) type = 'image';
+                else if (videoExtSet.has(ext)) type = 'video';
+                else if (audioExtSet.has(ext)) type = 'audio';
+            } else {
+                // 无扩展名：检查是否包含图片服务常见关键词
+                const lowerUrl = url.toLowerCase();
+                if (lowerUrl.includes('/image/') || lowerUrl.includes('/img/') || lowerUrl.includes('/photo/') ||
+                    lowerUrl.includes('/thumbnail/') || lowerUrl.includes('/thumb/') || lowerUrl.includes('/picture/') ||
+                    lowerUrl.includes('image') || lowerUrl.includes('img') || 
+                    lowerUrl.startsWith('//') && (lowerUrl.includes('.webp') || lowerUrl.includes('.jpg') || lowerUrl.includes('.png'))) {
+                    type = 'image';
+                }
+            }
             addResource(type, url);
         } catch (e) { /* 忽略 */ }
+    }
+
+    // 智能检查一个URL是否为图片（通过尝试加载）
+    function isImageUrl(url) {
+        if (!url || typeof url !== 'string') return false;
+        // 先通过扩展名快速判断
+        try {
+            const urlObj = new URL(url);
+            const path = urlObj.pathname;
+            const dotIdx = path.lastIndexOf('.');
+            if (dotIdx !== -1) {
+                const ext = path.substring(dotIdx).toLowerCase().split('?')[0].split('#')[0];
+                if (imageExtSet.has(ext)) return true;
+            }
+            // data URL
+            if (url.startsWith('data:image/')) return true;
+            // 包含图片特征但不一定是
+            if (url.startsWith('blob:')) return true;
+        } catch(e) {}
+        return false;
     }
 
     function addResource(type, url) {
@@ -58,7 +99,11 @@
         if (window._hyUIReady) window._hyAddResourceItem(type, url);
     }
 
+    // 常见懒加载图片属性列表
+    const lazyAttrs = ['data-src', 'data-original', 'data-lazy-src', 'data-srcset', 'data-url', 'data-echo', 'data-lazy', 'data-full', 'data-real-src', 'data-bg', 'data-bg-url', 'data-image', 'data-img', 'data-load', 'data-lazyload', 'data-original-src', 'data-highres', 'data-normal', 'data-small', 'data-medium', 'data-large'];
+
     function scanDOM() {
+        // 1. 标准标签的 src / srcset
         ['video', 'audio', 'img', 'image'].forEach(tag => {
             document.querySelectorAll(tag).forEach(el => {
                 if (el.src) categorizeUrl(el.src);
@@ -68,9 +113,26 @@
                         categorizeUrl(url);
                     });
                 }
+                // 懒加载属性
+                lazyAttrs.forEach(attr => {
+                    const val = el.getAttribute(attr);
+                    if (val) categorizeUrl(val);
+                });
             });
         });
-        // 内联 SVG
+
+        // 2. 单独扫描所有元素的懒加载属性（用于那些非标准标签或自定义元素）
+        const lazySelector = lazyAttrs.map(a => '[' + a + ']').join(',');
+        if (lazySelector) {
+            document.querySelectorAll(lazySelector).forEach(el => {
+                lazyAttrs.forEach(attr => {
+                    const val = el.getAttribute(attr);
+                    if (val) categorizeUrl(val);
+                });
+            });
+        }
+
+        // 3. 内联 SVG
         document.querySelectorAll('svg').forEach(svg => {
             if (!svg.querySelector('*') && (!svg.textContent || !svg.textContent.trim())) return;
             if (svg.closest('img')) return;
@@ -82,10 +144,78 @@
                 addResource('image', 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr));
             } catch (e) { /* 忽略 */ }
         });
-        // object/embed SVG
+
+        // 4. object/embed SVG
         document.querySelectorAll('object[type="image/svg+xml"], object[data$=".svg"], embed[type="image/svg+xml"], embed[src$=".svg"]').forEach(el => {
             const url = el.data || el.src;
             if (url) categorizeUrl(url);
+        });
+
+        // 5. <picture>/<video>/<audio> 中的 <source> 标签
+        document.querySelectorAll('picture source, video source, audio source').forEach(el => {
+            if (el.src) categorizeUrl(el.src);
+            if (el.srcset) {
+                el.srcset.split(',').forEach(s => {
+                    const url = s.trim().split(' ')[0];
+                    if (url) categorizeUrl(url);
+                });
+            }
+            lazyAttrs.forEach(attr => {
+                const val = el.getAttribute(attr);
+                if (val) categorizeUrl(val);
+            });
+        });
+
+        // 6. <video> poster 属性
+        document.querySelectorAll('video[poster]').forEach(el => {
+            if (el.poster) categorizeUrl(el.poster);
+        });
+
+        // 7. <link rel="preload" / prefetch> — 同时支持 image/video/audio
+        document.querySelectorAll('link[rel="preload"][as="image"], link[rel="preload"][as="video"], link[rel="preload"][as="audio"], link[rel="prefetch"][as="image"], link[rel="prefetch"][as="video"], link[rel="prefetch"][as="audio"]').forEach(el => {
+            if (el.href) categorizeUrl(el.href);
+        });
+
+        // 8. <link rel="apple-touch-icon"> 等图标
+        document.querySelectorAll('link[rel*="icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-startup-image"], link[rel="manifest"]').forEach(el => {
+            if (el.href) categorizeUrl(el.href);
+        });
+
+        // 9. <meta property="og:image"> / <meta name="twitter:image"> / og:video / og:audio
+        document.querySelectorAll('meta[property="og:image"], meta[property="og:image:url"], meta[property="og:image:secure_url"], meta[property="og:video"], meta[property="og:video:url"], meta[property="og:video:secure_url"], meta[property="og:audio"], meta[property="og:audio:url"], meta[name="twitter:image"], meta[name="twitter:image:src"], meta[name="twitter:player"], meta[itemprop="image"]').forEach(el => {
+            if (el.content) categorizeUrl(el.content);
+        });
+
+        // 10. <iframe> 中的视频平台嵌入链接
+        document.querySelectorAll('iframe[src]').forEach(el => {
+            const src = el.src;
+            if (src) {
+                // YouTube / YouTube Shorts / Bilibili / Vimeo / Dailymotion / Tencent Video / Youku
+                const videoPlatforms = ['youtube.com/embed/', 'youtube.com/watch?v=', 'youtu.be/', 'bilibili.com/', 'player.bilibili.com',
+                    'vimeo.com/', 'dailymotion.com/embed/', 'v.qq.com/', 'v.youku.com/', 'miguvideo.com/'];
+                if (videoPlatforms.some(p => src.includes(p))) {
+                    categorizeUrl(src);
+                }
+            }
+        });
+
+        // 11. CSS background-image（内联样式）
+        document.querySelectorAll('[style*="background"]').forEach(el => {
+            const s = el.getAttribute('style');
+            if (s) {
+                const matches = s.match(/url\(['"]?([^'")\s]+)['"]?\)/gi);
+                if (matches) {
+                    matches.forEach(m => {
+                        const url = m.replace(/url\(['"]?/, '').replace(/['"]?\)/, '').trim();
+                        if (url && isImageUrl(url)) categorizeUrl(url);
+                    });
+                }
+            }
+        });
+
+        // 12. <meta name="msapplication-TileImage">
+        document.querySelectorAll('meta[name="msapplication-TileImage"]').forEach(el => {
+            if (el.content) categorizeUrl(el.content);
         });
     }
 
@@ -97,7 +227,38 @@
     function startDomObserver() {
         if (!document.body) { setTimeout(startDomObserver, 100); return; }
         scanDOM();
-        new MutationObserver(scanDOM).observe(document.body, { childList: true, subtree: true });
+        // 增强 MutationObserver：同时监听属性变化（尤其是 src 和懒加载属性）
+        const observer = new MutationObserver((mutations) => {
+            let needsScan = false;
+            for (const m of mutations) {
+                if (m.type === 'childList' && m.addedNodes.length > 0) {
+                    needsScan = true;
+                    break;
+                }
+                if (m.type === 'attributes') {
+                    const attr = m.attributeName;
+                    if (attr === 'src' || attr === 'srcset' || attr === 'href' || lazyAttrs.includes(attr) || attr === 'style' || attr === 'data') {
+                        needsScan = true;
+                        break;
+                    }
+                }
+            }
+            if (needsScan) scanDOM();
+        });
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['src', 'srcset', 'href', 'style', 'data', ...lazyAttrs]
+        });
+
+        // 定期扫描（捕获懒加载和动态添加的资源）
+        setInterval(scanDOM, 3000);
+
+        // 注意：无需劫持 Image 构造函数。
+        // MutationObserver 已监听 attributes + attributeFilter:['src']
+        // 当 JS 设置 img.src = url 时，属性变化会触发扫描，足够捕获动态图片。
+        // 劫持 Image 会阻断浏览器正常的图片加载流程，导致网页图片不显示。
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startDomObserver);
     else startDomObserver();
@@ -127,7 +288,10 @@
         info: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
         image: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
         sparkle: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5z"/><path d="M19 16l1 3.5L23 21l-3.5 1L19 25l-1-3.5L14 21l3.5-1z"/></svg>',
-        drag: '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="9" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="15" y2="18"/></svg>'
+        drag: '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="9" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="15" y2="18"/></svg>',
+        'chevron-left': '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+        'chevron-right': '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
+        'maximize': '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>'
     };
 
     // SVG 图标辅助函数
@@ -607,35 +771,183 @@
 }
 #_hy-about ._hy-footer p { margin: 3px 0; color: rgba(255,255,255,0.35); }
 
-/* 图片预览浮层 */
-#_hy-preview {
+/* ========== 图片画廊查看器（全屏） ========== */
+#_hy-gallery {
+    all: initial;
     position: fixed;
+    inset: 0;
     z-index: 2147483647;
-    padding: 8px;
-    background: rgba(13,12,29,0.9);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-radius: 14px;
-    border: 1px solid rgba(108,99,255,0.2);
-    max-width: 70vw;
-    max-height: 60vh;
-    pointer-events: none;
-    opacity: 0;
-    transform: scale(0.9);
-    transition: opacity 0.15s, transform 0.15s;
+    background: rgba(0,0,0,0.92);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     display: none;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    flex-direction: column;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    touch-action: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
-#_hy-preview.visible {
-    display: block;
+#_hy-gallery.show {
+    display: flex;
     opacity: 1;
-    transform: scale(1);
 }
-#_hy-preview img {
-    width: 100%;
-    height: 100%;
+/* 顶部栏 */
+#_hy-gallery ._hy-gallery-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    z-index: 2;
+    background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+}
+#_hy-gallery ._hy-gallery-counter {
+    color: rgba(255,255,255,0.85);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: 0.5px;
+}
+#_hy-gallery ._hy-gallery-close {
+    all: initial;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    transition: background 0.2s, transform 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+#_hy-gallery ._hy-gallery-close:active {
+    background: rgba(255,255,255,0.18);
+    transform: scale(0.88);
+}
+/* 图片容器 */
+#_hy-gallery ._hy-gallery-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+}
+#_hy-gallery ._hy-gallery-body img {
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
-    border-radius: 8px;
+    transition: transform 0.3s ease;
+    will-change: transform;
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+}
+/* 导航箭头（左右半区点击） */
+#_hy-gallery ._hy-gallery-prev,
+#_hy-gallery ._hy-gallery-next {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 35%;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: rgba(255,255,255,0.6);
+    opacity: 0;
+    transition: opacity 0.3s, background 0.3s;
+    -webkit-tap-highlight-color: transparent;
+}
+#_hy-gallery ._hy-gallery-prev { left: 0; }
+#_hy-gallery ._hy-gallery-next { right: 0; }
+#_hy-gallery:hover ._hy-gallery-prev,
+#_hy-gallery:hover ._hy-gallery-next { opacity: 1; }
+#_hy-gallery ._hy-gallery-prev:active,
+#_hy-gallery ._hy-gallery-next:active {
+    background: rgba(255,255,255,0.04);
+    opacity: 1;
+}
+/* 底部信息栏 */
+#_hy-gallery ._hy-gallery-bottom {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 12px 16px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: linear-gradient(0deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+    z-index: 2;
+}
+#_hy-gallery ._hy-gallery-bottom a {
+    color: rgba(255,255,255,0.75);
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+#_hy-gallery ._hy-gallery-bottom a:active {
+    background: rgba(255,255,255,0.14);
+}
+/* 底部移动端导航条 */
+#_hy-gallery ._hy-gallery-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 0 12px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    max-width: 50%;
+}
+#_hy-gallery ._hy-gallery-dots::-webkit-scrollbar { display: none; }
+#_hy-gallery ._hy-gallery-dot {
+    all: initial;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.25);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background 0.25s, transform 0.25s;
+    -webkit-tap-highlight-color: transparent;
+}
+#_hy-gallery ._hy-gallery-dot.active {
+    background: #00f5d4;
+    transform: scale(1.3);
+    box-shadow: 0 0 8px rgba(0,245,212,0.5);
+}
+/* 桌面端箭头始终可见 */
+@media (hover: hover) {
+    #_hy-gallery ._hy-gallery-prev,
+    #_hy-gallery ._hy-gallery-next { opacity: 0; }
+    #_hy-gallery:hover ._hy-gallery-prev,
+    #_hy-gallery:hover ._hy-gallery-next { opacity: 1; }
+}
+/* 移动端箭头常显半透明 */
+@media (hover: none) {
+    #_hy-gallery ._hy-gallery-prev,
+    #_hy-gallery ._hy-gallery-next { opacity: 0.5; }
+    #_hy-gallery ._hy-gallery-prev:active,
+    #_hy-gallery ._hy-gallery-next:active { opacity: 1; }
 }
 
 /* 动画 */
@@ -750,7 +1062,7 @@
         panel.innerHTML = `
             <div id="_hy-handle">${icon('drag')}</div>
             <div id="_hy-toolbar">
-                <div class="_hy-title">${icon('sparkle')}<span>幻</span>隐嗅探</div>
+                <div class="_hy-title">${icon('sparkle')}<span>资源嗅探</div>
                 <div class="_hy-tool-actions">
                     <button id="_hy-close-btn" title="关闭">${icon('close')}</button>
                 </div>
@@ -784,15 +1096,29 @@
             </div>
         `;
 
-        // 预览容器
-        const preview = document.createElement('div');
-        preview.id = '_hy-preview';
+        // ---- 全屏画廊查看器 ----
+        const gallery = document.createElement('div');
+        gallery.id = '_hy-gallery';
+        gallery.innerHTML = `
+            <div class="_hy-gallery-top">
+                <span class="_hy-gallery-counter" id="_hy-gallery-counter">0 / 0</span>
+                <button class="_hy-gallery-close" id="_hy-gallery-close">${icon('close')}</button>
+            </div>
+            <div class="_hy-gallery-body" id="_hy-gallery-body">
+                <div class="_hy-gallery-prev" id="_hy-gallery-prev">${icon('chevron-left')}</div>
+                <img id="_hy-gallery-img" src="" alt="preview">
+                <div class="_hy-gallery-next" id="_hy-gallery-next">${icon('chevron-right')}</div>
+            </div>
+            <div class="_hy-gallery-bottom">
+                <a id="_hy-gallery-open" href="#" target="_blank" rel="noopener">${icon('maximize')} 原图</a>
+            </div>
+        `;
 
         root.appendChild(toast);
         root.appendChild(overlay);
         root.appendChild(btn);
         root.appendChild(panel);
-        root.appendChild(preview);
+        root.appendChild(gallery);
         document.body.appendChild(root);
 
         // --- 状态 ---
@@ -815,7 +1141,15 @@
         const aboutEl = document.getElementById('_hy-about');
         const sourceCodeEl = document.getElementById('_hy-source-code');
         const seoContentEl = document.getElementById('_hy-seo-content');
-        const previewEl = document.getElementById('_hy-preview');
+        const galleryEl = document.getElementById('_hy-gallery');
+        const galleryImg = document.getElementById('_hy-gallery-img');
+        const galleryCounter = document.getElementById('_hy-gallery-counter');
+        const galleryClose = document.getElementById('_hy-gallery-close');
+        const galleryPrev = document.getElementById('_hy-gallery-prev');
+        const galleryNext = document.getElementById('_hy-gallery-next');
+        const galleryOpen = document.getElementById('_hy-gallery-open');
+        let galleryIndex = 0;
+        let galleryList = [];
 
         // --- 暴露接口 ---
         window._hyUIReady = true;
@@ -1085,9 +1419,10 @@
                     <div class="_hy-resource-meta">${badgeHtml}</div>
                 </div>
                 <div class="_hy-resource-actions">
-                    <button class="_hy-copy-btn" data-url="${url}">${icon('copy')} 复制</button>
-                    <button class="_hy-open-btn" data-url="${url}">${icon('external')} 打开</button>
-                </div>
+    <button class="_hy-preview-btn" data-url="${url}">${icon('image')} 预览</button>
+    <button class="_hy-copy-btn" data-url="${url}">${icon('copy')} 复制</button>
+    <button class="_hy-open-btn" data-url="${url}">${icon('external')} 打开</button>
+    </div>
             `;
             resourceListEl.appendChild(item);
         }
@@ -1177,53 +1512,116 @@
         });
 
         // ============================================================
-        //  图片预览（桌面悬停 + 移动长按）
+        //  全屏画廊查看器（点击缩略图打开，支持上一张/下一张）
         // ============================================================
-        let previewTimer = null;
-        resourceListEl.addEventListener('touchstart', (e) => {
-            const thumb = e.target.closest('._hy-thumb');
-            if (!thumb) return;
-            previewTimer = setTimeout(() => {
-                previewEl.innerHTML = `<img src="${thumb.src}" alt="">`;
-                previewEl.classList.add('visible');
-                const touch = e.touches[0];
-                previewEl.style.left = Math.min(touch.clientX + 10, window.innerWidth - 280) + 'px';
-                previewEl.style.top = Math.min(touch.clientY + 10, window.innerHeight - 280) + 'px';
-            }, 400);
-        }, { passive: true });
-        resourceListEl.addEventListener('touchend', () => {
-            clearTimeout(previewTimer);
-            previewEl.classList.remove('visible');
-            previewEl.innerHTML = '';
-        }, { passive: true });
-        resourceListEl.addEventListener('touchmove', () => {
-            clearTimeout(previewTimer);
-            previewEl.classList.remove('visible');
-            previewEl.innerHTML = '';
-        }, { passive: true });
 
-        resourceListEl.addEventListener('mouseover', (e) => {
-            const thumb = e.target.closest('._hy-thumb');
-            if (!thumb) return;
-            previewEl.innerHTML = `<img src="${thumb.src}" alt="">`;
-            previewEl.classList.add('visible');
-        });
-        resourceListEl.addEventListener('mouseout', (e) => {
-            if (e.target.closest('._hy-thumb')) {
-                previewEl.classList.remove('visible');
-                previewEl.innerHTML = '';
+        function openGallery(list, idx) {
+            galleryList = list;
+            galleryIndex = idx;
+            updateGallery();
+            galleryEl.classList.add('show');
+            // 关闭嗅探面板
+            if (isPanelOpen) closePanel();
+        }
+
+        function updateGallery() {
+            if (!galleryList.length) return;
+            const url = galleryList[galleryIndex];
+            galleryImg.src = url;
+            galleryCounter.textContent = (galleryIndex + 1) + ' / ' + galleryList.length;
+            galleryOpen.href = url;
+            // 预加载相邻图片
+            if (galleryIndex > 0) {
+                const p = new Image();
+                p.src = galleryList[galleryIndex - 1];
+            }
+            if (galleryIndex < galleryList.length - 1) {
+                const n = new Image();
+                n.src = galleryList[galleryIndex + 1];
+            }
+        }
+
+        function closeGallery() {
+            galleryEl.classList.remove('show');
+            galleryImg.src = '';
+            galleryList = [];
+        }
+
+        function prevGallery() {
+            if (galleryList.length < 2) return;
+            galleryIndex = (galleryIndex - 1 + galleryList.length) % galleryList.length;
+            updateGallery();
+        }
+
+        function nextGallery() {
+            if (galleryList.length < 2) return;
+            galleryIndex = (galleryIndex + 1) % galleryList.length;
+            updateGallery();
+        }
+
+        // 点击关闭按钮
+        galleryClose.addEventListener('click', closeGallery);
+        // 点击背景关闭（点击图片本身不关闭）
+        galleryEl.addEventListener('click', (e) => {
+            if (e.target === galleryEl || e.target === document.getElementById('_hy-gallery-body') || e.target.closest('._hy-gallery-body') === e.target) {
+                closeGallery();
             }
         });
-        resourceListEl.addEventListener('mousemove', (e) => {
-            if (!previewEl.classList.contains('visible')) return;
-            const x = e.clientX + 16;
-            const y = e.clientY + 16;
-            const rect = previewEl.getBoundingClientRect();
-            const bw = document.documentElement.clientWidth;
-            const bh = document.documentElement.clientHeight;
-            previewEl.style.left = (x + rect.width > bw ? e.clientX - rect.width - 16 : x) + 'px';
-            previewEl.style.top = (y + rect.height > bh ? e.clientY - rect.height - 16 : y) + 'px';
+        // 上一张/下一张
+        galleryPrev.addEventListener('click', (e) => { e.stopPropagation(); prevGallery(); });
+        galleryNext.addEventListener('click', (e) => { e.stopPropagation(); nextGallery(); });
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            if (!galleryEl.classList.contains('show')) return;
+            if (e.key === 'Escape') closeGallery();
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); prevGallery(); }
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nextGallery(); }
         });
+        // 触摸滑动
+        let touchStartX = 0;
+        galleryEl.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+        galleryEl.addEventListener('touchend', (e) => {
+            const diff = e.changedTouches[0].screenX - touchStartX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) prevGallery();
+                else nextGallery();
+            }
+        }, { passive: true });
+
+        // 点击资源列表中的缩略图 → 打开画廊
+        resourceListEl.addEventListener('click', (e) => {
+            const thumb = e.target.closest('._hy-thumb');
+            if (!thumb) return;
+            const item = thumb.closest('._hy-resource-item');
+            if (!item) return;
+            const url = item.dataset.hyUrl;
+            if (!url) return;
+            // 获取当前分类的所有URL
+            const type = currentTab;
+            const list = allResources[type] || [];
+            if (!list.length) return;
+            const idx = list.indexOf(url);
+            if (idx === -1) return;
+            openGallery(list, idx);
+        });
+
+        // 点击"预览"按钮打开画廊
+resourceListEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('._hy-preview-btn');
+    if (!btn) return;
+    const item = btn.closest('._hy-resource-item');
+    if (!item) return;
+    const url = item.dataset.hyUrl;
+    if (!url) return;
+    const type = currentTab;
+    const list = allResources[type] || [];
+    if (!list.length) return;
+    const idx = list.indexOf(url);
+    if (idx === -1) return;
+    openGallery(list, idx);
+});
 
         // ============================================================
         //  SEO / 源代码 / 可视化编辑
