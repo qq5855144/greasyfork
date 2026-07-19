@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.1
+// @version      v4.2.3
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -319,7 +319,7 @@
 
 /* ========== U形开关按钮（半圆外壳 + 内嵌圆形图标容器） ========== */
 /*
- * 外层U形槽：深色暗紫半透明，完整半圆（左侧），无边框，右侧贴屏幕边缘
+ * 外层U形槽：毛玻璃，完整半圆（左侧），无边框，右侧贴屏幕边缘
  * 内圆：青绿色，比槽小，向左贴弧形方向，与槽保留2px间隔
  */
 #_hy-btn {
@@ -335,11 +335,11 @@
     /* 完美半圆：左侧radius = 半高 = 20px */
     border-radius: 20px 0 0 20px;
     border: none;
-    /* 深色暗紫半透明 */
-    background: rgba(22, 18, 48, 0.78);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: -2px 0 18px rgba(80, 50, 160, 0.35);
+    /* 白色毛玻璃 */
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    box-shadow: -2px 0 18px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -354,20 +354,21 @@
 /* 伸出状态 */
 #_hy-btn.extend {
     transform: translateY(calc(var(--_hy-btn-offset, -50%))) translateX(0);
-    background: rgba(28, 22, 58, 0.88);
-    box-shadow: -3px 0 22px rgba(80, 50, 160, 0.45);
+    background: rgba(255, 255, 255, 0.32);
+    box-shadow: -3px 0 22px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 #_hy-btn.extend:active {
     transform: translateY(calc(var(--_hy-btn-offset, -50%))) translateX(0) scale(0.93);
 }
 #_hy-btn:hover {
-    background: rgba(28, 22, 58, 0.88);
+    background: rgba(255, 255, 255, 0.32);
 }
 
 /* _hy-btn-bg 不使用 */
 #_hy-btn ._hy-btn-bg {
     display: none;
 }
+
 
 /* 内层圆形图标容器：34px，青绿色 */
 #_hy-btn ._hy-btn-inner {
@@ -1085,7 +1086,7 @@
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>1.2.0（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.3（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后可直接在网页上编辑文字（移动端双击进入编辑状态）。</p>
