@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.4
+// @version      v4.2.5
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -291,9 +291,10 @@
         drag: '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="9" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="15" y2="18"/></svg>',
         'chevron-left': '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
         'chevron-right': '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
-        'maximize': '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>'
+        'maximize': '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>',
+        'download': '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
     };
-
+    
     // SVG 图标辅助函数
     function icon(name) { return ICONS[name] || ''; }
 
@@ -1098,7 +1099,7 @@
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.4（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.5（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后可直接在网页上编辑文字（移动端双击进入编辑状态）。</p>
@@ -1432,7 +1433,7 @@
                     <div class="_hy-resource-meta">${badgeHtml}</div>
                 </div>
                 <div class="_hy-resource-actions">
-    <button class="_hy-preview-btn" data-url="${url}">${icon('image')} 预览</button>
+    <button class="_hy-download-btn" data-url="${url}">${icon('download')} 下载</button>
     <button class="_hy-copy-btn" data-url="${url}">${icon('copy')} 复制</button>
     <button class="_hy-open-btn" data-url="${url}">${icon('external')} 打开</button>
     </div>
@@ -1620,20 +1621,21 @@
             openGallery(list, idx);
         });
 
-        // 点击"预览"按钮打开画廊
+        // 点击"下载"按钮下载对应资源
 resourceListEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('._hy-preview-btn');
+    const btn = e.target.closest('._hy-download-btn');
     if (!btn) return;
-    const item = btn.closest('._hy-resource-item');
-    if (!item) return;
-    const url = item.dataset.hyUrl;
+    const url = btn.dataset.url;
     if (!url) return;
-    const type = currentTab;
-    const list = allResources[type] || [];
-    if (!list.length) return;
-    const idx = list.indexOf(url);
-    if (idx === -1) return;
-    openGallery(list, idx);
+    // 创建临时 <a> 元素触发下载
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = url.split('/').pop() || 'download';
+    a.rel = 'noopener noreferrer';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 });
 
         // ============================================================
