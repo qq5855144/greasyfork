@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.6
+// @version      v4.2.7
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -875,30 +875,35 @@
     -webkit-user-drag: none;
     pointer-events: none;
 }
-/* 导航箭头（左右半区点击） */
+/* 导航箭头（居中固定在左右两侧） */
 #_hy-gallery ._hy-gallery-prev,
 #_hy-gallery ._hy-gallery-next {
-    position: absolute;
-    top: 0; bottom: 0;
-    width: 35%;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: rgba(255,255,255,0.6);
-    opacity: 0;
-    transition: opacity 0.3s, background 0.3s;
-    -webkit-tap-highlight-color: transparent;
+position: absolute;
+top: 50%;
+transform: translateY(-50%);
+width: 44px;
+height: 44px;
+border-radius: 50%;
+z-index: 2;
+display: flex;
+align-items: center;
+justify-content: center;
+background: rgba(0,0,0,0.35);
+color: #fff;
+cursor: pointer;
+opacity: 0;
+transition: opacity 0.3s, background 0.3s;
+-webkit-tap-highlight-color: transparent;
 }
-#_hy-gallery ._hy-gallery-prev { left: 0; }
-#_hy-gallery ._hy-gallery-next { right: 0; }
+#_hy-gallery ._hy-gallery-prev { left: 12px; }
+#_hy-gallery ._hy-gallery-next { right: 12px; }
 #_hy-gallery:hover ._hy-gallery-prev,
 #_hy-gallery:hover ._hy-gallery-next { opacity: 1; }
 #_hy-gallery ._hy-gallery-prev:active,
 #_hy-gallery ._hy-gallery-next:active {
-    background: rgba(255,255,255,0.04);
-    opacity: 1;
+background: rgba(255,255,255,0.2);
+opacity: 1;
+transform: translateY(-50%) scale(0.92);
 }
 /* 底部信息栏 */
 #_hy-gallery ._hy-gallery-bottom {
@@ -1111,7 +1116,7 @@
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.6（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.7（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后可直接在网页上编辑文字（移动端双击进入编辑状态）。</p>
