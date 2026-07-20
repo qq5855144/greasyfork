@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.5
+// @version      v4.2.6
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -106,6 +106,7 @@
         // 1. 标准标签的 src / srcset
         ['video', 'audio', 'img', 'image'].forEach(tag => {
             document.querySelectorAll(tag).forEach(el => {
+                if (el.closest && el.closest('#_hy-root')) return; // 排除脚本自身UI
                 if (el.src) categorizeUrl(el.src);
                 if (el.srcset) {
                     el.srcset.split(',').forEach(s => {
@@ -125,6 +126,7 @@
         const lazySelector = lazyAttrs.map(a => '[' + a + ']').join(',');
         if (lazySelector) {
             document.querySelectorAll(lazySelector).forEach(el => {
+                if (el.closest && el.closest('#_hy-root')) return; // 排除脚本自身UI
                 lazyAttrs.forEach(attr => {
                     const val = el.getAttribute(attr);
                     if (val) categorizeUrl(val);
@@ -134,6 +136,7 @@
 
         // 3. 内联 SVG
         document.querySelectorAll('svg').forEach(svg => {
+            if (svg.closest && svg.closest('#_hy-root')) return; // 排除脚本自身UI
             if (!svg.querySelector('*') && (!svg.textContent || !svg.textContent.trim())) return;
             if (svg.closest('img')) return;
             try {
@@ -147,12 +150,14 @@
 
         // 4. object/embed SVG
         document.querySelectorAll('object[type="image/svg+xml"], object[data$=".svg"], embed[type="image/svg+xml"], embed[src$=".svg"]').forEach(el => {
+            if (el.closest && el.closest('#_hy-root')) return;
             const url = el.data || el.src;
             if (url) categorizeUrl(url);
         });
 
         // 5. <picture>/<video>/<audio> 中的 <source> 标签
         document.querySelectorAll('picture source, video source, audio source').forEach(el => {
+            if (el.closest && el.closest('#_hy-root')) return;
             if (el.src) categorizeUrl(el.src);
             if (el.srcset) {
                 el.srcset.split(',').forEach(s => {
@@ -168,26 +173,31 @@
 
         // 6. <video> poster 属性
         document.querySelectorAll('video[poster]').forEach(el => {
+            if (el.closest && el.closest('#_hy-root')) return;
             if (el.poster) categorizeUrl(el.poster);
         });
 
         // 7. <link rel="preload" / prefetch> — 同时支持 image/video/audio
         document.querySelectorAll('link[rel="preload"][as="image"], link[rel="preload"][as="video"], link[rel="preload"][as="audio"], link[rel="prefetch"][as="image"], link[rel="prefetch"][as="video"], link[rel="prefetch"][as="audio"]').forEach(el => {
+            if (el.closest && el.closest('#_hy-root')) return;
             if (el.href) categorizeUrl(el.href);
         });
 
         // 8. <link rel="apple-touch-icon"> 等图标
         document.querySelectorAll('link[rel*="icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-startup-image"], link[rel="manifest"]').forEach(el => {
+            if (el.closest && el.closest('#_hy-root')) return;
             if (el.href) categorizeUrl(el.href);
         });
 
         // 9. <meta property="og:image"> / <meta name="twitter:image"> / og:video / og:audio
         document.querySelectorAll('meta[property="og:image"], meta[property="og:image:url"], meta[property="og:image:secure_url"], meta[property="og:video"], meta[property="og:video:url"], meta[property="og:video:secure_url"], meta[property="og:audio"], meta[property="og:audio:url"], meta[name="twitter:image"], meta[name="twitter:image:src"], meta[name="twitter:player"], meta[itemprop="image"]').forEach(el => {
+            if (el.closest && el.closest('#_hy-root')) return;
             if (el.content) categorizeUrl(el.content);
         });
 
         // 10. <iframe> 中的视频平台嵌入链接
         document.querySelectorAll('iframe[src]').forEach(el => {
+            if (el.closest && el.closest('#_hy-root')) return;
             const src = el.src;
             if (src) {
                 // YouTube / YouTube Shorts / Bilibili / Vimeo / Dailymotion / Tencent Video / Youku
@@ -201,6 +211,7 @@
 
         // 11. CSS background-image（内联样式）
         document.querySelectorAll('[style*="background"]').forEach(el => {
+            if (el.closest && el.closest('#_hy-root')) return;
             const s = el.getAttribute('style');
             if (s) {
                 const matches = s.match(/url\(['"]?([^'")\s]+)['"]?\)/gi);
@@ -215,6 +226,7 @@
 
         // 12. <meta name="msapplication-TileImage">
         document.querySelectorAll('meta[name="msapplication-TileImage"]').forEach(el => {
+            if (el.closest && el.closest('#_hy-root')) return;
             if (el.content) categorizeUrl(el.content);
         });
     }
@@ -1099,7 +1111,7 @@
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.5（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.6（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后可直接在网页上编辑文字（移动端双击进入编辑状态）。</p>
