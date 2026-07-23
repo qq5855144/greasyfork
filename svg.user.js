@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.7
+// @version      v4.2.8
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -891,7 +891,7 @@ justify-content: center;
 background: rgba(0,0,0,0.35);
 color: #fff;
 cursor: pointer;
-opacity: 0;
+opacity: 0.7;
 transition: opacity 0.3s, background 0.3s;
 -webkit-tap-highlight-color: transparent;
 }
@@ -966,19 +966,20 @@ transform: translateY(-50%) scale(0.92);
     transform: scale(1.3);
     box-shadow: 0 0 8px rgba(0,245,212,0.5);
 }
-/* 桌面端箭头始终可见 */
+/* 桌面端箭头常显（半透明，悬停更亮） */
 @media (hover: hover) {
-    #_hy-gallery ._hy-gallery-prev,
-    #_hy-gallery ._hy-gallery-next { opacity: 0; }
-    #_hy-gallery:hover ._hy-gallery-prev,
-    #_hy-gallery:hover ._hy-gallery-next { opacity: 1; }
+#_hy-gallery ._hy-gallery-prev,
+#_hy-gallery ._hy-gallery-next { opacity: 0.7; }
+#_hy-gallery:hover ._hy-gallery-prev,
+#_hy-gallery:hover ._hy-gallery-next { opacity: 1; }
 }
 /* 移动端箭头常显半透明 */
 @media (hover: none) {
-    #_hy-gallery ._hy-gallery-prev,
-    #_hy-gallery ._hy-gallery-next { opacity: 0.5; }
-    #_hy-gallery ._hy-gallery-prev:active,
-    #_hy-gallery ._hy-gallery-next:active { opacity: 1; }
+#_hy-gallery ._hy-gallery-prev,
+#_hy-gallery ._hy-gallery-next { opacity: 0.7; }
+#_hy-gallery ._hy-gallery-prev:active,
+#_hy-gallery ._hy-gallery-next:active { opacity: 1; }
+}
 }
 
 /* 动画 */
@@ -1116,7 +1117,7 @@ transform: translateY(-50%) scale(0.92);
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.7（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.8（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后可直接在网页上编辑文字（移动端双击进入编辑状态）。</p>
