@@ -517,22 +517,8 @@
     let retractTimer = null;
     let btnY = 0;
 
-    // 更新按钮图标
-    function updateBtnIcon() {
-        if (isPanelOpen) {
-            btnIcon.innerHTML = icons.close;
-            btn.title = '关闭面板';
-        } else if (isBtnExtended) {
-            btnIcon.innerHTML = icons.search;
-            btn.title = '打开脚本查找';
-        } else {
-            btnIcon.innerHTML = '...';
-            btn.title = '点击展开 · 脚本查找';
-        }
-    }
-
-    // 更新球体颜色
-    function updateBallColor() {
+    // 更新球体颜色与数字（始终显示脚本数量）
+    function updateBallDisplay() {
         const total = gfData.length + scData.length + (disableGitHubSearch ? 0 : ghTotal);
         btnInner.classList.remove('ag-color-green', 'ag-color-orange', 'ag-color-black');
         if ((gfLoaded && scLoaded) && total === 0) {
@@ -542,12 +528,12 @@
         } else {
             btnInner.classList.add('ag-color-orange');
         }
-        // 更新数字显示
         if (gfLoaded || scLoaded || (disableGitHubSearch || ghLoaded)) {
-            btnIcon.innerHTML = total;
+            btnIcon.textContent = total;
         } else {
-            btnIcon.innerHTML = '...';
+            btnIcon.textContent = '...';
         }
+        btn.title = isPanelOpen ? '关闭面板' : (total + ' 个脚本 · 点击展开');
     }
 
     // 伸出
@@ -556,7 +542,6 @@
         isBtnExtended = true;
         btn.classList.add('extend');
         clearTimeout(retractTimer);
-        updateBtnIcon();
     }
 
     // 缩回
@@ -566,7 +551,6 @@
             if (isPanelOpen) return;
             isBtnExtended = false;
             btn.classList.remove('extend');
-            updateBtnIcon();
         }, delay || 2000);
     }
 
@@ -576,8 +560,7 @@
         panel.classList.add('show');
         overlay.classList.add('show');
         extendBtn();
-        updateBtnIcon();
-        updateBallColor();
+        updateBallDisplay();
         render();
     }
 
@@ -586,8 +569,7 @@
         isPanelOpen = false;
         panel.classList.remove('show');
         overlay.classList.remove('show');
-        updateBtnIcon();
-        updateBallColor();
+        updateBallDisplay();
         scheduleRetract(2000);
     }
 
@@ -610,7 +592,6 @@
     // 初始伸出后自动缩回
     isBtnExtended = true;
     btn.classList.add('extend');
-    updateBtnIcon();
     scheduleRetract(3000);
 
     // 核心点击逻辑：两步交互
@@ -818,7 +799,7 @@
     //  UI 更新
     // ============================================================
     function updateUI() {
-        updateBallColor();
+        updateBallDisplay();
 
         let order = disableGitHubSearch
             ? (isWallAccessible ? ['gf', 'sc'] : ['sc', 'gf'])
