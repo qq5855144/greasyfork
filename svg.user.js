@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.10
+// @version      v4.2.11
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -1013,6 +1013,20 @@ transform: translateY(-50%) scale(0.92);
     transform: translateX(-50%) translateY(0);
 }
 
+/* 可视化编辑模式 */
+body._hy-editing { cursor: text !important; }
+body._hy-editing [contenteditable="true"]:focus {
+    outline: 2px solid #00f5d4 !important;
+    outline-offset: 2px;
+    background: rgba(0,245,212,0.06) !important;
+    border-radius: 3px;
+}
+body._hy-editing [contenteditable="true"] {
+    cursor: text;
+    -webkit-user-select: text;
+    user-select: text;
+}
+
 /* ========== 桌面适配 ========== */
 @media (min-width: 640px) {
     #_hy-btn {
@@ -1117,10 +1131,10 @@ transform: translateY(-50%) scale(0.92);
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.10（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.11（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
-                    <p><strong>可视化编辑：</strong>开启后可直接在网页上编辑文字（移动端双击进入编辑状态）。</p>
+                    <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
                     <p><strong>SEO检测：</strong>快速获取网站标题、描述、关键词等元数据。</p>
                     <div class="_hy-footer">                                     
                     </div>
@@ -1681,25 +1695,92 @@ resourceListEl.addEventListener('click', (e) => {
             }
         });
 
-        // ----- 可视化编辑（contentEditable，排除脚本自身 UI） -----
+        // ----- 可视化编辑（适配移动端触摸操作） -----
         const editBtn = document.getElementById('_hy-edit-mode-btn');
         let editModeOn = false;
+        let lastTouchX = 0, lastTouchY = 0;
+
+        function isMobile() {
+            return window.innerWidth < 640 || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+        }
+        function isSelfUI(el) {
+            return !!(el && el.closest && el.closest('[id^="_hy-"]'));
+        }
+        // 将光标定位到指定坐标（移动端点击后弹出键盘并定位光标）
+        function placeCaretAtPoint(x, y) {
+            let range = null;
+            if (document.caretRangeFromPoint) {
+                range = document.caretRangeFromPoint(x, y);
+            } else if (document.caretPositionFromPoint) {
+                const pos = document.caretPositionFromPoint(x, y);
+                if (pos) {
+                    range = document.createRange();
+                    range.setStart(pos.offsetNode, pos.offset);
+                    range.collapse(true);
+                }
+            }
+            if (!range) return false;
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            return true;
+        }
+        // 让目标元素可编辑并聚焦、定位光标
+        function makeEditableAndFocus(target, x, y) {
+            if (!target || isSelfUI(target)) return false;
+            // 选取最近的可编辑文本块，避免落到非文本容器
+            const block = target.closest('h1,h2,h3,h4,h5,h6,p,span,a,li,td,th,label,figcaption,blockquote,em,strong,b,i,div');
+            const el = block || target;
+            if (isSelfUI(el)) return false;
+            el.setAttribute('contenteditable', 'true');
+            try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); }
+            placeCaretAtPoint(x, y);
+            return true;
+        }
+        function onEditTouchStart(e) {
+            if (!editModeOn) return;
+            const t = e.touches[0];
+            if (t) { lastTouchX = t.clientX; lastTouchY = t.clientY; }
+        }
+        function onEditTouchEnd(e) {
+            if (!editModeOn) return;
+            const t = e.changedTouches[0];
+            if (!t) return;
+            const target = document.elementFromPoint(t.clientX, t.clientY);
+            if (!target || isSelfUI(target)) return;
+            e.preventDefault(); // 阻止默认滚动/选择，确保聚焦与键盘弹出
+            makeEditableAndFocus(target, t.clientX, t.clientY);
+        }
+        function onEditClick(e) {
+            if (!editModeOn) return;
+            if (isSelfUI(e.target)) return;
+            makeEditableAndFocus(e.target, e.clientX, e.clientY);
+        }
+
         editBtn.addEventListener('click', function (e) {
             e.stopPropagation();
             if (editModeOn) {
-                document.body.contentEditable = 'false';
+                // 关闭编辑：还原所有动态设置过的可编辑元素
+                document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+                    el.removeAttribute('contenteditable');
+                });
+                document.body.classList.remove('_hy-editing');
+                document.removeEventListener('touchstart', onEditTouchStart);
+                document.removeEventListener('touchend', onEditTouchEnd);
+                document.removeEventListener('click', onEditClick, true);
                 editModeOn = false;
                 this.innerHTML = icon('edit') + ' 可视化编辑';
                 showToast('已关闭编辑模式');
             } else {
-                document.body.contentEditable = 'true';
-                // 排除脚本自身 UI，保持按钮可交互
-                document.querySelectorAll('[id^="_hy-"]').forEach(el => {
-                    el.contentEditable = 'false';
-                });
+                document.body.classList.add('_hy-editing');
+                document.addEventListener('touchstart', onEditTouchStart, { passive: true });
+                document.addEventListener('touchend', onEditTouchEnd, { passive: false });
+                document.addEventListener('click', onEditClick, true);
                 editModeOn = true;
                 this.innerHTML = icon('lock') + ' 关闭编辑';
-                showToast('编辑模式已开启，点击页面文字即可编辑');
+                showToast(isMobile()
+                    ? '编辑模式已开启，点击页面文字即可编辑'
+                    : '编辑模式已开启，点击页面文字即可编辑');
             }
         });
 
