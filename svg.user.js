@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.9
+// @version      v4.2.10
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -1117,7 +1117,7 @@ transform: translateY(-50%) scale(0.92);
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.9（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.10（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后可直接在网页上编辑文字（移动端双击进入编辑状态）。</p>
@@ -1481,14 +1481,15 @@ transform: translateY(-50%) scale(0.92);
         function fetchSourceCode() {
             if (sourceCodeFetched && sourceCodeEl.textContent) return;
             sourceCodeEl.textContent = '加载中...';
-            setTimeout(() => {
-                try {
-                    sourceCodeEl.textContent = document.documentElement.outerHTML;
+            fetch(location.href, { credentials: 'include' })
+                .then(res => res.text())
+                .then(html => {
+                    sourceCodeEl.textContent = html;
                     sourceCodeFetched = true;
-                } catch (e) {
+                })
+                .catch(() => {
                     sourceCodeEl.textContent = '无法加载源代码。';
-                }
-            }, 100);
+                });
         }
 
         // ============================================================
@@ -1680,21 +1681,25 @@ resourceListEl.addEventListener('click', (e) => {
             }
         });
 
-        // ----- 可视化编辑（修复移动端） -----
+        // ----- 可视化编辑（contentEditable，排除脚本自身 UI） -----
         const editBtn = document.getElementById('_hy-edit-mode-btn');
-        editBtn.addEventListener('click', function () {
-            if (document.designMode === 'on') {
-                document.designMode = 'off';
+        let editModeOn = false;
+        editBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (editModeOn) {
+                document.body.contentEditable = 'false';
+                editModeOn = false;
                 this.innerHTML = icon('edit') + ' 可视化编辑';
                 showToast('已关闭编辑模式');
             } else {
-                document.designMode = 'on';
+                document.body.contentEditable = 'true';
+                // 排除脚本自身 UI，保持按钮可交互
+                document.querySelectorAll('[id^="_hy-"]').forEach(el => {
+                    el.contentEditable = 'false';
+                });
+                editModeOn = true;
                 this.innerHTML = icon('lock') + ' 关闭编辑';
-                showToast('编辑模式已开启，点击页面内容即可编辑');
-                // 移动端：提示双击进入编辑状态
-                if (window.innerWidth < 640) {
-                    showToast('已开启编辑模式，点击页面文字即可编辑');
-                }
+                showToast('编辑模式已开启，点击页面文字即可编辑');
             }
         });
 
