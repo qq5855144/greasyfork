@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.8
+// @version      v4.2.9
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -1117,7 +1117,7 @@ transform: translateY(-50%) scale(0.92);
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.8（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.9（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后可直接在网页上编辑文字（移动端双击进入编辑状态）。</p>
@@ -1451,9 +1451,9 @@ transform: translateY(-50%) scale(0.92);
                     <div class="_hy-resource-meta">${badgeHtml}</div>
                 </div>
                 <div class="_hy-resource-actions">
-    <button class="_hy-download-btn" data-url="${url}">${icon('download')} 下载</button>
-    <button class="_hy-copy-btn" data-url="${url}">${icon('copy')} 复制</button>
-    <button class="_hy-open-btn" data-url="${url}">${icon('external')} 打开</button>
+    <button class="_hy-download-btn" data-url="${url}">下载</button>
+    <button class="_hy-copy-btn" data-url="${url}">复制</button>
+    <button class="_hy-open-btn" data-url="${url}">打开</button>
     </div>
             `;
             resourceListEl.appendChild(item);
@@ -1535,8 +1535,8 @@ transform: translateY(-50%) scale(0.92);
 
             if (target.classList.contains('_hy-copy-btn')) {
                 navigator.clipboard.writeText(url).then(() => {
-                    target.innerHTML = icon('check') + ' 已复制';
-                    setTimeout(() => target.innerHTML = icon('copy') + ' 复制', 1200);
+                    target.innerHTML = '已复制';
+                    setTimeout(() => target.innerHTML = '复制', 1200);
                 });
             } else if (target.classList.contains('_hy-open-btn')) {
                 window.open(url, '_blank');
