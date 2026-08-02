@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.19
+// @version      v4.2.20
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -1349,7 +1349,7 @@ body._hy-editing [contenteditable="true"] {
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.19（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.20（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源，视频缩略图优先使用封面图。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
@@ -1853,6 +1853,33 @@ body._hy-editing [contenteditable="true"] {
         }
 
         // ============================================================
+        //  辅助：安全打开链接（优先使用 GM_openInTab 绕过弹窗拦截）
+        // ============================================================
+        function openUrlInTab(url) {
+            try {
+                if (typeof GM_openInTab === 'function') {
+                    GM_openInTab(url, false);
+                    return;
+                }
+            } catch (_) {}
+            try {
+                if (typeof GM !== 'undefined' && typeof GM.openInTab === 'function') {
+                    GM.openInTab(url, { active: true });
+                    return;
+                }
+            } catch (_) {}
+            // 兜底：通过创建 <a> 标签点击打开，比 window.open 更不容易被拦截
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => document.body.removeChild(a), 100);
+        }
+
+        // ============================================================
         //  事件委托（资源操作）
         // ============================================================
         resourceListEl.addEventListener('click', (e) => {
@@ -1879,7 +1906,7 @@ body._hy-editing [contenteditable="true"] {
                     setTimeout(() => target.innerHTML = '复制', 1200);
                 });
             } else if (target.classList.contains('_hy-open-btn')) {
-                window.open(url, '_blank');
+                openUrlInTab(url);
             }
         });
 
@@ -1973,7 +2000,7 @@ body._hy-editing [contenteditable="true"] {
             // 视频缩略图：直接打开视频，不进入图片画廊
             if (thumb.classList.contains('_hy-thumb-video')) {
                 e.preventDefault();
-                window.open(url, '_blank');
+                openUrlInTab(url);
                 return;
             }
             // 获取当前分类的所有URL
@@ -1994,7 +2021,7 @@ resourceListEl.addEventListener('click', (e) => {
     // googlevideo 等流媒体直链：需要 Referer 头才能访问，用新窗口打开
     // 浏览器从 youtube.com 发起的请求会自带 Referer，新窗口可正常播放/下载
     if (url.includes('googlevideo.com/videoplayback')) {
-        window.open(url, '_blank');
+        openUrlInTab(url);
         return;
     }
     // 创建临时 <a> 元素触发下载
