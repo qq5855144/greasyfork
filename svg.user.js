@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.15
+// @version      v4.2.16
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -62,11 +62,14 @@
                 else if (videoExtSet.has(ext)) type = 'video';
                 else if (audioExtSet.has(ext)) type = 'audio';
             } else {
-                // 无扩展名：检查是否包含图片服务常见关键词
+                // 无扩展名：按域名/路径特征识别流媒体直链
                 const lowerUrl = url.toLowerCase();
-                if (lowerUrl.includes('/image/') || lowerUrl.includes('/img/') || lowerUrl.includes('/photo/') ||
+                if (lowerUrl.includes('googlevideo.com/videoplayback') ||
+                    lowerUrl.includes('/videoplayback') || lowerUrl.includes('/m3u8')) {
+                    type = 'video';
+                } else if (lowerUrl.includes('/image/') || lowerUrl.includes('/img/') || lowerUrl.includes('/photo/') ||
                     lowerUrl.includes('/thumbnail/') || lowerUrl.includes('/thumb/') || lowerUrl.includes('/picture/') ||
-                    lowerUrl.includes('image') || lowerUrl.includes('img') || 
+                    lowerUrl.includes('image') || lowerUrl.includes('img') ||
                     lowerUrl.startsWith('//') && (lowerUrl.includes('.webp') || lowerUrl.includes('.jpg') || lowerUrl.includes('.png'))) {
                     type = 'image';
                 }
@@ -224,6 +227,11 @@
             }
         });
 
+        // 10.5 YouTube 等流媒体：从页面内联脚本数据中提取真实视频流地址
+        // YouTube 使用 MSE + blob: 播放，<video src> 是 blob 无法直接访问
+        // 真实流地址（googlevideo.com/videoplayback）藏在 ytInitialPlayerResponse 等数据中
+        try { extractStreamingVideoUrls(); } catch (e) { /* 忽略 */ }
+
         // 11. CSS background-image（内联样式）
         document.querySelectorAll('[style*="background"]').forEach(el => {
             if (el.closest && el.closest('#_hy-root')) return;
@@ -250,6 +258,42 @@
         new PerformanceObserver(list => list.getEntries().forEach(e => categorizeUrl(e.name)))
             .observe({ entryTypes: ['resource'] });
     } catch (e) { /* 忽略 */ }
+
+    // 从页面内联 <script> 文本中提取流媒体真实视频地址
+    // 覆盖 YouTube(googlevideo) / Bilibili / 通用 .m3u8/.mp4 直链
+    let streamingExtracted = false;
+    function extractStreamingVideoUrls() {
+        if (streamingExtracted) return;
+        const scripts = document.querySelectorAll('script:not([src])');
+        if (!scripts.length) return;
+        // 首次扫描到足够多脚本内容才标记完成，避免 SPA 早期空数据
+        let foundAny = false;
+        // 匹配 googlevideo.com/videoplayback 直链（YouTube 真实视频流）
+        const gvRe = /https?:\/\/[^"'\s]*googlevideo\.com\/videoplayback[^"'\s\\]*/g;
+        // 通用 m3u8 / mp4 直链（带引号边界，减少误报）
+        const m3u8Re = /https?:\\?\/\\?\/[^"'\s\\]*\.m3u8[^"'\s\\]*/g;
+        const mp4Re = /https?:\\?\/\\?\/[^"'\s\\]*\.mp4[^"'\s\\]*/g;
+        const collect = (re, text) => {
+            const matches = text.match(re);
+            if (matches) {
+                matches.forEach(u => {
+                    // 还原转义斜杠
+                    const clean = u.replace(/\\\//g, '/');
+                    if (clean.length > 30) { categorizeUrl(clean); foundAny = true; }
+                });
+            }
+        };
+        let totalLen = 0;
+        scripts.forEach(s => {
+            const t = s.textContent || '';
+            totalLen += t.length;
+            collect(gvRe, t);
+            collect(m3u8Re, t);
+            collect(mp4Re, t);
+        });
+        // YouTube 页面脚本通常 >100KB，足够大才认为已加载完数据
+        if (foundAny && totalLen > 20000) streamingExtracted = true;
+    }
 
     function startDomObserver() {
         if (!document.body) { setTimeout(startDomObserver, 100); return; }
@@ -330,6 +374,7 @@
     //  3. UI — 移动端优先浮动面板 + U形开关
     // ============================================================
     // 等 body 就绪后注入；YouTube 等 SPA 在 document-start 时 body 尚不存在
+    // 部分浏览器（如狐猴）脚本注入时机较晚，readystate 可能已为 complete
     function whenBodyReady(cb) {
         if (document.body) { cb(); return; }
         const timer = setInterval(() => {
@@ -339,7 +384,13 @@
             }
         }, 50);
     }
-    whenBodyReady(injectUI);
+    // 兜底：防止 readystatechange 在脚本加载前就已触发导致错过
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        whenBodyReady(injectUI);
+    } else {
+        document.addEventListener('DOMContentLoaded', () => whenBodyReady(injectUI));
+        window.addEventListener('load', () => { if (!document.getElementById('_hy-root')) whenBodyReady(injectUI); });
+    }
 
     function injectUI() {
         if (document.getElementById('_hy-root')) return;
@@ -1200,7 +1251,7 @@ body._hy-editing [contenteditable="true"] {
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.15（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.16（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源，视频缩略图优先使用封面图。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
