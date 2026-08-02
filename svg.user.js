@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.11
+// @version      v4.2.12
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -1131,7 +1131,7 @@ body._hy-editing [contenteditable="true"] {
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.11（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.12（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
@@ -1549,7 +1549,19 @@ body._hy-editing [contenteditable="true"] {
             if (!url) return;
 
             if (target.classList.contains('_hy-copy-btn')) {
-                navigator.clipboard.writeText(url).then(() => {
+                // 内嵌 SVG：解码 data URL，复制完整 SVG 代码
+                let copyText = url;
+                if (url.startsWith('data:image/svg+xml')) {
+                    const commaIdx = url.indexOf(',');
+                    if (commaIdx > -1) {
+                        try {
+                            copyText = decodeURIComponent(url.substring(commaIdx + 1));
+                        } catch (_) {
+                            copyText = url;
+                        }
+                    }
+                }
+                navigator.clipboard.writeText(copyText).then(() => {
                     target.innerHTML = '已复制';
                     setTimeout(() => target.innerHTML = '复制', 1200);
                 });
