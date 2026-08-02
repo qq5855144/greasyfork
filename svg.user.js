@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.20
+// @version      v4.2.21
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -14,6 +14,40 @@
 
 (function () {
     'use strict';
+
+    // ============================================================
+    //  0. 兼容性辅助
+    // ============================================================
+    // GM_addStyle 兼容：不同油猴管理器 API 不同，失败时手动注入 <style>
+    function addStyleCompat(css) {
+        try {
+            if (typeof GM_addStyle === 'function') {
+                GM_addStyle(css);
+                return;
+            }
+        } catch (_) {}
+        try {
+            if (typeof GM !== 'undefined' && typeof GM.addStyle === 'function') {
+                GM.addStyle(css);
+                return;
+            }
+        } catch (_) {}
+        // 兜底：手动创建 style 标签
+        try {
+            const style = document.createElement('style');
+            style.textContent = css;
+            (document.head || document.documentElement || document.body).appendChild(style);
+        } catch (_) {}
+    }
+
+    // CSS.escape 兼容：旧版浏览器没有该方法，用简单转义兜底
+    if (typeof CSS === 'undefined' || typeof CSS.escape !== 'function') {
+        window.CSS = window.CSS || {};
+        CSS.escape = function (value) {
+            if (value == null) return '';
+            return String(value).replace(/([!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~])/g, '\\$1');
+        };
+    }
 
     // ============================================================
     //  1. 存储层
@@ -336,14 +370,16 @@
     }
 
     // YouTube SPA 导航时重置提取状态，以便新视频能被嗅探
-    if (location.hostname.includes('youtube.com')) {
-        const resetAndExtract = () => {
-            streamingExtracted = false;
-            extractStreamingVideoUrls();
-        };
-        document.addEventListener('yt-navigate-finish', resetAndExtract);
-        document.addEventListener('yt-page-data-updated', resetAndExtract);
-    }
+    try {
+        if (location.hostname && location.hostname.includes('youtube.com')) {
+            const resetAndExtract = () => {
+                streamingExtracted = false;
+                extractStreamingVideoUrls();
+            };
+            document.addEventListener('yt-navigate-finish', resetAndExtract);
+            document.addEventListener('yt-page-data-updated', resetAndExtract);
+        }
+    } catch (_) { /* 忽略 */ }
 
     function startDomObserver() {
         if (!document.body) { setTimeout(startDomObserver, 100); return; }
@@ -381,8 +417,10 @@
         // 当 JS 设置 img.src = url 时，属性变化会触发扫描，足够捕获动态图片。
         // 劫持 Image 会阻断浏览器正常的图片加载流程，导致网页图片不显示。
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startDomObserver);
-    else startDomObserver();
+    try {
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startDomObserver);
+        else startDomObserver();
+    } catch (_) { /* 忽略 */ }
 
     // ============================================================
     //  3. SVG 图标库（所有图标集中定义）
@@ -425,28 +463,57 @@
     // ============================================================
     // 等 body 就绪后注入；YouTube 等 SPA 在 document-start 时 body 尚不存在
     // 部分浏览器（如狐猴）脚本注入时机较晚，readystate 可能已为 complete
-    function whenBodyReady(cb) {
+    function whenBodyReady(cb, timeout) {
         if (document.body) { cb(); return; }
+        let elapsed = 0;
+        const step = 50;
         const timer = setInterval(() => {
+            elapsed += step;
             if (document.body) {
                 clearInterval(timer);
                 cb();
+                return;
             }
-        }, 50);
+            if (timeout && elapsed >= timeout) {
+                clearInterval(timer);
+            }
+        }, step);
     }
+
+    // 安全注入：失败时延迟重试，避免某次执行环境问题导致按钮永远不出现
+    function safeInjectUI() {
+        try {
+            if (document.getElementById('_hy-root')) return;
+            if (!document.body) {
+                whenBodyReady(safeInjectUI, 10000);
+                return;
+            }
+            injectUI();
+        } catch (err) {
+            // 注入失败时最多重试 3 次
+            if (!safeInjectUI.retryCount) safeInjectUI.retryCount = 0;
+            safeInjectUI.retryCount++;
+            if (safeInjectUI.retryCount <= 3) {
+                setTimeout(safeInjectUI, 500);
+            }
+        }
+    }
+
     // 兜底：防止 readystatechange 在脚本加载前就已触发导致错过
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        whenBodyReady(injectUI);
+        safeInjectUI();
     } else {
-        document.addEventListener('DOMContentLoaded', () => whenBodyReady(injectUI));
-        window.addEventListener('load', () => { if (!document.getElementById('_hy-root')) whenBodyReady(injectUI); });
+        document.addEventListener('DOMContentLoaded', safeInjectUI);
+        window.addEventListener('load', () => { if (!document.getElementById('_hy-root')) safeInjectUI(); });
     }
+    // 额外兜底：某些浏览器脚本注入极晚，load 已错过，直接尝试一次
+    setTimeout(() => { if (!document.getElementById('_hy-root')) safeInjectUI(); }, 1000);
 
     function injectUI() {
         if (document.getElementById('_hy-root')) return;
 
         // --- 样式 ---
-        GM_addStyle(`
+        addStyleCompat(`
 /* === 嗅探 - 完整样式 === */
 #_hy-root {
     all: initial;
@@ -1349,7 +1416,7 @@ body._hy-editing [contenteditable="true"] {
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.20（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.21（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源，视频缩略图优先使用封面图。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
@@ -1383,7 +1450,11 @@ body._hy-editing [contenteditable="true"] {
         root.appendChild(btn);
         root.appendChild(panel);
         root.appendChild(gallery);
-        document.body.appendChild(root);
+        if (document.body) {
+            document.body.appendChild(root);
+        } else if (document.documentElement) {
+            document.documentElement.appendChild(root);
+        }
 
         // --- 状态 ---
         let currentTab = 'image';
@@ -1426,19 +1497,23 @@ body._hy-editing [contenteditable="true"] {
 
         // --- SPA（如 YouTube）渲染时可能移除 root，自动重注入 ---
         let reinjectTimer = null;
-        const guardObserver = new MutationObserver(() => {
-            if (!document.getElementById('_hy-root')) {
-                if (reinjectTimer) return;
-                reinjectTimer = setTimeout(() => {
-                    reinjectTimer = null;
-                    if (!document.getElementById('_hy-root') && document.body) {
-                        window._hyUIReady = false;
-                        injectUI();
-                    }
-                }, 300);
+        try {
+            const guardObserver = new MutationObserver(() => {
+                if (!document.getElementById('_hy-root')) {
+                    if (reinjectTimer) return;
+                    reinjectTimer = setTimeout(() => {
+                        reinjectTimer = null;
+                        if (!document.getElementById('_hy-root') && document.body) {
+                            window._hyUIReady = false;
+                            safeInjectUI();
+                        }
+                    }, 300);
+                }
+            });
+            if (document.documentElement) {
+                guardObserver.observe(document.documentElement, { childList: true, subtree: false });
             }
-        });
-        guardObserver.observe(document.documentElement, { childList: true, subtree: false });
+        } catch (_) { /* 忽略 Observer 初始化失败 */ }
 
         // --- 构造标签 ---
         const tabDefs = [
@@ -1828,9 +1903,12 @@ body._hy-editing [contenteditable="true"] {
             setTimeout(() => {
                 try {
                     const title = document.title || '无';
-                    const desc = document.querySelector('meta[name="description"]')?.getAttribute('content')
-                        || document.querySelector('meta[property="og:description"]')?.getAttribute('content') || '无';
-                    const keywords = document.querySelector('meta[name="keywords"]')?.getAttribute('content') || '无';
+                    const descMeta = document.querySelector('meta[name="description"]');
+                    const ogDescMeta = document.querySelector('meta[property="og:description"]');
+                    const desc = (descMeta && descMeta.getAttribute('content'))
+                        || (ogDescMeta && ogDescMeta.getAttribute('content')) || '无';
+                    const keywordsMeta = document.querySelector('meta[name="keywords"]');
+                    const keywords = (keywordsMeta && keywordsMeta.getAttribute('content')) || '无';
                     let otherMeta = '';
                     document.querySelectorAll('meta').forEach(meta => {
                         const name = meta.getAttribute('name') || meta.getAttribute('property') || meta.getAttribute('http-equiv');
@@ -1855,6 +1933,34 @@ body._hy-editing [contenteditable="true"] {
         // ============================================================
         //  辅助：安全打开链接（优先使用 GM_openInTab 绕过弹窗拦截）
         // ============================================================
+        function copyToClipboard(text) {
+            return new Promise((resolve, reject) => {
+                try {
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                        navigator.clipboard.writeText(text).then(resolve).catch(reject);
+                        return;
+                    }
+                } catch (_) {}
+                // 兜底：document.execCommand('copy')
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    ta.style.top = '0';
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (ok) resolve();
+                    else reject(new Error('execCommand copy failed'));
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        }
+
         function openUrlInTab(url) {
             try {
                 if (typeof GM_openInTab === 'function') {
@@ -1901,7 +2007,7 @@ body._hy-editing [contenteditable="true"] {
                         }
                     }
                 }
-                navigator.clipboard.writeText(copyText).then(() => {
+                copyToClipboard(copyText).then(() => {
                     target.innerHTML = '已复制';
                     setTimeout(() => target.innerHTML = '复制', 1200);
                 });
@@ -2041,7 +2147,7 @@ resourceListEl.addEventListener('click', (e) => {
         document.getElementById('_hy-copy-seo-btn').addEventListener('click', function () {
             const text = seoContentEl.innerText || seoContentEl.textContent;
             if (text && text !== '加载中...') {
-                navigator.clipboard.writeText(text).then(() => {
+                copyToClipboard(text).then(() => {
                     this.innerHTML = icon('check') + ' 已复制';
                     setTimeout(() => this.innerHTML = icon('clipboard') + ' 复制SEO信息', 1500);
                 });
@@ -2051,7 +2157,7 @@ resourceListEl.addEventListener('click', (e) => {
         document.getElementById('_hy-copy-source-btn').addEventListener('click', function () {
             const text = sourceCodeEl.textContent;
             if (text && text !== '加载中...' && text !== '无法加载源代码。') {
-                navigator.clipboard.writeText(text).then(() => {
+                copyToClipboard(text).then(() => {
                     this.innerHTML = icon('check') + ' 已复制';
                     setTimeout(() => this.innerHTML = icon('clipboard') + ' 复制源代码', 1500);
                 });
