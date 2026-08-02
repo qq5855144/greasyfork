@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.16
+// @version      v4.2.17
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -21,6 +21,8 @@
     const allResources = { video: [], audio: [], image: [], other: [] };
     // 视频封面图映射：videoUrl -> posterUrl（优先用于缩略图）
     const videoPosters = new Map();
+    // 视频元数据：videoUrl -> { qualityLabel, codec, bitrate, contentLength, type }
+    const videoMeta = new Map();
 
     // ============================================================
     //  2. 嗅探引擎
@@ -259,40 +261,91 @@
             .observe({ entryTypes: ['resource'] });
     } catch (e) { /* 忽略 */ }
 
-    // 从页面内联 <script> 文本中提取流媒体真实视频地址
-    // 覆盖 YouTube(googlevideo) / Bilibili / 通用 .m3u8/.mp4 直链
+    // 从页面内联 <script> 中提取 YouTube 等流媒体真实视频地址
+    // YouTube 使用 MSE + blob: 播放，真实地址在 ytInitialPlayerResponse JSON 中
     let streamingExtracted = false;
     function extractStreamingVideoUrls() {
         if (streamingExtracted) return;
         const scripts = document.querySelectorAll('script:not([src])');
         if (!scripts.length) return;
-        // 首次扫描到足够多脚本内容才标记完成，避免 SPA 早期空数据
-        let foundAny = false;
-        // 匹配 googlevideo.com/videoplayback 直链（YouTube 真实视频流）
+
+        // 1. 解析 YouTube ytInitialPlayerResponse JSON
+        let totalLen = 0, foundAny = false;
+        for (const s of scripts) {
+            const t = s.textContent || '';
+            totalLen += t.length;
+            const m = t.match(/ytInitialPlayerResponse\s*=\s*(\{[\s\S]*?\});/);
+            if (!m) continue;
+            try {
+                const json = JSON.parse(m[1]);
+                const sd = json.streamingData;
+                if (!sd) continue;
+                const formats = [...(sd.formats || []), ...(sd.adaptiveFormats || [])];
+                formats.forEach(f => {
+                    let url = f.url || '';
+                    // 处理 signatureCipher 加密格式
+                    if (!url && f.signatureCipher) {
+                        const params = new URLSearchParams(f.signatureCipher);
+                        url = params.get('url') || '';
+                        const sig = params.get('s') || '';
+                        const sp = params.get('sp') || 'signature';
+                        if (url && sig) url += '&' + sp + '=' + sig;
+                    }
+                    if (!url || url.length < 50) return;
+                    // 提取质量信息
+                    const meta = {};
+                    if (f.qualityLabel) meta.qualityLabel = f.qualityLabel;
+                    if (f.mimeType) {
+                        const codecMatch = f.mimeType.match(/codecs="([^"]+)"/);
+                        if (codecMatch) meta.codec = codecMatch[1];
+                        meta.mime = f.mimeType.split(';')[0];
+                    }
+                    if (f.bitrate) meta.bitrate = f.bitrate;
+                    if (f.contentLength) meta.contentLength = parseInt(f.contentLength, 10);
+                    if (f.width && f.height) meta.resolution = f.width + 'x' + f.height;
+                    if (f.audioQuality) meta.audioQuality = f.audioQuality;
+                    if (Object.keys(meta).length > 0) videoMeta.set(url, meta);
+                    categorizeUrl(url);
+                    foundAny = true;
+                });
+            } catch (e) { /* JSON 解析失败，忽略 */ }
+        }
+
+        // 2. 通用正则兜底：m3u8 / mp4 / googlevideo（非 YouTube 页面或不含 JSON 时）
         const gvRe = /https?:\/\/[^"'\s]*googlevideo\.com\/videoplayback[^"'\s\\]*/g;
-        // 通用 m3u8 / mp4 直链（带引号边界，减少误报）
         const m3u8Re = /https?:\\?\/\\?\/[^"'\s\\]*\.m3u8[^"'\s\\]*/g;
         const mp4Re = /https?:\\?\/\\?\/[^"'\s\\]*\.mp4[^"'\s\\]*/g;
         const collect = (re, text) => {
             const matches = text.match(re);
             if (matches) {
                 matches.forEach(u => {
-                    // 还原转义斜杠
                     const clean = u.replace(/\\\//g, '/');
                     if (clean.length > 30) { categorizeUrl(clean); foundAny = true; }
                 });
             }
         };
-        let totalLen = 0;
         scripts.forEach(s => {
             const t = s.textContent || '';
-            totalLen += t.length;
             collect(gvRe, t);
             collect(m3u8Re, t);
             collect(mp4Re, t);
         });
-        // YouTube 页面脚本通常 >100KB，足够大才认为已加载完数据
+
+        // 脚本数据足够大（>20KB）且找到地址才标记完成
         if (foundAny && totalLen > 20000) streamingExtracted = true;
+    }
+
+    // YouTube SPA 导航时重置提取状态，以便新视频能被嗅探
+    // 监听 title 变化（YouTube 切换视频时 title 会更新）
+    if (location.hostname.includes('youtube.com')) {
+        let lastTitle = document.title;
+        setInterval(() => {
+            if (document.title !== lastTitle) {
+                lastTitle = document.title;
+                streamingExtracted = false;
+                extractStreamingVideoUrls();
+            }
+        }, 1000);
     }
 
     function startDomObserver() {
@@ -763,6 +816,54 @@
     background: rgba(0,245,212,0.1);
     color: #00f5d4;
     border: 1px solid rgba(0,245,212,0.2);
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+    font-weight: 500;
+}
+/* 视频质量徽章 */
+._hy-quality-badge {
+    font-size: 10px;
+    background: rgba(108,99,255,0.15);
+    color: #8b83ff;
+    border: 1px solid rgba(108,99,255,0.25);
+    border-radius: 4px;
+    padding: 1px 6px;
+    white-space: nowrap;
+    font-weight: 600;
+}
+._hy-codec-badge {
+    font-size: 10px;
+    background: rgba(255,255,255,0.04);
+    color: #999;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    padding: 1px 5px;
+    white-space: nowrap;
+}
+._hy-size-badge {
+    font-size: 10px;
+    background: rgba(254,202,87,0.1);
+    color: #feca57;
+    border: 1px solid rgba(254,202,87,0.2);
+    border-radius: 4px;
+    padding: 1px 5px;
+    white-space: nowrap;
+}
+._hy-audio-badge {
+    font-size: 10px;
+    background: rgba(29,209,161,0.1);
+    color: #1dd1a1;
+    border: 1px solid rgba(29,209,161,0.2);
+    border-radius: 4px;
+    padding: 1px 5px;
+    white-space: nowrap;
+}
+._hy-type-badge {
+    font-size: 10px;
+    background: rgba(255,107,107,0.1);
+    color: #ff6b6b;
+    border: 1px solid rgba(255,107,107,0.2);
     border-radius: 4px;
     padding: 1px 6px;
     white-space: nowrap;
@@ -1251,7 +1352,7 @@ body._hy-editing [contenteditable="true"] {
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.16（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.17（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源，视频缩略图优先使用封面图。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
@@ -1575,6 +1676,15 @@ body._hy-editing [contenteditable="true"] {
             resources.forEach(url => addItemToDOM(type, url));
         }
 
+        // 格式化文件大小
+        function formatSize(bytes) {
+            if (!bytes || bytes === 0) return '';
+            if (bytes < 1024) return bytes + 'B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'KB';
+            if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + 'MB';
+            return (bytes / 1073741824).toFixed(1) + 'GB';
+        }
+
         function addItemToDOM(type, url) {
             if (resourceListEl.querySelector(`[data-hy-url="${CSS.escape(url)}"]`)) return;
 
@@ -1586,20 +1696,46 @@ body._hy-editing [contenteditable="true"] {
             const isImg = type === 'image';
             const isVideo = type === 'video';
             const poster = isVideo ? videoPosters.get(url) : null;
+            const meta = isVideo ? videoMeta.get(url) : null;
+
+            // 质量徽章
+            let badgeHtml = '';
+            if (isInlineSvg) badgeHtml += '<span class="_hy-inline-badge">内嵌SVG</span>';
+            if (meta) {
+                const parts = [];
+                if (meta.qualityLabel) parts.push('<span class="_hy-quality-badge">' + meta.qualityLabel + '</span>');
+                if (meta.codec) parts.push('<span class="_hy-codec-badge">' + meta.codec + '</span>');
+                if (meta.contentLength) parts.push('<span class="_hy-size-badge">' + formatSize(meta.contentLength) + '</span>');
+                if (meta.audioQuality) parts.push('<span class="_hy-audio-badge">' + meta.audioQuality.replace('AUDIO_QUALITY_', '') + '</span>');
+                badgeHtml += parts.join(' ');
+            }
+            if (!badgeHtml && isVideo) badgeHtml = '<span class="_hy-type-badge">视频</span>';
+
+            // 紧凑显示 URL：YouTube googlevideo → 仅显示视频 ID + 质量
+            let displayUrl = url;
+            let urlTitle = url;
+            if (isInlineSvg) {
+                displayUrl = url.substring(0, 55) + '\u2026';
+            } else if (meta && url.includes('googlevideo.com')) {
+                try {
+                    const vp = new URL(url);
+                    const id = vp.searchParams.get('id') || vp.searchParams.get('itag') || '';
+                    displayUrl = (meta.qualityLabel || meta.mime || 'YouTube') + (id ? ' ' + id : '');
+                    urlTitle = url;
+                } catch (_) {}
+            }
+
+            // 缩略图
             let thumbHtml = '';
             if (isImg) {
                 thumbHtml = `<img src="${url}" class="_hy-thumb" alt="" loading="lazy">`;
             } else if (isVideo) {
                 if (poster) {
-                    // 有封面图：用 img 显示 poster，叠加播放按钮
                     thumbHtml = `<div class="_hy-thumb _hy-thumb-video" data-video-url="${url}"><img src="${poster}" class="_hy-vthumb-img" alt="" loading="lazy"><span class="_hy-play-overlay">${icon('play')}</span></div>`;
                 } else {
-                    // 无封面图：异步加载首帧
                     thumbHtml = `<div class="_hy-thumb _hy-thumb-video" data-video-url="${url}"><span class="_hy-vthumb-ph">${icon('video')}</span><span class="_hy-play-overlay">${icon('play')}</span></div>`;
                 }
             }
-            const badgeHtml = isInlineSvg ? '<span class="_hy-inline-badge">内嵌SVG</span>' : '';
-            const displayUrl = isInlineSvg ? url.substring(0, 55) + '…' : url;
 
             // 根据类型选图标
             let typeIcon = icon('file');
@@ -1610,7 +1746,7 @@ body._hy-editing [contenteditable="true"] {
             item.innerHTML = `
                 ${thumbHtml}
                 <div class="_hy-resource-info">
-                    <a href="${url}" target="_blank" class="_hy-resource-url" title="${url}">${displayUrl}</a>
+                    <a href="${url}" target="_blank" class="_hy-resource-url" title="${urlTitle}">${displayUrl}</a>
                     <div class="_hy-resource-meta">${badgeHtml}</div>
                 </div>
                 <div class="_hy-resource-actions">
