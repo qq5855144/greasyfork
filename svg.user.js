@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.14
+// @version      v4.2.15
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -329,8 +329,17 @@
     // ============================================================
     //  3. UI — 移动端优先浮动面板 + U形开关
     // ============================================================
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectUI);
-    else injectUI();
+    // 等 body 就绪后注入；YouTube 等 SPA 在 document-start 时 body 尚不存在
+    function whenBodyReady(cb) {
+        if (document.body) { cb(); return; }
+        const timer = setInterval(() => {
+            if (document.body) {
+                clearInterval(timer);
+                cb();
+            }
+        }, 50);
+    }
+    whenBodyReady(injectUI);
 
     function injectUI() {
         if (document.getElementById('_hy-root')) return;
@@ -1191,7 +1200,7 @@ body._hy-editing [contenteditable="true"] {
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.14（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.2.15（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源，视频缩略图优先使用封面图。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
@@ -1265,6 +1274,22 @@ body._hy-editing [contenteditable="true"] {
             }
             updateTabCounts();
         };
+
+        // --- SPA（如 YouTube）渲染时可能移除 root，自动重注入 ---
+        let reinjectTimer = null;
+        const guardObserver = new MutationObserver(() => {
+            if (!document.getElementById('_hy-root')) {
+                if (reinjectTimer) return;
+                reinjectTimer = setTimeout(() => {
+                    reinjectTimer = null;
+                    if (!document.getElementById('_hy-root') && document.body) {
+                        window._hyUIReady = false;
+                        injectUI();
+                    }
+                }, 300);
+            }
+        });
+        guardObserver.observe(document.documentElement, { childList: true, subtree: false });
 
         // --- 构造标签 ---
         const tabDefs = [
