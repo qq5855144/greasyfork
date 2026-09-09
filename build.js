@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * 打包脚本：将模块化源代码打包为单文件 svg.user.js。
- */
 const fs = require("fs");
 const path = require("path");
 
@@ -24,11 +21,12 @@ const sourceFiles = [
     "src/modules/DynamicListener.js",
     "src/modules/Draggable.js",
     "src/modules/PreviewModal.js",
-    "src/modules/MediaPreview.js",
     "src/modules/UIRenderer.js",
+    "src/modules/MediaPreview.js",
     "src/modules/Clipboard.js",
     "src/modules/DOMBuilder.js",
-    "src/modules/App.js"
+    "src/modules/App.js",
+    "src/modules/MediaIntegration.js"
 ];
 
 function readAndProcessFile(filePath) {
@@ -43,7 +41,7 @@ function buildUserScript() {
 // @name         资源嗅探 Pro
 // @namespace    http://tampermonkey.net/
 // @version      v5.0.0
-// @description  图片/视频/音频/SVG 全资源持续嗅探；支持懒加载、fetch/XHR、MSE、HLS/DASH 清单、无限滚动与原生媒体预览。
+// @description  图片/视频/音频/SVG 全资源持续嗅探；支持懒加载、fetch/XHR、MSE、HLS/DASH、无限滚动与原生媒体预览。
 // @author       增强版
 // @match        *://*/*
 // @grant        GM_addStyle
@@ -53,21 +51,16 @@ function buildUserScript() {
 // @grant        GM_xmlhttpRequest
 // @connect      *
 // @require      https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js
-// @icon         data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2218%22%20height%3D%2218%22%20rx%3D%223%22%20fill%3D%22%231dd1a1%22%2F%3E%3Cpath%20d%3D%22M8%2010l8%204-8%204z%22%20fill%3D%22%23fff%22%2F%3E%3C%2Fsvg%3E
 // @license      MIT
 // ==/UserScript==
 
 (function() {
     'use strict';
-
 `;
     const footer = `
     window.addEventListener('load', function() { App.init(); });
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() { App.init(); });
-    } else {
-        App.init();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function() { App.init(); });
+    else App.init();
 })();
 `;
     let allCode = "";
@@ -75,7 +68,7 @@ function buildUserScript() {
         const filePath = path.join(__dirname, file);
         if (!fs.existsSync(filePath)) throw new Error(`源文件不存在: ${file}`);
         const code = readAndProcessFile(filePath);
-        allCode += "\n    // ==================== " + file + " ====================\n";
+        allCode += `\n    // ==================== ${file} ====================\n`;
         allCode += code.split("\n").map(line => "    " + line).join("\n");
     }
     const outputPath = path.join(__dirname, "svg.user.js");
