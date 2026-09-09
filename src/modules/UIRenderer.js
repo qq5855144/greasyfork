@@ -1,165 +1,63 @@
 /**
- * UI 渲染模块
- * 负责渲染图片列表、处理筛选和排序，以及生成图片项的 DOM 结构。
+ * 资源列表 UI：图片 / SVG / 视频 / 音频统一展示。
  */
-
 import { CONFIG } from "../config.js";
 import { Utils } from "../utils/index.js";
 import { Icons } from "../icons.js";
 import { PreviewModal } from "./PreviewModal.js";
+import { Downloader } from "./Downloader.js";
+import { Clipboard } from "./Clipboard.js";
+import { Notification } from "../services/Notification.js";
 
 class UIRendererService {
-    constructor() {
-        this.imageItemCache = new Map(); // 用于存储图片项的完整信息
-    }
+    constructor() { this.imageItemCache = new Map(); }
 
-    /**
-     * 渲染图片列表
-     * @param {Array<Object>} items - 要渲染的图片项数组
-     * @param {Map<string, Object>} imageItemCache - 图片缓存 Map
-     */
     renderImageList(items, imageItemCache) {
-        const svgList = document.getElementById("svgList");
-        if (!svgList) return;
-
-        svgList.innerHTML = ""; // 清空现有列表
-        this.imageItemCache = imageItemCache; // 更新缓存引用
-
-        if (items.length === 0) {
-            svgList.innerHTML = 
-                `<div class="loading" style="text-align: center; padding: 20px; color: #888;">
-                    没有找到任何图片资源
-                </div>`;
-            return;
-        }
-
-        const fragment = document.createDocumentFragment();
-        items.forEach(item => {
-            fragment.appendChild(this.createImageItemElement(item));
-        });
-        svgList.appendChild(fragment);
+        const list=document.getElementById('svgList'); if(!list)return;
+        list.innerHTML=''; this.imageItemCache=imageItemCache;
+        if(!items.length){ list.innerHTML='<div class="loading" style="text-align:center;padding:20px;color:#888;">没有找到资源</div>'; return; }
+        const frag=document.createDocumentFragment(); items.forEach(i=>frag.appendChild(this.createImageItemElement(i))); list.appendChild(frag);
     }
 
-    /**
-     * 创建单个图片项的 DOM 元素
-     * @param {Object} item - 图片信息对象
-     * @returns {HTMLElement} 图片项的 DOM 元素
-     */
-    createImageItemElement(item) {
-        const itemDiv = document.createElement("div");
-        itemDiv.className = "svg-item";
-        itemDiv.dataset.id = item.id;
+    _escape(value){ const d=document.createElement('div'); d.textContent=String(value??''); return d.innerHTML; }
 
-        const checkboxId = `checkbox-${item.id}`;
-        const previewSrc = item.preview || item.url;
-
-        itemDiv.innerHTML = `
-            <div class="item-checkbox">
-                <input type="checkbox" id="${checkboxId}" class="svg-checkbox" data-id="${item.id}">
-                <label for="${checkboxId}"></label>
-            </div>
-            <div class="item-preview" data-id="${item.id}">
-                ${item.format === "svg" && item.svgContent
-                    ? `<div class="svg-content-preview">${Utils.ensureSvgNamespace(item.svgContent)}</div>`
-                    : `<img src="${previewSrc}" alt="${item.name}" loading="lazy">`
-                }
-            </div>
-            <div class="item-info">
-                <div class="info-row">
-                    <span class="info-name" title="${item.originalName || item.name}">${item.name}</span>
-                    <span class="info-format">${String(item.format).toUpperCase()}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-size">${item.width} × ${item.height}</span>
-                    <span class="info-type">${item.type}</span>
-                </div>
-            </div>
-            <div class="item-actions">
-                <button class="action-btn preview-btn" data-id="${item.id}" title="预览">${Icons.eye}</button>
-                <button class="action-btn download-btn" data-id="${item.id}" title="下载">${Icons.download}</button>
-                <button class="action-btn copy-btn" data-id="${item.id}" title="复制链接">${Icons.copy}</button>
-            </div>
-        `;
-
-        // 添加事件监听器
-        itemDiv.querySelector(".item-preview").addEventListener("click", (e) => {
-            const id = e.currentTarget.dataset.id;
-            const item = this.imageItemCache.get(id);
-            if (item) PreviewModal.show(item, Array.from(this.imageItemCache.values()), Array.from(this.imageItemCache.values()).indexOf(item));
-        });
-
-        itemDiv.querySelector(".preview-btn").addEventListener("click", (e) => {
-            const id = e.currentTarget.dataset.id;
-            const item = this.imageItemCache.get(id);
-            if (item) PreviewModal.show(item, Array.from(this.imageItemCache.values()), Array.from(this.imageItemCache.values()).indexOf(item));
-        });
-
-        itemDiv.querySelector(".download-btn").addEventListener("click", (e) => {
-            const id = e.currentTarget.dataset.id;
-            const item = this.imageItemCache.get(id);
-            if (item) Downloader.downloadImage(item, item.originalName, item.originalFormat);
-        });
-
-        itemDiv.querySelector(".copy-btn").addEventListener("click", (e) => {
-            const id = e.currentTarget.dataset.id;
-            const item = this.imageItemCache.get(id);
-            if (item) {
-                // 假设 Clipboard 模块存在并提供 copyUrls 方法
-                // Clipboard.copyUrls([item]);
-                if (CONFIG.features.enableNotifications) Notification.show("复制功能待实现", "info");
-            }
-        });
-
-        return itemDiv;
+    _preview(item){
+        const src=this._escape(item.preview||item.url);
+        if(item.format==='svg' && item.svgContent) return `<div class="svg-content-preview">${Utils.ensureSvgNamespace(item.svgContent)}</div>`;
+        if(item.mediaType==='video') return `<video src="${src}" preload="metadata" muted playsinline controls></video>`;
+        if(item.mediaType==='audio') return `<div style="padding:12px 8px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;font-size:28px;">🎵<audio src="${src}" preload="metadata" controls style="width:100%;max-width:260px"></audio></div>`;
+        return `<img src="${src}" alt="${this._escape(item.name)}" loading="lazy">`;
     }
 
-    /**
-     * 应用筛选和排序
-     * @param {Array<Object>} items - 原始图片项数组
-     * @param {string} searchTerm - 搜索关键词
-     * @param {string} sortBy - 排序方式
-     * @param {string} formatFilter - 格式筛选
-     * @returns {Array<Object>} 筛选和排序后的图片项数组
-     */
-    applyFilterAndSort(items, searchTerm, sortBy, formatFilter) {
-        let filtered = [...items];
+    createImageItemElement(item){
+        const div=document.createElement('div'); div.className='svg-item'; div.dataset.id=item.id;
+        const checkboxId=`checkbox-${item.id}`;
+        div.innerHTML=`
+          <div class="item-checkbox"><input type="checkbox" id="${checkboxId}" class="svg-checkbox" data-id="${item.id}"><label for="${checkboxId}"></label></div>
+          <div class="item-preview" data-id="${item.id}">${this._preview(item)}</div>
+          <div class="item-info"><div class="info-row"><span class="info-name" title="${this._escape(item.originalName||item.name)}">${this._escape(item.name)}</span><span class="info-format">${this._escape(String(item.format).toUpperCase())}</span></div>
+          <div class="info-row"><span class="info-size">${this._escape(String(item.width))} × ${this._escape(String(item.height))}</span><span class="info-type">${this._escape(item.type||item.mediaType||'资源')}</span></div></div>
+          <div class="item-actions"><button class="action-btn preview-btn" data-id="${item.id}" title="预览">${Icons.eye}</button><button class="action-btn download-btn" data-id="${item.id}" title="下载">${Icons.download}</button><button class="action-btn copy-btn" data-id="${item.id}" title="复制链接">${Icons.copy}</button></div>`;
 
-        // 搜索过滤
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            filtered = filtered.filter(item =>
-                (item.originalName || item.name || "").toLowerCase().includes(term) ||
-                (item.url || "").toLowerCase().includes(term)
-            );
+        const getItem=e=>this.imageItemCache.get(e.currentTarget.dataset.id);
+        div.querySelector('.item-preview').addEventListener('click',e=>{const x=getItem(e);if(x)PreviewModal.show(x,Array.from(this.imageItemCache.values()),Array.from(this.imageItemCache.values()).indexOf(x));});
+        div.querySelector('.preview-btn').addEventListener('click',e=>{const x=getItem(e);if(x)PreviewModal.show(x,Array.from(this.imageItemCache.values()),Array.from(this.imageItemCache.values()).indexOf(x));});
+        div.querySelector('.download-btn').addEventListener('click',e=>{const x=getItem(e);if(x)Downloader.downloadImage(x,x.originalName,x.originalFormat);});
+        div.querySelector('.copy-btn').addEventListener('click',e=>{const x=getItem(e);if(x)Clipboard.copyUrls([x]);});
+        return div;
+    }
+
+    applyFilterAndSort(items,searchTerm,sortBy,formatFilter){
+        let filtered=[...items];
+        if(searchTerm){const t=searchTerm.toLowerCase();filtered=filtered.filter(i=>(i.originalName||i.name||'').toLowerCase().includes(t)||(i.url||'').toLowerCase().includes(t)||(i.mediaType||'').toLowerCase().includes(t));}
+        if(formatFilter&&formatFilter!=='all') filtered=filtered.filter(i=>(i.originalFormat||i.format||'').toLowerCase()===formatFilter.toLowerCase());
+        switch(sortBy){
+            case 'name-asc':filtered.sort((a,b)=>(a.originalName||a.name||'').localeCompare(b.originalName||b.name||''));break;
+            case 'name-desc':filtered.sort((a,b)=>(b.originalName||b.name||'').localeCompare(a.originalName||a.name||''));break;
+            case 'format':filtered.sort((a,b)=>(a.format||'').localeCompare(b.format||''));break;
+            case 'type':filtered.sort((a,b)=>(a.mediaType||a.type||'').localeCompare(b.mediaType||b.type||''));break;
         }
-
-        // 格式过滤
-        if (formatFilter && formatFilter !== "all") {
-            filtered = filtered.filter(item =>
-                (item.originalFormat || item.format || "").toLowerCase() === formatFilter.toLowerCase()
-            );
-        }
-
-        // 排序
-        switch (sortBy) {
-            case "name-asc":
-                filtered.sort((a, b) => (a.originalName || a.name).localeCompare(b.originalName || b.name));
-                break;
-            case "name-desc":
-                filtered.sort((a, b) => (b.originalName || b.name).localeCompare(a.originalName || a.name));
-                break;
-            case "format":
-                filtered.sort((a, b) => (a.format || "").localeCompare(b.format || ""));
-                break;
-            case "type":
-                filtered.sort((a, b) => (a.type || "").localeCompare(b.type || ""));
-                break;
-            default:
-                break;
-        }
-
         return filtered;
     }
 }
-
-export const UIRenderer = new UIRendererService();
+export const UIRenderer=new UIRendererService();
