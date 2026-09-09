@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探 Pro
 // @namespace    http://tampermonkey.net/
-// @version      v5.0.0
+// @version      v5.1.0
 // @description  图片/视频/音频/SVG 全资源持续嗅探；支持懒加载、fetch/XHR、MSE、HLS/DASH、无限滚动与原生媒体预览。
 // @author       增强版
 // @match        *://*/*
@@ -15,10 +15,9 @@
 // @license      MIT
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(function(){'use strict';
 
-    // ==================== src/config.js ====================
+    // ===== src/config.js =====
     /** 全局配置 v5.0：图片 + 视频 + 音频持续嗅探 */
     const CONFIG = {
         ui:{buttonSize:36,zIndex:99999,positionOffset:20,panelSafeMargin:'16px',panelMinSize:'380px',fixedFontSize:'11px',touchDelay:300,clickDetectDelay:900,scrollCheckInterval:350},
@@ -44,9 +43,8 @@
         merge(newConfig){Object.assign(this,newConfig)}
     };
     if(typeof module!=='undefined'&&module.exports)module.exports=CONFIG;
-    export { CONFIG };
     
-    // ==================== src/styles.js ====================
+    // ===== src/styles.js =====
     /**
      * 全局样式管理模块
      * 集中管理所有 CSS 样式
@@ -978,7 +976,7 @@
         module.exports = StyleManager;
     }
     
-    // ==================== src/icons.js ====================
+    // ===== src/icons.js =====
     /**
      * 图标系统模块 - 集中管理所有 SVG 图标
      * 提供统一的图标创建和渲染接口
@@ -1309,7 +1307,7 @@
         module.exports = IconSystem;
     }
     
-    // ==================== src/utils/debounce.js ====================
+    // ===== src/utils/debounce.js =====
     /**
      * 防抖函数
      * @param {Function} func - 要执行的函数
@@ -1325,7 +1323,7 @@
         };
     }
     
-    // ==================== src/utils/hash.js ====================
+    // ===== src/utils/hash.js =====
     /**
      * 简单的哈希函数，用于生成内容的签名
      * @param {ArrayBuffer} buffer - 输入的 ArrayBuffer
@@ -1338,7 +1336,7 @@
         return hexHash;
     }
     
-    // ==================== src/utils/url.js ====================
+    // ===== src/utils/url.js =====
     /**
      * URL 处理工具函数
      */
@@ -1359,7 +1357,7 @@
         }
     }
     
-    // ==================== src/utils/index.js ====================
+    // ===== src/utils/index.js =====
     /**
      * 通用工具函数模块
      * 统一导出所有工具函数
@@ -1508,7 +1506,7 @@
         }
     };
     
-    // ==================== src/services/Notification.js ====================
+    // ===== src/services/Notification.js =====
     /**
      * 通知模块
      * 负责在页面上显示临时通知
@@ -1557,7 +1555,7 @@
     
     const Notification = new NotificationService();
     
-    // ==================== src/services/BlobManager.js ====================
+    // ===== src/services/BlobManager.js =====
     /**
      * Blob 管理模块
      * 负责创建和清理 Blob URL
@@ -1621,7 +1619,7 @@
     
     const BlobManager = new BlobManagerService();
     
-    // ==================== src/modules/Deduplication.js ====================
+    // ===== src/modules/Deduplication.js =====
     /**
      * 去重模块
      * 负责图片的去重逻辑，包括 URL 去重和内容签名去重。
@@ -1720,7 +1718,7 @@
     
     const Deduplication = new DeduplicationService();
     
-    // ==================== src/modules/Downloader.js ====================
+    // ===== src/modules/Downloader.js =====
     /**
      * 通用资源下载模块：图片 / SVG / 视频 / 音频。
      * 对 m3u8/mpd 只下载清单文件，不伪装成已经完成的视频文件。
@@ -1781,7 +1779,7 @@
     }
     const Downloader=new DownloaderService();
     
-    // ==================== src/modules/MediaDownloader.js ====================
+    // ===== src/modules/MediaDownloader.js =====
     
     class MediaDownloaderService {
         async download(item) {
@@ -1793,32 +1791,23 @@
     }
     const MediaDownloader = new MediaDownloaderService();
     
-    // ==================== src/modules/ImageCollector.js ====================
-    /** 图片资源采集：DOM、懒加载、srcset、CSS、Resource Timing、动态页面。视频/音频由 MediaCollector 负责。 */
+    // ===== src/modules/ImageCollector.js =====
+    /* 图片采集器：DOM + 懒加载 + srcset + CSS + Resource Timing + 动态页面。视频/音频由 MediaCollector 负责。 */
     
     
     
     
-    class ImageCollectorService {
+    class ImageCollectorService{
      constructor(){this.observer=null;this.po=null;this.lazyAttrs=['data-src','data-original','data-lazy-src','data-srcset','data-url','data-echo','data-lazy','data-full','data-real-src','data-bg','data-bg-url','data-image','data-img','data-load','data-lazyload','data-original-src','data-highres','data-normal','data-small','data-medium','data-large','data-fallback','data-zoom','data-full-src','data-original-url','data-poster'];}
      _ui(e){return!!(e&&e.closest&&e.closest('#_hy-root'))}
-     _norm(u){if(!u||typeof u!=='string')return'';let s=u.trim();if(!s||s===' #'||s.startsWith('data:')||s.startsWith('javascript:'))return'';s=s.replace(/^url\(\s*["']?/i,'').replace(/["']?\s*\)$/,'');try{return new URL(s,location.href).href}catch(_){return''}}
+     _norm(u){if(!u||typeof u!=='string')return'';let s=u.trim();if(!s||s==='#'||s.startsWith('data:')||s.startsWith('javascript:'))return'';s=s.replace(/^url\(\s*["']?/i,'').replace(/["']?\s*\)$/,'');try{return new URL(s,location.href).href}catch(_){return''}}
      _ext(u){try{const x=new URL(u,location.href),a=[x.pathname,x.searchParams.get('filename')||'',x.searchParams.get('file')||'',x.searchParams.get('name')||''];for(const s of a){const m=String(s).match(/\.([a-z0-9]{1,10})(?:$|[?#])/i);if(m)return m[1].toLowerCase()}}catch(_){}return''}
-     _isImage(u,mime='',hint=''){const m=String(mime).toLowerCase();if(m.startsWith('image/'))return true;const e=this._ext(u);if(['jpg','jpeg','png','gif','bmp','webp','avif','svg','svgz','ico','tif','tiff','jxl','heic','heif'].includes(e))return true;const s=(String(u)+' '+hint).toLowerCase();return /(?:^|[/?_-])(image|img|photo|picture|thumbnail|thumb)(?:[/?_-]|$)/.test(s)}
+     _isImage(u,mime='',hint=''){const m=String(mime).toLowerCase();if(m.startsWith('image/'))return true;const e=this._ext(u);if(['jpg','jpeg','png','gif','bmp','webp','avif','svg','svgz','ico','tif','tiff','jxl','heic','heif'].includes(e))return true;const s=(String(u)+' '+hint).toLowerCase();return/(?:^|[/?_-])(image|img|photo|picture|thumbnail|thumb)(?:[/?_-]|$)/.test(s)}
      _name(u,alt){if(alt&&String(alt).trim())return String(alt).trim();try{const x=new URL(u,location.href),q=x.searchParams.get('filename')||x.searchParams.get('file')||x.searchParams.get('name');if(q)return decodeURIComponent(q).replace(/\.[^.]+$/,'');const p=x.pathname.split('/').filter(Boolean).pop();return p?decodeURIComponent(p).replace(/\.[^.]+$/,''):'图片'}catch(_){return'图片'}}
      _push(items,seen,u,el=null,source='dom',mime=''){const full=this._norm(u);if(!full||seen.has(full)||!this._isImage(full,mime,source))return;seen.add(full);const ext=this._ext(full)||(String(mime).match(/image\/([a-z0-9.+-]+)/i)?.[1]||CONFIG.image.defaultImageFormat);const name=this._name(full,el?.alt);items.push({id:Utils.generateUniqueId(),url:full,preview:full,name:Utils.truncateTo4Bytes(name),originalName:name,originalFormat:ext,format:Utils.truncateTo4Bytes(ext),mediaType:'image',type:source,width:el?.naturalWidth||el?.width||'未知',height:el?.naturalHeight||el?.height||'未知',fileSize:'未知',mime:mime||'',source,svgContent:''})}
      _srcset(v){return String(v||'').split(',').map(x=>x.trim().split(/\s+/)[0]).filter(Boolean)}
-     _scan(items,seen){
-      const addAttrs=(el)=>this.lazyAttrs.forEach(a=>{const v=el.getAttribute?.(a);if(!v)return;a.includes('srcset')?this._srcset(v).forEach(u=>this._push(items,seen,u,el,'lazy-srcset')):this._push(items,seen,v,el,'lazy-attr')});
-      document.querySelectorAll('img,picture source').forEach(el=>{if(this._ui(el))return;if(el.currentSrc||el.src)this._push(items,seen,el.currentSrc||el.src,el,'element');if(el.srcset)this._srcset(el.srcset).forEach(u=>this._push(items,seen,u,el,'srcset'));addAttrs(el)});
-      const selector=this.lazyAttrs.map(a=>`[${a}]`).join(',');if(selector)document.querySelectorAll(selector).forEach(el=>{if(!this._ui(el))addAttrs(el)});
-      document.querySelectorAll('link[rel="preload"][as="image"],link[rel="prefetch"][as="image"],link[rel*="icon"]').forEach(el=>{if(el.href)this._push(items,seen,el.href,el,'preload')});
-      document.querySelectorAll('meta[property^="og:image"],meta[name="twitter:image"]').forEach(el=>this._push(items,seen,el.content,el,'meta'));
-      document.querySelectorAll('svg').forEach(svg=>{if(this._ui(svg)||svg.closest('img'))return;try{const content=svg.outerHTML;if(content.length<20)return;const url=BlobManager.createManagedBlobUrl(new Blob([content],{type:'image/svg+xml'}));this._push(items,seen,url,svg,'SVG标签','image/svg+xml');const x=items[items.length-1];if(x){x.svgContent=content;x.preview=url;x.originalFormat='svg';x.format='svg'}}catch(_){}});
-      document.querySelectorAll('[style*="background"],[style*="background-image"]').forEach(el=>{if(this._ui(el))return;const bg=getComputedStyle(el).backgroundImage;const re=/url\(\s*["']?([^"')]+)["']?\s*\)/gi;let m;while((m=re.exec(bg||'')))this._push(items,seen,m[1],el,'background')});
-     }
-     _network(items,seen){try{performance.getEntriesByType('resource').forEach(e=>{if(this._isImage(e.name,'',e.initiatorType))this._push(items,seen,e.name,null,'network')})}catch(_){}
-     }
+     _scan(items,seen){const addAttrs=el=>this.lazyAttrs.forEach(a=>{const v=el.getAttribute?.(a);if(!v)return;a.includes('srcset')?this._srcset(v).forEach(u=>this._push(items,seen,u,el,'lazy-srcset')):this._push(items,seen,v,el,'lazy-attr')});document.querySelectorAll('img,picture source').forEach(el=>{if(this._ui(el))return;if(el.currentSrc||el.src)this._push(items,seen,el.currentSrc||el.src,el,'element');if(el.srcset)this._srcset(el.srcset).forEach(u=>this._push(items,seen,u,el,'srcset'));addAttrs(el)});const selector=this.lazyAttrs.map(a=>`[${a}]`).join(',');if(selector)document.querySelectorAll(selector).forEach(el=>{if(!this._ui(el))addAttrs(el)});document.querySelectorAll('link[rel="preload"][as="image"],link[rel="prefetch"][as="image"],link[rel*="icon"]').forEach(el=>{if(el.href)this._push(items,seen,el.href,el,'preload')});document.querySelectorAll('meta[property^="og:image"],meta[name="twitter:image"]').forEach(el=>this._push(items,seen,el.content,el,'meta'));document.querySelectorAll('svg').forEach(svg=>{if(this._ui(svg)||svg.closest('img'))return;try{const content=svg.outerHTML;if(content.length<20)return;const url=BlobManager.createManagedBlobUrl(new Blob([content],{type:'image/svg+xml'}));this._push(items,seen,url,svg,'SVG标签','image/svg+xml');const x=items[items.length-1];if(x){x.svgContent=content;x.preview=url;x.originalFormat='svg';x.format='svg'}}catch(_){}});document.querySelectorAll('[style*="background"],[style*="background-image"]').forEach(el=>{if(this._ui(el))return;const bg=getComputedStyle(el).backgroundImage;const re=/url\(\s*["']?([^"')]+)["']?\s*\)/gi;let m;while((m=re.exec(bg||'')))this._push(items,seen,m[1],el,'background')})}
+     _network(items,seen){try{performance.getEntriesByType('resource').forEach(e=>{if(this._isImage(e.name,'',e.initiatorType))this._push(items,seen,e.name,null,'network')})}catch(_){} }
      startLiveObserver(){if(this.observer||!document.documentElement)return;try{let timer=null;this.observer=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(()=>this._scanIncremental(),220)});this.observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','srcset','style',...this.lazyAttrs]})}catch(_){} }
      _scanIncremental(){try{const items=[],seen=new Set();this._scan(items,seen);this._network(items,seen)}catch(_){} }
      async collectAllImages(signatureMap){this.startLiveObserver();const items=[],seen=new Set();this._scan(items,seen);this._network(items,seen);return Deduplication.checkAndRemoveDuplicates(items,signatureMap)}
@@ -1830,7 +1819,23 @@
     }
     const ImageCollector=new ImageCollectorService();
     
-    // ==================== src/modules/MediaCollector.js ====================
+    // ===== src/modules/MediaPageHook.js =====
+    /** 页面上下文媒体请求桥：让 userscript 能观察页面自己的 fetch/XHR。 */
+    class MediaPageHookService {
+        constructor(){this.installed=false;this.listener=null;}
+        init(listener){
+            if(this.installed)return;this.installed=true;this.listener=listener;
+            window.addEventListener('message',e=>{const d=e&&e.data;if(d&&d.__RS_PAGE_MEDIA__&&this.listener)this.listener(d)});
+            try{
+                const s=document.createElement('script');
+                s.textContent=`(()=>{if(window.__RS_PAGE_MEDIA_HOOK__)return;window.__RS_PAGE_MEDIA_HOOK__=1;const emit=(url,mime,source)=>{try{if(url)window.postMessage({__RS_PAGE_MEDIA__:1,url:String(url),mime:String(mime||''),source:String(source||'page')},'*')}catch(e){}};const f=window.fetch;if(f){window.fetch=function(){let u='';try{const x=arguments[0];u=typeof x==='string'?x:x&&x.url||''}catch(e){}return f.apply(this,arguments).then(r=>{try{emit(r.url||u,r.headers.get('content-type')||'','fetch')}catch(e){emit(u,'','fetch')}return r})}};const o=XMLHttpRequest.prototype.open,x=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.open=function(m,u){this.__rsPageUrl=u;return o.apply(this,arguments)};XMLHttpRequest.prototype.send=function(){this.addEventListener('loadend',()=>{try{emit(this.responseURL||this.__rsPageUrl,this.getResponseHeader('content-type')||'','xhr')}catch(e){}},{once:true});return x.apply(this,arguments)};})();`;
+                (document.documentElement||document.head||document.body).appendChild(s);s.remove();
+            }catch(_){}
+        }
+    }
+    const MediaPageHook=new MediaPageHookService();
+    
+    // ===== src/modules/MediaCollector.js =====
     /* media collector */
     
     
@@ -1858,7 +1863,7 @@
     }
     const MediaCollector=new MediaCollectorService();
     
-    // ==================== src/modules/DynamicListener.js ====================
+    // ===== src/modules/DynamicListener.js =====
     /**
      * 动态监听模块
      * 增强：滚动不再依赖页面高度变化；同时监听 DOM 动态插入/懒加载属性变化。
@@ -1954,7 +1959,7 @@
     
     const DynamicListener = new DynamicListenerService();
     
-    // ==================== src/modules/Draggable.js ====================
+    // ===== src/modules/Draggable.js =====
     /**
      * 拖拽模块
      * 负责 UI 元素的拖拽功能，支持位置记忆。
@@ -2129,7 +2134,7 @@
     
     const Draggable = new DraggableService();
     
-    // ==================== src/modules/PreviewModal.js ====================
+    // ===== src/modules/PreviewModal.js =====
     /** 统一资源预览：图片 / SVG / 视频 / 音频 */
     
     
@@ -2182,7 +2187,7 @@
     }
     const PreviewModal=new PreviewModalService();
     
-    // ==================== src/modules/UIRenderer.js ====================
+    // ===== src/modules/UIRenderer.js =====
     /**
      * 资源列表 UI：图片 / SVG / 视频 / 音频统一展示。
      */
@@ -2246,7 +2251,7 @@
     }
     const UIRenderer=new UIRendererService();
     
-    // ==================== src/modules/MediaPreview.js ====================
+    // ===== src/modules/MediaPreview.js =====
     
     class MediaPreviewService {
         constructor() { this.overlay = null; }
@@ -2279,7 +2284,7 @@
     }
     const MediaPreview = new MediaPreviewService();
     
-    // ==================== src/modules/Clipboard.js ====================
+    // ===== src/modules/Clipboard.js =====
     /**
      * 剪贴板模块
      * 负责复制图片链接到剪贴板。
@@ -2332,7 +2337,7 @@
     
     const Clipboard = new ClipboardService();
     
-    // ==================== src/modules/DOMBuilder.js ====================
+    // ===== src/modules/DOMBuilder.js =====
     /** DOM 构建模块 */
     
     
@@ -2364,7 +2369,7 @@
     }
     const DOMBuilder=new DOMBuilderService();
     
-    // ==================== src/modules/App.js ====================
+    // ===== src/modules/App.js =====
     /**
      * 主应用模块
      * 负责初始化、协调各个模块，并处理整体逻辑。
@@ -2692,7 +2697,7 @@
     
     const App = new AppService();
     
-    // ==================== src/modules/MediaIntegration.js ====================
+    // ===== src/modules/MediaIntegration.js =====
     /**
      * 媒体功能桥接层。
      * 不重写既有 App/UI 结构，直接把视频/音频资源接入现有列表、筛选、预览和下载流程。
@@ -2785,7 +2790,5 @@
         };
     })();
     
-    window.addEventListener('load', function() { App.init(); });
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function() { App.init(); });
-    else App.init();
+window.addEventListener('load',function(){App.init()});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){App.init()});else App.init();
 })();
