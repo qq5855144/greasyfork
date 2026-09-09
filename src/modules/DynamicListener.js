@@ -19,7 +19,8 @@ class DynamicListenerService {
             'src', 'srcset', 'data-src', 'data-original', 'data-lazy-src', 'data-srcset',
             'data-url', 'data-full', 'data-real-src', 'data-image', 'data-img', 'data-highres',
             'data-original-src', 'style'
-        ];n    }
+        ];
+    }
 
     init(appDetectNewImagesCallback) {
         this.appDetectNewImagesCallback = appDetectNewImagesCallback;
@@ -27,7 +28,6 @@ class DynamicListenerService {
         document.addEventListener("click", this.boundClick, true);
         this.lastScrollHeight = document.documentElement.scrollHeight;
 
-        // 监听无限滚动/虚拟列表：很多网站替换 src，而页面总高度并不会变化。
         try {
             this.mutationObserver = new MutationObserver(mutations => {
                 let relevant = false;
@@ -38,14 +38,11 @@ class DynamicListenerService {
                 if (relevant) this._scheduleDetect(180);
             });
             this.mutationObserver.observe(document.documentElement, {
-                subtree: true,
-                childList: true,
-                attributes: true,
+                subtree: true, childList: true, attributes: true,
                 attributeFilter: this.lazyAttrs
             });
         } catch (_) {}
 
-        // 处理脚本初始化后才开始加载的图片。
         this._scheduleDetect(500);
     }
 
@@ -53,7 +50,8 @@ class DynamicListenerService {
         clearTimeout(this.scanTimer);
         this.scanTimer = setTimeout(async () => {
             if (!this.appDetectNewImagesCallback) return;
-            try { await this.appDetectNewImagesCallback(); } catch (e) { console.warn('动态图片检测失败:', e); }
+            try { await this.appDetectNewImagesCallback(); }
+            catch (e) { console.warn('动态图片检测失败:', e); }
         }, delay);
     }
 
@@ -61,15 +59,17 @@ class DynamicListenerService {
         clearTimeout(this.scrollTimer);
         this.scrollTimer = setTimeout(async () => {
             const currentScrollHeight = document.documentElement.scrollHeight;
-            // 不再要求 scrollHeight 增长：懒加载、虚拟列表经常高度不变。
+            // 关键修复：不再要求 scrollHeight 增长。
+            // 图片懒加载、虚拟列表和轮播组件经常在页面高度不变时替换 src。
             this._scheduleDetect(80);
             this.lastScrollHeight = currentScrollHeight;
         }, Math.min(CONFIG.ui.scrollCheckInterval || 300, 250));
     }
 
     _handleClick(e) {
-        if (e.target.closest("#rainbowFabContainer") || e.target.closest("#svgSnifferModal")) return;
-        const isLoadButton = CONFIG.clickDetection.selectors.some(selector => e.target.closest(selector));
+        const target = e.target && e.target.closest ? e.target : null;
+        if (target && (target.closest("#rainbowFabContainer") || target.closest("#svgSnifferModal"))) return;
+        const isLoadButton = CONFIG.clickDetection.selectors.some(selector => target && target.closest(selector));
         if (isLoadButton && !this.isClickDetecting) {
             this.isClickDetecting = true;
             setTimeout(async () => {
