@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.2.12
+// @version      v4.3.0
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
 // @grant        GM_addStyle
 // @grant        GM_openInTab
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @run-at       document-start
 // @icon         data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23ff6b6b%22%2F%3E%3Cstop%20offset%3D%220.5%22%20stop-color%3D%22%23feca57%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%231dd1a1%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20x%3D%223%22%20y%3D%223%22%20width%3D%2218%22%20height%3D%2218%22%20rx%3D%223%22%20fill%3D%22url(%23g)%22%2F%3E%3Ccircle%20cx%3D%228.5%22%20cy%3D%228.5%22%20r%3D%221.6%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M21%2015l-5-5L7%2019%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M12%2017v-4%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M9.5%2013L12%2010.5L14.5%2013%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E
 // @license      MIT
@@ -19,262 +21,203 @@
     //  1. 存储层
     // ============================================================
     const allResources = { video: [], audio: [], image: [], other: [] };
+    const resourceSets = Object.fromEntries(Object.keys(allResources).map(type => [type, new Set()]));
 
     // ============================================================
     //  2. 嗅探引擎
     // ============================================================
     if (location.protocol === 'chrome:' || location.protocol === 'edge:' || location.hostname === '') return;
+    const imageExtSet = new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico', '.avif', '.tiff', '.tif', '.heic', '.heif', '.apng', '.jxl']);
+    const videoExtSet = new Set(['.mp4', '.flv', '.m3u8', '.avi', '.wmv', '.mov', '.webm', '.mkv', '.ts', '.mpeg', '.mpd']);
+    const audioExtSet = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma', '.opus']);
+    const lazyAttrs = ['data-src', 'data-original', 'data-lazy-src', 'data-srcset', 'data-original-set', 'data-url', 'data-echo', 'data-lazy', 'data-full', 'data-real-src', 'data-bg', 'data-bg-url', 'data-background', 'data-background-image', 'data-image', 'data-img', 'data-load', 'data-lazyload', 'data-original-src', 'data-highres', 'data-normal', 'data-small', 'data-medium', 'data-large', 'data-thumb', 'data-thumbnail'];
+    const observedAttrs = ['src', 'srcset', 'href', 'poster', 'style', 'data', ...lazyAttrs];
+    const srcsetAttrs = new Set(['srcset', 'data-srcset', 'data-original-set']);
 
-    const resourceTypes = {
-        video: new Set(['.mp4', '.flv', '.m3u8', '.avi', '.wmv', '.mov']),
-        audio: new Set(['.mp3', '.wav', '.ogg', '.m4a']),
-        image: new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'])
-    };
-
-    // 常规扩展名检查
-    const imageExtSet = new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico', '.avif', '.tiff', '.tif']);
-    const videoExtSet = new Set(['.mp4', '.flv', '.m3u8', '.avi', '.wmv', '.mov', '.webm', '.mkv', '.ts', '.mpeg']);
-    const audioExtSet = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma']);
-
-    function categorizeUrl(url) {
-        if (!url || typeof url !== 'string') return;
-        // 跳过空字符串、纯数字ID（无法直接访问的资源标记）
-        if (url.trim() === '') return;
-        try {
-            const urlObj = new URL(url);
-            let type = 'other';
-            if (urlObj.protocol === 'data:') {
-                const mime = urlObj.pathname.split(';')[0];
-                if (mime.startsWith('image/')) type = 'image';
-                else if (mime.startsWith('video/')) type = 'video';
-                else if (mime.startsWith('audio/')) type = 'audio';
-                addResource(type, url);
-                return;
-            }
-            // 检查文件扩展名
-            const path = urlObj.pathname;
-            const dotIdx = path.lastIndexOf('.');
-            if (dotIdx !== -1) {
-                const ext = path.substring(dotIdx).toLowerCase().split('?')[0].split('#')[0];
-                if (imageExtSet.has(ext)) type = 'image';
-                else if (videoExtSet.has(ext)) type = 'video';
-                else if (audioExtSet.has(ext)) type = 'audio';
-            } else {
-                // 无扩展名：检查是否包含图片服务常见关键词
-                const lowerUrl = url.toLowerCase();
-                if (lowerUrl.includes('/image/') || lowerUrl.includes('/img/') || lowerUrl.includes('/photo/') ||
-                    lowerUrl.includes('/thumbnail/') || lowerUrl.includes('/thumb/') || lowerUrl.includes('/picture/') ||
-                    lowerUrl.includes('image') || lowerUrl.includes('img') || 
-                    lowerUrl.startsWith('//') && (lowerUrl.includes('.webp') || lowerUrl.includes('.jpg') || lowerUrl.includes('.png'))) {
-                    type = 'image';
-                }
-            }
-            addResource(type, url);
-        } catch (e) { /* 忽略 */ }
+    function absoluteUrl(raw) {
+        if (!raw || typeof raw !== 'string') return '';
+        const value = raw.trim().replace(/^['"]|['"]$/g, '');
+        if (!value || value === '#' || /^(javascript|mailto|tel):/i.test(value)) return '';
+        try { return new URL(value, document.baseURI || location.href).href; } catch (_) { return '' }
     }
 
-    // 智能检查一个URL是否为图片（通过尝试加载）
-    function isImageUrl(url) {
-        if (!url || typeof url !== 'string') return false;
-        // 先通过扩展名快速判断
-        try {
-            const urlObj = new URL(url);
-            const path = urlObj.pathname;
-            const dotIdx = path.lastIndexOf('.');
-            if (dotIdx !== -1) {
-                const ext = path.substring(dotIdx).toLowerCase().split('?')[0].split('#')[0];
-                if (imageExtSet.has(ext)) return true;
-            }
-            // data URL
-            if (url.startsWith('data:image/')) return true;
-            // 包含图片特征但不一定是
-            if (url.startsWith('blob:')) return true;
-        } catch(e) {}
-        return false;
+    function typeFromMime(mime) {
+        mime = String(mime || '').toLowerCase();
+        if (mime.startsWith('image/')) return 'image';
+        if (mime.startsWith('video/') || /mpegurl|dash\+xml/.test(mime)) return 'video';
+        if (mime.startsWith('audio/')) return 'audio';
+        return '';
     }
 
-    function addResource(type, url) {
-        if (!url || allResources[type].includes(url)) return;
+    function addResource(type, rawUrl) {
+        const url = absoluteUrl(rawUrl);
+        if (!url || !allResources[type] || resourceSets[type].has(url)) return;
+        resourceSets[type].add(url);
         allResources[type].push(url);
         if (window._hyUIReady) window._hyAddResourceItem(type, url);
     }
 
-    // 常见懒加载图片属性列表
-    const lazyAttrs = ['data-src', 'data-original', 'data-lazy-src', 'data-srcset', 'data-url', 'data-echo', 'data-lazy', 'data-full', 'data-real-src', 'data-bg', 'data-bg-url', 'data-image', 'data-img', 'data-load', 'data-lazyload', 'data-original-src', 'data-highres', 'data-normal', 'data-small', 'data-medium', 'data-large'];
+    function categorizeUrl(rawUrl, hintType, mime) {
+        const url = absoluteUrl(rawUrl);
+        if (!url) return;
+        let type = typeFromMime(mime) || hintType || 'other';
+        try {
+            const u = new URL(url);
+            if (u.protocol === 'data:') type = typeFromMime(u.pathname.split(';')[0]) || type;
+            if (!hintType && !typeFromMime(mime)) {
+                const match = u.pathname.toLowerCase().match(/\.[a-z0-9]+$/);
+                const ext = match ? match[0] : '';
+                if (imageExtSet.has(ext)) type = 'image';
+                else if (videoExtSet.has(ext)) type = 'video';
+                else if (audioExtSet.has(ext)) type = 'audio';
+                else if (/\/(?:images?|imgs?|photos?|pictures?|thumb(?:nail)?s?)(?:\/|$)/i.test(u.pathname)) type = 'image';
+            }
+            addResource(type, url);
+        } catch (_) { /* 忽略无效地址 */ }
+    }
 
-    function scanDOM() {
-        // 1. 标准标签的 src / srcset
-        ['video', 'audio', 'img', 'image'].forEach(tag => {
-            document.querySelectorAll(tag).forEach(el => {
-                if (el.closest && el.closest('#_hy-root')) return; // 排除脚本自身UI
-                if (el.src) categorizeUrl(el.src);
-                if (el.srcset) {
-                    el.srcset.split(',').forEach(s => {
-                        const url = s.trim().split(' ')[0];
-                        categorizeUrl(url);
-                    });
-                }
-                // 懒加载属性
-                lazyAttrs.forEach(attr => {
-                    const val = el.getAttribute(attr);
-                    if (val) categorizeUrl(val);
-                });
-            });
+    function parseSrcset(value, hintType = 'image') {
+        if (!value) return;
+        // URL 中可含逗号（尤其 data URL），优先使用浏览器解析后的 currentSrc，
+        // 同时兼容常见的“url 1x, url 2x”格式。
+        const candidates = String(value).match(/(?:data:[^\s]+|[^\s,]+)(?:\s+\d+(?:\.\d+)?[wx])?(?=\s*(?:,|$))/gi) || [];
+        candidates.forEach(candidate => {
+            const url = candidate.trim().replace(/\s+(?:\d+(?:\.\d+)?[wx])\s*$/i, '');
+            if (url) categorizeUrl(url, hintType);
         });
+    }
 
-        // 2. 单独扫描所有元素的懒加载属性（用于那些非标准标签或自定义元素）
-        const lazySelector = lazyAttrs.map(a => '[' + a + ']').join(',');
-        if (lazySelector) {
-            document.querySelectorAll(lazySelector).forEach(el => {
-                if (el.closest && el.closest('#_hy-root')) return; // 排除脚本自身UI
-                lazyAttrs.forEach(attr => {
-                    const val = el.getAttribute(attr);
-                    if (val) categorizeUrl(val);
-                });
-            });
+    function extractCssUrls(cssText) {
+        if (!cssText || !/url\s*\(/i.test(cssText)) return;
+        const re = /url\(\s*(['"]?)(.*?)\1\s*\)/gi;
+        let match;
+        while ((match = re.exec(cssText))) {
+            if (match[2] && !match[2].startsWith('#')) categorizeUrl(match[2], 'image');
+        }
+    }
+
+    function scanElement(el) {
+        if (!el || el.nodeType !== 1 || el.closest?.('#_hy-root')) return;
+        const tag = el.localName?.toLowerCase();
+        const mediaHint = tag === 'img' || tag === 'image' || tag === 'picture' ? 'image' :
+            tag === 'video' ? 'video' : tag === 'audio' ? 'audio' : '';
+
+        if (tag === 'img') {
+            categorizeUrl(el.currentSrc || el.src || el.getAttribute('src'), 'image');
+            parseSrcset(el.getAttribute('srcset'));
+        } else if (tag === 'video' || tag === 'audio') {
+            categorizeUrl(el.currentSrc || el.src || el.getAttribute('src'), mediaHint);
+            if (tag === 'video') categorizeUrl(el.poster || el.getAttribute('poster'), 'image');
+        } else if (tag === 'source') {
+            const parentHint = el.parentElement?.localName === 'picture' ? 'image' : el.parentElement?.localName;
+            categorizeUrl(el.src || el.getAttribute('src'), parentHint);
+            parseSrcset(el.getAttribute('srcset'), parentHint || 'image');
+        } else if (tag === 'image') {
+            categorizeUrl(el.href?.baseVal || el.getAttribute('href') || el.getAttribute('xlink:href'), 'image');
+        } else if (tag === 'object' || tag === 'embed') {
+            categorizeUrl(el.data || el.src || el.getAttribute('data') || el.getAttribute('src'), typeFromMime(el.type));
+        } else if (tag === 'link') {
+            const as = el.getAttribute('as');
+            const rel = el.rel || '';
+            if (/icon/i.test(rel) || ['image', 'video', 'audio'].includes(as)) categorizeUrl(el.href, /icon/i.test(rel) ? 'image' : as);
+        } else if (tag === 'meta') {
+            const key = `${el.getAttribute('property') || ''} ${el.name || ''} ${el.getAttribute('itemprop') || ''}`;
+            if (/image|thumbnail|tileimage/i.test(key)) categorizeUrl(el.content, 'image');
+            else if (/video/i.test(key)) categorizeUrl(el.content, 'video');
+            else if (/audio/i.test(key)) categorizeUrl(el.content, 'audio');
         }
 
-        // 3. 内联 SVG
-        document.querySelectorAll('svg').forEach(svg => {
-            if (svg.closest && svg.closest('#_hy-root')) return; // 排除脚本自身UI
-            if (!svg.querySelector('*') && (!svg.textContent || !svg.textContent.trim())) return;
-            if (svg.closest('img')) return;
+        for (const attr of lazyAttrs) {
+            const value = el.getAttribute(attr);
+            if (!value) continue;
+            if (srcsetAttrs.has(attr)) parseSrcset(value, mediaHint || 'image');
+            else if (/bg|background|image|img|thumb|small|medium|large|highres/i.test(attr)) categorizeUrl(value, 'image');
+            else categorizeUrl(value, mediaHint || undefined);
+        }
+        extractCssUrls(el.getAttribute('style'));
+
+        // 内联 SVG 作为完整图片保存；仅处理有内容的根 SVG。
+        if (tag === 'svg' && !el.closest('svg svg')) {
             try {
-                const clone = svg.cloneNode(true);
+                const clone = el.cloneNode(true);
                 if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-                const svgStr = new XMLSerializer().serializeToString(clone);
-                if (svgStr.length < 50) return;
-                addResource('image', 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr));
-            } catch (e) { /* 忽略 */ }
-        });
+                const svg = new XMLSerializer().serializeToString(clone);
+                if (svg.length >= 50) addResource('image', 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+            } catch (_) { /* 忽略 */ }
+        }
+        if (el.shadowRoot) {
+            scanRoot(el.shadowRoot);
+            observeRoot(el.shadowRoot);
+        }
+    }
 
-        // 4. object/embed SVG
-        document.querySelectorAll('object[type="image/svg+xml"], object[data$=".svg"], embed[type="image/svg+xml"], embed[src$=".svg"]').forEach(el => {
-            if (el.closest && el.closest('#_hy-root')) return;
-            const url = el.data || el.src;
-            if (url) categorizeUrl(url);
-        });
+    function scanRoot(root) {
+        if (!root?.querySelectorAll) return;
+        if (root.nodeType === 1) scanElement(root);
+        root.querySelectorAll('img,video,audio,source,image,svg,object,embed,link,meta,[style*="url(" i],' + lazyAttrs.map(a => `[${a}]`).join(','))
+            .forEach(scanElement);
+    }
 
-        // 5. <picture>/<video>/<audio> 中的 <source> 标签
-        document.querySelectorAll('picture source, video source, audio source').forEach(el => {
-            if (el.closest && el.closest('#_hy-root')) return;
-            if (el.src) categorizeUrl(el.src);
-            if (el.srcset) {
-                el.srcset.split(',').forEach(s => {
-                    const url = s.trim().split(' ')[0];
-                    if (url) categorizeUrl(url);
+    // 捕获真正完成加载的响应式/懒加载图片，currentSrc 可得到浏览器最终选择的候选图。
+    document.addEventListener('load', event => scanElement(event.target), true);
+    document.addEventListener('error', event => scanElement(event.target), true);
+
+    function collectPerformanceEntries(entries) {
+        entries.forEach(entry => categorizeUrl(entry.name, entry.initiatorType === 'img' ? 'image' :
+            entry.initiatorType === 'video' ? 'video' : entry.initiatorType === 'audio' ? 'audio' : undefined));
+    }
+    try {
+        collectPerformanceEntries(performance.getEntriesByType('resource'));
+        const po = new PerformanceObserver(list => collectPerformanceEntries(list.getEntries()));
+        try { po.observe({ type: 'resource', buffered: true }); }
+        catch (_) { po.observe({ entryTypes: ['resource'] }); }
+    } catch (_) { /* 忽略 */ }
+
+    // fetch/XHR 可利用 Content-Type 识别无扩展名 CDN 图片及媒体接口。
+    try {
+        const nativeFetch = window.fetch;
+        if (nativeFetch) window.fetch = function (...args) {
+            return nativeFetch.apply(this, args).then(response => {
+                categorizeUrl(response.url || (typeof args[0] === 'string' ? args[0] : args[0]?.url), undefined, response.headers.get('content-type'));
+                return response;
+            });
+        };
+        const nativeOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+            this.__hyResourceUrl = url;
+            this.addEventListener('loadend', () => {
+                let mime = '';
+                try { mime = this.getResponseHeader('content-type') || ''; } catch (_) {}
+                categorizeUrl(this.responseURL || this.__hyResourceUrl, undefined, mime);
+            }, { once: true });
+            return nativeOpen.call(this, method, url, ...rest);
+        };
+    } catch (_) { /* 不影响页面自身请求 */ }
+
+    const observedRoots = new WeakSet();
+    function observeRoot(root) {
+        if (!root || observedRoots.has(root)) return;
+        observedRoots.add(root);
+        const observer = new MutationObserver(mutations => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'attributes') scanElement(mutation.target);
+                else mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1) scanRoot(node);
                 });
             }
-            lazyAttrs.forEach(attr => {
-                const val = el.getAttribute(attr);
-                if (val) categorizeUrl(val);
-            });
         });
-
-        // 6. <video> poster 属性
-        document.querySelectorAll('video[poster]').forEach(el => {
-            if (el.closest && el.closest('#_hy-root')) return;
-            if (el.poster) categorizeUrl(el.poster);
-        });
-
-        // 7. <link rel="preload" / prefetch> — 同时支持 image/video/audio
-        document.querySelectorAll('link[rel="preload"][as="image"], link[rel="preload"][as="video"], link[rel="preload"][as="audio"], link[rel="prefetch"][as="image"], link[rel="prefetch"][as="video"], link[rel="prefetch"][as="audio"]').forEach(el => {
-            if (el.closest && el.closest('#_hy-root')) return;
-            if (el.href) categorizeUrl(el.href);
-        });
-
-        // 8. <link rel="apple-touch-icon"> 等图标
-        document.querySelectorAll('link[rel*="icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-startup-image"], link[rel="manifest"]').forEach(el => {
-            if (el.closest && el.closest('#_hy-root')) return;
-            if (el.href) categorizeUrl(el.href);
-        });
-
-        // 9. <meta property="og:image"> / <meta name="twitter:image"> / og:video / og:audio
-        document.querySelectorAll('meta[property="og:image"], meta[property="og:image:url"], meta[property="og:image:secure_url"], meta[property="og:video"], meta[property="og:video:url"], meta[property="og:video:secure_url"], meta[property="og:audio"], meta[property="og:audio:url"], meta[name="twitter:image"], meta[name="twitter:image:src"], meta[name="twitter:player"], meta[itemprop="image"]').forEach(el => {
-            if (el.closest && el.closest('#_hy-root')) return;
-            if (el.content) categorizeUrl(el.content);
-        });
-
-        // 10. <iframe> 中的视频平台嵌入链接
-        document.querySelectorAll('iframe[src]').forEach(el => {
-            if (el.closest && el.closest('#_hy-root')) return;
-            const src = el.src;
-            if (src) {
-                // YouTube / YouTube Shorts / Bilibili / Vimeo / Dailymotion / Tencent Video / Youku
-                const videoPlatforms = ['youtube.com/embed/', 'youtube.com/watch?v=', 'youtu.be/', 'bilibili.com/', 'player.bilibili.com',
-                    'vimeo.com/', 'dailymotion.com/embed/', 'v.qq.com/', 'v.youku.com/', 'miguvideo.com/'];
-                if (videoPlatforms.some(p => src.includes(p))) {
-                    categorizeUrl(src);
-                }
-            }
-        });
-
-        // 11. CSS background-image（内联样式）
-        document.querySelectorAll('[style*="background"]').forEach(el => {
-            if (el.closest && el.closest('#_hy-root')) return;
-            const s = el.getAttribute('style');
-            if (s) {
-                const matches = s.match(/url\(['"]?([^'")\s]+)['"]?\)/gi);
-                if (matches) {
-                    matches.forEach(m => {
-                        const url = m.replace(/url\(['"]?/, '').replace(/['"]?\)/, '').trim();
-                        if (url && isImageUrl(url)) categorizeUrl(url);
-                    });
-                }
-            }
-        });
-
-        // 12. <meta name="msapplication-TileImage">
-        document.querySelectorAll('meta[name="msapplication-TileImage"]').forEach(el => {
-            if (el.closest && el.closest('#_hy-root')) return;
-            if (el.content) categorizeUrl(el.content);
-        });
+        observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: observedAttrs });
     }
-
-    try {
-        new PerformanceObserver(list => list.getEntries().forEach(e => categorizeUrl(e.name)))
-            .observe({ entryTypes: ['resource'] });
-    } catch (e) { /* 忽略 */ }
 
     function startDomObserver() {
-        if (!document.body) { setTimeout(startDomObserver, 100); return; }
-        scanDOM();
-        // 增强 MutationObserver：同时监听属性变化（尤其是 src 和懒加载属性）
-        const observer = new MutationObserver((mutations) => {
-            let needsScan = false;
-            for (const m of mutations) {
-                if (m.type === 'childList' && m.addedNodes.length > 0) {
-                    needsScan = true;
-                    break;
-                }
-                if (m.type === 'attributes') {
-                    const attr = m.attributeName;
-                    if (attr === 'src' || attr === 'srcset' || attr === 'href' || lazyAttrs.includes(attr) || attr === 'style' || attr === 'data') {
-                        needsScan = true;
-                        break;
-                    }
-                }
-            }
-            if (needsScan) scanDOM();
-        });
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['src', 'srcset', 'href', 'style', 'data', ...lazyAttrs]
-        });
-
-        // 定期扫描（捕获懒加载和动态添加的资源）
-        setInterval(scanDOM, 3000);
-
-        // 注意：无需劫持 Image 构造函数。
-        // MutationObserver 已监听 attributes + attributeFilter:['src']
-        // 当 JS 设置 img.src = url 时，属性变化会触发扫描，足够捕获动态图片。
-        // 劫持 Image 会阻断浏览器正常的图片加载流程，导致网页图片不显示。
+        if (!document.documentElement) { setTimeout(startDomObserver, 50); return; }
+        scanRoot(document);
+        observeRoot(document.documentElement);
+        // 虚拟列表可能复用节点且框架更新方式不触发预期属性事件，低频补扫兜底。
+        setInterval(() => scanRoot(document), 5000);
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startDomObserver);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startDomObserver, { once: true });
     else startDomObserver();
-
     // ============================================================
     //  3. SVG 图标库（所有图标集中定义）
     // ============================================================
@@ -1131,7 +1074,7 @@ body._hy-editing [contenteditable="true"] {
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.2.12（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.3.0（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
@@ -1167,14 +1110,39 @@ body._hy-editing [contenteditable="true"] {
         root.appendChild(gallery);
         document.body.appendChild(root);
 
-        // --- 状态 ---
-        let currentTab = 'image';
+        // --- 状态（跨页面记忆悬浮按钮位置、开合状态和当前标签） ---
+        const UI_STATE_KEY = '_hy_resource_sniffer_ui_v1';
+        function readUiState() {
+            try {
+                const value = typeof GM_getValue === 'function' ? GM_getValue(UI_STATE_KEY, {}) : {};
+                return value && typeof value === 'object' && typeof value.then !== 'function' ? value : {};
+            } catch (_) { return {}; }
+        }
+        const savedUiState = readUiState();
+        const validTabs = new Set(['image', 'video', 'audio', 'other', 'seo', 'source', 'about']);
+        let currentTab = validTabs.has(savedUiState.currentTab) ? savedUiState.currentTab : 'image';
         let sourceCodeFetched = false;
         let seoFetched = false;
-        let isPanelOpen = false;
-        let isBtnExtended = false;
+        let isPanelOpen = savedUiState.panelOpen === true;
+        let isBtnExtended = savedUiState.extended !== false;
         let retractTimer = null;
-        let btnY = 0; // 垂直偏移（px）
+        const btnRange = () => Math.max(0, window.innerHeight / 2 - 50);
+        let btnY = Math.max(-btnRange(), Math.min(btnRange(), Number(savedUiState.btnYRatio || 0) * btnRange()));
+        let saveUiTimer = null;
+        function saveUiState() {
+            clearTimeout(saveUiTimer);
+            saveUiTimer = setTimeout(() => {
+                try {
+                    const range = btnRange();
+                    GM_setValue(UI_STATE_KEY, {
+                        btnYRatio: range ? btnY / range : 0,
+                        panelOpen: isPanelOpen,
+                        extended: isBtnExtended,
+                        currentTab
+                    });
+                } catch (_) { /* 无存储权限时静默降级 */ }
+            }, 100);
+        }
 
         // DOM 引用
         const panelEl = panel;
@@ -1218,7 +1186,7 @@ body._hy-editing [contenteditable="true"] {
         ];
         tabDefs.forEach(t => {
             const el = document.createElement('button');
-            el.className = '_hy-tab' + (t.id === 'image' ? ' active' : '');
+            el.className = '_hy-tab' + (t.id === currentTab ? ' active' : '');
             el.dataset.tab = t.id;
             el.innerHTML = t.label;
             el.addEventListener('click', () => switchTab(t.id));
@@ -1254,6 +1222,7 @@ body._hy-editing [contenteditable="true"] {
             btnEl.classList.add('extend');
             clearTimeout(retractTimer);
             updateBtnIcon();
+            saveUiState();
         }
 
         // 缩回（延迟后）
@@ -1264,6 +1233,7 @@ body._hy-editing [contenteditable="true"] {
                 isBtnExtended = false;
                 btnEl.classList.remove('extend');
                 updateBtnIcon();
+                saveUiState();
             }, delay || 2000);
         }
 
@@ -1281,11 +1251,19 @@ body._hy-editing [contenteditable="true"] {
             if (!isPanelOpen) scheduleRetract(1500);
         });
 
-        // 初始3秒后自动缩回
-        isBtnExtended = true;
-        btnEl.classList.add('extend');
+        // 恢复上次按钮位置及开合状态；首次使用时保持原有的3秒展示。
+        btnEl.style.setProperty('--_hy-btn-offset', `calc(-50% + ${btnY}px)`);
+        btnEl.classList.toggle('extend', isBtnExtended || isPanelOpen);
+        if (isPanelOpen) {
+            panelEl.classList.add('show');
+            overlayEl.classList.add('show');
+            switchTab(currentTab);
+        } else if (savedUiState.extended === undefined) {
+            isBtnExtended = true;
+            btnEl.classList.add('extend');
+            scheduleRetract(3000);
+        }
         updateBtnIcon();
-        scheduleRetract(3000);
 
         // ---- 核心点击逻辑：两步交互（touch专用，防止模拟click绕过） ----
         let _touchActivated = false; // touch已处理，阻止后续模拟click
@@ -1366,6 +1344,7 @@ body._hy-editing [contenteditable="true"] {
                 document.removeEventListener('touchend', endDrag);
                 if (isDragging) {
                     btnEl.addEventListener('click', preventClick, { once: true });
+                    saveUiState();
                 }
                 isDragging = false;
             }
@@ -1375,6 +1354,13 @@ body._hy-editing [contenteditable="true"] {
                 e.preventDefault();
             }
         })();
+
+
+        window.addEventListener('resize', () => {
+            btnY = Math.max(-btnRange(), Math.min(btnRange(), btnY));
+            btnEl.style.setProperty('--_hy-btn-offset', `calc(-50% + ${btnY}px)`);
+            saveUiState();
+        }, { passive: true });
 
         // ============================================================
         //  面板开关
@@ -1386,6 +1372,7 @@ body._hy-editing [contenteditable="true"] {
             extendBtn();
             updateBtnIcon();
             switchTab(currentTab);
+            saveUiState();
         }
 
         function closePanel() {
@@ -1394,6 +1381,7 @@ body._hy-editing [contenteditable="true"] {
             overlayEl.classList.remove('show');
             updateBtnIcon();
             scheduleRetract(2000);
+            saveUiState();
         }
 
         overlayEl.addEventListener('click', closePanel);
@@ -1404,6 +1392,7 @@ body._hy-editing [contenteditable="true"] {
         // ============================================================
         function switchTab(tabId) {
             currentTab = tabId;
+            saveUiState();
             document.querySelectorAll('._hy-tab').forEach(el => {
                 el.classList.toggle('active', el.dataset.tab === tabId);
             });
