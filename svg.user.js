@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探 Pro
 // @namespace    http://tampermonkey.net/
-// @version      v5.1.0
+// @version      v5.1.1
 // @description  图片/视频/音频/SVG 全资源持续嗅探；支持懒加载、fetch/XHR、MSE、HLS/DASH、无限滚动与原生媒体预览。
 // @author       增强版
 // @match        *://*/*
@@ -52,7 +52,6 @@
         merge:function(newConfig){Object.assign(this,newConfig)}
     };
     if(typeof module!=='undefined'&&module.exports)module.exports=CONFIG;
-    
     // ===== src/styles.js =====
     /**
      * 全局样式管理模块
@@ -1111,8 +1110,6 @@
      */
     
     
-    
-    
     const Utils = {
         debounce,
         simpleHash,
@@ -1309,7 +1306,6 @@
      */
     
     
-    
     class BlobManagerService {
         constructor() {
             this.blobUrlMap = new Map();
@@ -1371,8 +1367,6 @@
      * 去重模块
      * 负责图片的去重逻辑，包括 URL 去重和内容签名去重。
      */
-    
-    
     
     
     class DeduplicationService {
@@ -1471,8 +1465,6 @@
      * 对 m3u8/mpd 只下载清单文件，不伪装成已经完成的视频文件。
      */
     
-    
-    
     class DownloaderService {
         constructor(){this._cancelFlag=false;}
         _saveAs(blob,filename){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=filename;a.style.display='none';document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(u);},500);}
@@ -1540,10 +1532,6 @@
     
     // ===== src/modules/ImageCollector.js =====
     /* 图片采集器：DOM + 懒加载 + srcset + CSS + Resource Timing + 动态页面。视频/音频由 MediaCollector 负责。 */
-    
-    
-    
-    
     class ImageCollectorService{
      constructor(){this.observer=null;this.po=null;this.lazyAttrs=['data-src','data-original','data-lazy-src','data-srcset','data-url','data-echo','data-lazy','data-full','data-real-src','data-bg','data-bg-url','data-image','data-img','data-load','data-lazyload','data-original-src','data-highres','data-normal','data-small','data-medium','data-large','data-fallback','data-zoom','data-full-src','data-original-url','data-poster'];}
      _ui(e){return!!(e&&e.closest&&e.closest('#_hy-root'))}
@@ -1584,8 +1572,6 @@
     
     // ===== src/modules/MediaCollector.js =====
     /* media collector */
-    
-    
     class MediaCollectorService{
      constructor(){this.items=new Map();this.installed=false;this.manifestSeen=new Set();this.pendingNotify=null;this.onResource=null;this.mime=new Map([['video/mp4','video'],['video/webm','video'],['video/ogg','video'],['video/quicktime','video'],['video/x-m4v','video'],['video/x-msvideo','video'],['video/mpeg','video'],['video/mp2t','video'],['audio/mpeg','audio'],['audio/mp3','audio'],['audio/mp4','audio'],['audio/aac','audio'],['audio/ogg','audio'],['audio/wav','audio'],['audio/x-wav','audio'],['audio/flac','audio'],['audio/webm','audio'],['application/vnd.apple.mpegurl','video'],['application/x-mpegurl','video'],['application/dash+xml','video']]);}
      init(cb){if(this.installed)return;this.installed=true;this.onResource=cb;MediaPageHook.init(d=>{const t=this._mimeType(d.mime)||this._guessType(d.url);if(t){this._add(d.url,d.mime,t,d.source||'page-hook');if(t==='video'&&this._isManifest(d.mime,d.url)&&d.text)this._parseManifestText(d.text,d.url)}});this._scanDom();this._installPerformanceObserver();this._hookFetchFallback();this._hookXHRFallback();document.addEventListener('loadedmetadata',e=>this._mediaElement(e.target),true);document.addEventListener('play',e=>this._mediaElement(e.target),true);document.addEventListener('canplay',e=>this._mediaElement(e.target),true);document.addEventListener('loadstart',e=>this._mediaElement(e.target),true);try{new MutationObserver(()=>this._scheduleScan()).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','srcset','poster','preload','data-src','data-srcset','data-url','data-video','data-video-src','data-audio','data-audio-src','data-media','data-file']})}catch(_){}this._timer=setInterval(()=>this._scanPerformance(),2000)}
@@ -1884,9 +1870,6 @@
     // ===== src/modules/PreviewModal.js =====
     /** 统一资源预览：图片 / SVG / 视频 / 音频 */
     
-    
-    
-    
     class PreviewModalService {
      constructor(){this.currentItem=null;this.currentIndex=-1;this.imageList=[];this.modal=null;this.escapeHandler=null;this.transform={scale:1,rotate:0,x:0,y:0};this.wheelTimer=null;}
      init(){
@@ -1938,12 +1921,6 @@
     /**
      * 资源列表 UI：图片 / SVG / 视频 / 音频统一展示。
      */
-    
-    
-    
-    
-    
-    
     
     class UIRendererService {
         constructor() { this.imageItemCache = new Map(); }
@@ -2038,7 +2015,6 @@
      */
     
     
-    
     class ClipboardService {
         /**
          * 复制图片 URL 到剪贴板
@@ -2087,8 +2063,6 @@
     // ===== src/modules/DOMBuilder.js =====
     /** DOM 构建模块 */
     
-    
-    
     class DOMBuilderService {
         constructor(){this.modal=null;this.previewModal=null;this.batchProgressOverlay=null;}
         _icon(name){
@@ -2131,18 +2105,6 @@
      * 负责初始化、协调各个模块，并处理整体逻辑。
      */
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    import { DOMBuilder } from "./DOMBuilder.js"; // 假设 DOMBuilder 模块也已重构
     
     class AppService {
         constructor() {
@@ -2459,11 +2421,6 @@
      * 不重写既有 App/UI 结构，直接把视频/音频资源接入现有列表、筛选、预览和下载流程。
      */
     
-    
-    
-    
-    
-    
     (function installMediaIntegration() {
         if (window.__RS_MEDIA_INTEGRATED__) return;
         window.__RS_MEDIA_INTEGRATED__ = true;
@@ -2546,5 +2503,18 @@
         };
     })();
     
-window.addEventListener('load',function(){App.init()});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){App.init()});else App.init();
+(function __rsBoot(){
+    if(window.__RS_APP_BOOTED__)return;
+    window.__RS_APP_BOOTED__=true;
+    try{
+        const result=App.init();
+        if(result&&typeof result.catch==='function')result.catch(function(error){
+            console.error('[资源嗅探 Pro] 初始化失败:',error);
+            window.__RS_APP_BOOTED__=false;
+        });
+    }catch(error){
+        console.error('[资源嗅探 Pro] 初始化异常:',error);
+        window.__RS_APP_BOOTED__=false;
+    }
+})();
 })();
