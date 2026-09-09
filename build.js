@@ -10,11 +10,13 @@ const sourceFiles=[
 ];
 
 function stripModuleSyntax(content){
-    content=content.replace(/^\s*import\s+.*?from\s+['"].*?['"];?\s*$/gm,'');
-    content=content.replace(/^\s*import\s*['"].*?['"];?\s*$/gm,'');
-    content=content.replace(/^\s*export\s+(const|class|function|async function)\s+/gm,'$1 ');
-    content=content.replace(/^\s*export\s*\{[^}]+\};?\s*$/gm,'');
-    return content;
+    return content.split('\n').filter(function(line){
+        if(/^\s*import\s/.test(line))return false;
+        if(/^\s*export\s*\{/.test(line))return false;
+        return true;
+    }).map(function(line){
+        return line.replace(/^\s*export\s+(const|class|function|async function)\s+/,'$1 ');
+    }).join('\n');
 }
 
 function assertSyntax(label,content){
