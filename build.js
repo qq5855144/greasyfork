@@ -67,6 +67,7 @@ function buildUserScript(){
         window.__RS_APP_BOOTED__=false;
     }
 })();
+})();
 `;
 
     let allCode='';
