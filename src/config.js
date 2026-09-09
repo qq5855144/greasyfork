@@ -11,16 +11,25 @@ const CONFIG = {
     blob:{maxBlobUrlCount:100,cleanupNotification:true},
     clickDetection:{selectors:['.load-more','.load-btn','.next-page','.load-more-btn','[data-action="load-more"]','[class*="load"]','[class*="more"]','.pagination-next','.next-btn','.load-additional']},
     fonts:{family:"'Segoe UI','PingFang SC','Microsoft YaHei',Arial,sans-serif",sizes:{xs:'10px',sm:'11px',base:'12px',lg:'13px',xl:'14px'}},
-    animation:{duration:{fast:'.15s',normal:'.25s',slow:'.35s},easing:{ease:'ease',easeIn:'ease-in',easeOut:'ease-out',easeInOut:'ease-in-out',spring:'cubic-bezier(.34,1.56,.64,1)'}},
+    animation:{duration:{'fast':'.15s','normal':'.25s','slow':'.35s'},easing:{'ease':'ease','easeIn':'ease-in','easeOut':'ease-out','easeInOut':'ease-in-out','spring':'cubic-bezier(.34,1.56,.64,1)'}},
     spacing:{xs:'4px',sm:'8px',md:'12px',lg:'16px',xl:'20px',xxl:'24px'},
     radius:{sm:'4px',md:'8px',lg:'12px',xl:'16px',full:'50%'},
     shadow:{sm:'0 2px 4px rgba(0,0,0,.1)',md:'0 4px 8px rgba(0,0,0,.15)',lg:'0 8px 16px rgba(0,0,0,.2)',xl:'0 12px 24px rgba(0,0,0,.25)',inner:'inset 0 0 20px rgba(255,255,255,.08)'},
     notification:{duration:3000,colors:{info:'rgba(52,152,219,.8)',success:'rgba(39,174,96,.8)',warning:'rgba(243,156,18,.8)',error:'rgba(231,76,60,.8)'}},
     storage:{prefix:'imgCollector_',positionKey:'radarPosition',settingsKey:'settings',historyKey:'downloadHistory'},
     features:{enableDragFab:true,enablePreview:true,enableBatchDownload:true,enableDeduplication:true,enableDynamicLoading:true,enableNotifications:true,enableMediaSniffing:true},
-    get(path,defaultValue=undefined){const keys=path.split('.');let value=this;for(const key of keys){value=value?.[key];if(value===undefined)return defaultValue;}return value;},
-    set(path,value){const keys=path.split('.'),lastKey=keys.pop();let obj=this;for(const key of keys){if(!(key in obj))obj[key]={};obj=obj[key];}obj[lastKey]=value;},
-    merge(newConfig){Object.assign(this,newConfig)}
+    get:function(path,defaultValue){
+        if(defaultValue===undefined)defaultValue=undefined;
+        var keys=path.split('.'),value=this;
+        for(var i=0;i<keys.length;i++){value=value&&value[keys[i]];if(value===undefined)return defaultValue;}
+        return value;
+    },
+    set:function(path,value){
+        var keys=path.split('.'),lastKey=keys.pop(),obj=this;
+        for(var i=0;i<keys.length;i++){if(!(keys[i] in obj))obj[keys[i]]={};obj=obj[keys[i]];}
+        obj[lastKey]=value;
+    },
+    merge:function(newConfig){Object.assign(this,newConfig)}
 };
 if(typeof module!=='undefined'&&module.exports)module.exports=CONFIG;
 export { CONFIG };
