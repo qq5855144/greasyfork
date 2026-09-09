@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.3.2
+// @version      v4.3.3
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -70,17 +70,25 @@
             const u = new URL(url);
             const path = decodeURIComponent(u.pathname).toLowerCase();
             if (/googlevideo\.com$/i.test(u.hostname) && /\/videoplayback(?:\/|$)/.test(path)) return true;
-            if (/(?:^|\/)(?:videoplayback|playback|getvideo|getstream|play|stream|streaming|media|video)(?:\/|$)/i.test(path)) return true;
+            // 明确的播放端点可以位于路径中；video/media/play 等歧义词仅在路径末端视为接口，避免把 /video/标题 当作视频。
+            if (/(?:^|\/)(?:videoplayback|playback|getvideo|getstream|streaming)(?:\/|$)/i.test(path)) return true;
+            if (/(?:^|\/)(?:play|stream|media|video)\/?$/i.test(path)) return true;
             const declaredMime = u.searchParams.get('mime') || u.searchParams.get('type') || u.searchParams.get('content-type') || '';
             return /^video\//i.test(declaredMime) || /mpegurl|dash\+xml/i.test(declaredMime);
         } catch (_) { return false }
     }
     function isPlayableVideo(url, mime, trust = '') {
         if (!/^https?:/i.test(url)) return false; // blob/data 不能作为可复用下载地址
+        try {
+            const u = new URL(url);
+            // B 站 /video/... 是内容页路由，不是媒体 CDN；真实资源使用 bilivideo.com 等域名。
+            if (/(?:^|\.)bilibili\.com$/i.test(u.hostname) && /^\/video(?:\/|$)/i.test(u.pathname)) return false;
+        } catch (_) { return false }
         const ext = urlExtension(url);
         if (isLikelyMediaSegment(url, mime)) return false;
         if (videoExtSet.has(ext)) return true;
         const mediaType = String(mime || '').toLowerCase();
+        if (/^(?:text\/html|application\/(?:xhtml\+xml|json)|text\/json)(?:;|$)/.test(mediaType)) return false;
         if (/mpegurl|dash\+xml|^video\/(?!mp2t)/.test(mediaType)) return true;
         if (hasPlayableEndpoint(url)) return true;
         if (!trust) return false;
@@ -1167,7 +1175,7 @@ body._hy-editing [contenteditable="true"] {
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.3.2（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.3.3（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
