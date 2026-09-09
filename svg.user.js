@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.3.0
+// @version      v4.3.1
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -28,27 +28,55 @@
     // ============================================================
     if (location.protocol === 'chrome:' || location.protocol === 'edge:' || location.hostname === '') return;
     const imageExtSet = new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico', '.avif', '.tiff', '.tif', '.heic', '.heif', '.apng', '.jxl']);
-    const videoExtSet = new Set(['.mp4', '.flv', '.m3u8', '.avi', '.wmv', '.mov', '.webm', '.mkv', '.ts', '.mpeg', '.mpd']);
+    // 只将可独立播放的文件或流清单列入视频；ts/m4s 等媒体分片不能单独播放。
+    const videoExtSet = new Set(['.mp4', '.flv', '.m3u8', '.avi', '.wmv', '.mov', '.webm', '.mkv', '.mpeg', '.mpg', '.mpd', '.m4v', '.ogv', '.3gp']);
+    const segmentExtSet = new Set(['.ts', '.m2ts', '.m4s', '.cmfv', '.cmfa', '.isma', '.ismv']);
     const audioExtSet = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma', '.opus']);
     const lazyAttrs = ['data-src', 'data-original', 'data-lazy-src', 'data-srcset', 'data-original-set', 'data-url', 'data-echo', 'data-lazy', 'data-full', 'data-real-src', 'data-bg', 'data-bg-url', 'data-background', 'data-background-image', 'data-image', 'data-img', 'data-load', 'data-lazyload', 'data-original-src', 'data-highres', 'data-normal', 'data-small', 'data-medium', 'data-large', 'data-thumb', 'data-thumbnail'];
     const observedAttrs = ['src', 'srcset', 'href', 'poster', 'style', 'data', ...lazyAttrs];
     const srcsetAttrs = new Set(['srcset', 'data-srcset', 'data-original-set']);
-
     function absoluteUrl(raw) {
         if (!raw || typeof raw !== 'string') return '';
         const value = raw.trim().replace(/^['"]|['"]$/g, '');
         if (!value || value === '#' || /^(javascript|mailto|tel):/i.test(value)) return '';
         try { return new URL(value, document.baseURI || location.href).href; } catch (_) { return '' }
     }
-
+    function urlExtension(url) {
+        try {
+            const match = new URL(url).pathname.toLowerCase().match(/\.[a-z0-9]+$/);
+            return match ? match[0] : '';
+        } catch (_) { return '' }
+    }
     function typeFromMime(mime) {
-        mime = String(mime || '').toLowerCase();
+        mime = String(mime || '').toLowerCase().split(';')[0].trim();
         if (mime.startsWith('image/')) return 'image';
-        if (mime.startsWith('video/') || /mpegurl|dash\+xml/.test(mime)) return 'video';
+        if (/mpegurl|dash\+xml/.test(mime)) return 'video';
+        if (mime.startsWith('video/') && !/mp2t/.test(mime)) return 'video';
         if (mime.startsWith('audio/')) return 'audio';
         return '';
     }
-
+    function isLikelyMediaSegment(url, mime = '') {
+        const ext = urlExtension(url);
+        if (segmentExtSet.has(ext) || /video\/mp2t/i.test(mime)) return true;
+        try {
+            const u = new URL(url);
+            const path = decodeURIComponent(u.pathname).toLowerCase();
+            // 常见 HLS/DASH 分片命名；清单和完整媒体文件不受影响。
+            return /(?:^|[\/_-])(?:seg(?:ment)?|chunk|frag(?:ment)?|part|init)(?:[\/_\-.]|\d)/i.test(path) && !videoExtSet.has(ext);
+        } catch (_) { return false }
+    }
+    function isPlayableVideo(url, mime, trust = '') {
+        if (!/^https?:/i.test(url)) return false; // 排除 blob/data 临时地址
+        const ext = urlExtension(url);
+        if (isLikelyMediaSegment(url, mime)) return false;
+        if (videoExtSet.has(ext)) return true;
+        const mediaType = String(mime || '').toLowerCase();
+        if (/mpegurl|dash\+xml|^video\/(?!mp2t)/.test(mediaType)) return true;
+        if (!trust) return false;
+        // 仅 DOM 播放源或页面媒体元数据中的无后缀地址可信；网络分片请求不直接放行。
+        if (/\.(?:html?|json|js|css|txt|xml|php|aspx?|jsp)$/i.test(ext)) return false;
+        return trust === 'dom' || trust === 'meta';
+    }
     function addResource(type, rawUrl) {
         const url = absoluteUrl(rawUrl);
         if (!url || !allResources[type] || resourceSets[type].has(url)) return;
@@ -56,37 +84,34 @@
         allResources[type].push(url);
         if (window._hyUIReady) window._hyAddResourceItem(type, url);
     }
-
     function categorizeUrl(rawUrl, hintType, mime) {
         const url = absoluteUrl(rawUrl);
         if (!url) return;
-        let type = typeFromMime(mime) || hintType || 'other';
+        const videoTrust = hintType === 'video-dom' ? 'dom' : hintType === 'video-meta' ? 'meta' : '';
+        const normalizedHint = hintType?.replace(/-(?:dom|network|meta)$/, '');
+        let type = typeFromMime(mime) || normalizedHint || 'other';
         try {
             const u = new URL(url);
             if (u.protocol === 'data:') type = typeFromMime(u.pathname.split(';')[0]) || type;
-            if (!hintType && !typeFromMime(mime)) {
-                const match = u.pathname.toLowerCase().match(/\.[a-z0-9]+$/);
-                const ext = match ? match[0] : '';
+            if (!normalizedHint && !typeFromMime(mime)) {
+                const ext = urlExtension(url);
                 if (imageExtSet.has(ext)) type = 'image';
                 else if (videoExtSet.has(ext)) type = 'video';
                 else if (audioExtSet.has(ext)) type = 'audio';
                 else if (/\/(?:images?|imgs?|photos?|pictures?|thumb(?:nail)?s?)(?:\/|$)/i.test(u.pathname)) type = 'image';
             }
+            if (type === 'video' && !isPlayableVideo(url, mime, videoTrust)) return;
             addResource(type, url);
         } catch (_) { /* 忽略无效地址 */ }
     }
-
     function parseSrcset(value, hintType = 'image') {
         if (!value) return;
-        // URL 中可含逗号（尤其 data URL），优先使用浏览器解析后的 currentSrc，
-        // 同时兼容常见的“url 1x, url 2x”格式。
         const candidates = String(value).match(/(?:data:[^\s]+|[^\s,]+)(?:\s+\d+(?:\.\d+)?[wx])?(?=\s*(?:,|$))/gi) || [];
         candidates.forEach(candidate => {
             const url = candidate.trim().replace(/\s+(?:\d+(?:\.\d+)?[wx])\s*$/i, '');
             if (url) categorizeUrl(url, hintType);
         });
     }
-
     function extractCssUrls(cssText) {
         if (!cssText || !/url\s*\(/i.test(cssText)) return;
         const re = /url\(\s*(['"]?)(.*?)\1\s*\)/gi;
@@ -95,13 +120,22 @@
             if (match[2] && !match[2].startsWith('#')) categorizeUrl(match[2], 'image');
         }
     }
-
+    function extractMediaUrlsFromText(text, baseUrl = document.baseURI || location.href) {
+        if (typeof text !== 'string' || text.length > 2_000_000 || !/(?:m3u8|\.mpd|\.mp4|\.webm|\.mkv|\.flv|\.mov)/i.test(text)) return;
+        const decoded = text.replace(/\\u002[fF]/g, '/').replace(/\\\//g, '/').replace(/&amp;/g, '&');
+        const re = /(?:https?:)?\/\/[^\s'"<>\\]+|(?:\.\.\/|\.\/|\/)?[^\s/'"<>\\]+(?:\/[^\s'"<>\\]+)*\.(?:m3u8|mpd|mp4|webm|mkv|flv|mov)(?:\?[^\s'"<>\\]*)?/gi;
+        let match;
+        while ((match = re.exec(decoded))) {
+            let candidate = match[0].replace(/[),;\]}]+$/, '');
+            try { candidate = new URL(candidate, baseUrl).href; } catch (_) { continue; }
+            if (videoExtSet.has(urlExtension(candidate))) categorizeUrl(candidate);
+        }
+    }
     function scanElement(el) {
         if (!el || el.nodeType !== 1 || el.closest?.('#_hy-root')) return;
         const tag = el.localName?.toLowerCase();
         const mediaHint = tag === 'img' || tag === 'image' || tag === 'picture' ? 'image' :
-            tag === 'video' ? 'video' : tag === 'audio' ? 'audio' : '';
-
+            tag === 'video' ? 'video-dom' : tag === 'audio' ? 'audio' : '';
         if (tag === 'img') {
             categorizeUrl(el.currentSrc || el.src || el.getAttribute('src'), 'image');
             parseSrcset(el.getAttribute('srcset'));
@@ -109,7 +143,8 @@
             categorizeUrl(el.currentSrc || el.src || el.getAttribute('src'), mediaHint);
             if (tag === 'video') categorizeUrl(el.poster || el.getAttribute('poster'), 'image');
         } else if (tag === 'source') {
-            const parentHint = el.parentElement?.localName === 'picture' ? 'image' : el.parentElement?.localName;
+            const parentHint = el.parentElement?.localName === 'picture' ? 'image' :
+                el.parentElement?.localName === 'video' ? 'video-dom' : el.parentElement?.localName;
             categorizeUrl(el.src || el.getAttribute('src'), parentHint);
             parseSrcset(el.getAttribute('srcset'), parentHint || 'image');
         } else if (tag === 'image') {
@@ -119,14 +154,15 @@
         } else if (tag === 'link') {
             const as = el.getAttribute('as');
             const rel = el.rel || '';
-            if (/icon/i.test(rel) || ['image', 'video', 'audio'].includes(as)) categorizeUrl(el.href, /icon/i.test(rel) ? 'image' : as);
+            if (/icon/i.test(rel) || ['image', 'video', 'audio'].includes(as)) categorizeUrl(el.href, /icon/i.test(rel) ? 'image' : as === 'video' ? 'video-meta' : as);
         } else if (tag === 'meta') {
             const key = `${el.getAttribute('property') || ''} ${el.name || ''} ${el.getAttribute('itemprop') || ''}`;
             if (/image|thumbnail|tileimage/i.test(key)) categorizeUrl(el.content, 'image');
-            else if (/video/i.test(key)) categorizeUrl(el.content, 'video');
+            else if (/video/i.test(key)) categorizeUrl(el.content, 'video-meta');
             else if (/audio/i.test(key)) categorizeUrl(el.content, 'audio');
+        } else if (tag === 'script' && (!el.src || /json|ld\+json/i.test(el.type || ''))) {
+            extractMediaUrlsFromText(el.textContent || '');
         }
-
         for (const attr of lazyAttrs) {
             const value = el.getAttribute(attr);
             if (!value) continue;
@@ -135,8 +171,6 @@
             else categorizeUrl(value, mediaHint || undefined);
         }
         extractCssUrls(el.getAttribute('style'));
-
-        // 内联 SVG 作为完整图片保存；仅处理有内容的根 SVG。
         if (tag === 'svg' && !el.closest('svg svg')) {
             try {
                 const clone = el.cloneNode(true);
@@ -150,21 +184,17 @@
             observeRoot(el.shadowRoot);
         }
     }
-
     function scanRoot(root) {
         if (!root?.querySelectorAll) return;
         if (root.nodeType === 1) scanElement(root);
-        root.querySelectorAll('img,video,audio,source,image,svg,object,embed,link,meta,[style*="url(" i],' + lazyAttrs.map(a => `[${a}]`).join(','))
+        root.querySelectorAll('img,video,audio,source,image,svg,object,embed,link,meta,script[type*="json" i],[style*="url(" i],' + lazyAttrs.map(a => `[${a}]`).join(','))
             .forEach(scanElement);
     }
-
-    // 捕获真正完成加载的响应式/懒加载图片，currentSrc 可得到浏览器最终选择的候选图。
     document.addEventListener('load', event => scanElement(event.target), true);
     document.addEventListener('error', event => scanElement(event.target), true);
-
     function collectPerformanceEntries(entries) {
         entries.forEach(entry => categorizeUrl(entry.name, entry.initiatorType === 'img' ? 'image' :
-            entry.initiatorType === 'video' ? 'video' : entry.initiatorType === 'audio' ? 'audio' : undefined));
+            entry.initiatorType === 'video' ? 'video-network' : entry.initiatorType === 'audio' ? 'audio' : undefined));
     }
     try {
         collectPerformanceEntries(performance.getEntriesByType('resource'));
@@ -173,12 +203,20 @@
         catch (_) { po.observe({ entryTypes: ['resource'] }); }
     } catch (_) { /* 忽略 */ }
 
-    // fetch/XHR 可利用 Content-Type 识别无扩展名 CDN 图片及媒体接口。
+    // 响应头识别无扩展名媒体；JSON/脚本响应中只提取具有明确媒体后缀的真实地址。
     try {
+        const inspectResponseText = (response, mime) => {
+            if (!/(?:json|javascript|text\/plain)/i.test(mime || '')) return;
+            const size = Number(response.headers?.get?.('content-length') || 0);
+            if (size > 2_000_000) return;
+            response.clone().text().then(text => extractMediaUrlsFromText(text, response.url)).catch(() => {});
+        };
         const nativeFetch = window.fetch;
         if (nativeFetch) window.fetch = function (...args) {
             return nativeFetch.apply(this, args).then(response => {
-                categorizeUrl(response.url || (typeof args[0] === 'string' ? args[0] : args[0]?.url), undefined, response.headers.get('content-type'));
+                const mime = response.headers.get('content-type') || '';
+                categorizeUrl(response.url || (typeof args[0] === 'string' ? args[0] : args[0]?.url), undefined, mime);
+                inspectResponseText(response, mime);
                 return response;
             });
         };
@@ -189,11 +227,23 @@
                 let mime = '';
                 try { mime = this.getResponseHeader('content-type') || ''; } catch (_) {}
                 categorizeUrl(this.responseURL || this.__hyResourceUrl, undefined, mime);
+                try {
+                    if (/(?:json|javascript|text\/plain)/i.test(mime) && (!this.responseType || this.responseType === 'text') && this.responseText.length <= 2_000_000) {
+                        extractMediaUrlsFromText(this.responseText, this.responseURL || this.__hyResourceUrl);
+                    }
+                } catch (_) {}
             }, { once: true });
             return nativeOpen.call(this, method, url, ...rest);
         };
+        const nativeJsonParse = JSON.parse;
+        JSON.parse = function (text, reviver) {
+            const result = nativeJsonParse.call(this, text, reviver);
+            if (typeof text === 'string' && text.length <= 2_000_000 && /(?:m3u8|\.mpd|\.mp4|\.webm)/i.test(text)) {
+                queueMicrotask(() => extractMediaUrlsFromText(text));
+            }
+            return result;
+        };
     } catch (_) { /* 不影响页面自身请求 */ }
-
     const observedRoots = new WeakSet();
     function observeRoot(root) {
         if (!root || observedRoots.has(root)) return;
