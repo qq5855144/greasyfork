@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         资源嗅探
 // @namespace    http://tampermonkey.net/
-// @version      v4.3.1
+// @version      v4.3.2
 // @description  自动嗅探网页图片/视频/音频/SVG资源，含源码查看、可视化编辑、SEO检测。移动端适配。
 // @author       增强版
 // @match        *://*/*
@@ -65,17 +65,28 @@
             return /(?:^|[\/_-])(?:seg(?:ment)?|chunk|frag(?:ment)?|part|init)(?:[\/_\-.]|\d)/i.test(path) && !videoExtSet.has(ext);
         } catch (_) { return false }
     }
+    function hasPlayableEndpoint(url) {
+        try {
+            const u = new URL(url);
+            const path = decodeURIComponent(u.pathname).toLowerCase();
+            if (/googlevideo\.com$/i.test(u.hostname) && /\/videoplayback(?:\/|$)/.test(path)) return true;
+            if (/(?:^|\/)(?:videoplayback|playback|getvideo|getstream|play|stream|streaming|media|video)(?:\/|$)/i.test(path)) return true;
+            const declaredMime = u.searchParams.get('mime') || u.searchParams.get('type') || u.searchParams.get('content-type') || '';
+            return /^video\//i.test(declaredMime) || /mpegurl|dash\+xml/i.test(declaredMime);
+        } catch (_) { return false }
+    }
     function isPlayableVideo(url, mime, trust = '') {
-        if (!/^https?:/i.test(url)) return false; // 排除 blob/data 临时地址
+        if (!/^https?:/i.test(url)) return false; // blob/data 不能作为可复用下载地址
         const ext = urlExtension(url);
         if (isLikelyMediaSegment(url, mime)) return false;
         if (videoExtSet.has(ext)) return true;
         const mediaType = String(mime || '').toLowerCase();
         if (/mpegurl|dash\+xml|^video\/(?!mp2t)/.test(mediaType)) return true;
+        if (hasPlayableEndpoint(url)) return true;
         if (!trust) return false;
-        // 仅 DOM 播放源或页面媒体元数据中的无后缀地址可信；网络分片请求不直接放行。
         if (/\.(?:html?|json|js|css|txt|xml|php|aspx?|jsp)$/i.test(ext)) return false;
-        return trust === 'dom' || trust === 'meta';
+        // DOM、媒体元数据及结构化播放器数据中的无后缀地址具有明确播放语义。
+        return trust === 'dom' || trust === 'meta' || trust === 'structured';
     }
     function addResource(type, rawUrl) {
         const url = absoluteUrl(rawUrl);
@@ -87,8 +98,8 @@
     function categorizeUrl(rawUrl, hintType, mime) {
         const url = absoluteUrl(rawUrl);
         if (!url) return;
-        const videoTrust = hintType === 'video-dom' ? 'dom' : hintType === 'video-meta' ? 'meta' : '';
-        const normalizedHint = hintType?.replace(/-(?:dom|network|meta)$/, '');
+        const videoTrust = hintType === 'video-dom' ? 'dom' : hintType === 'video-meta' ? 'meta' : hintType === 'video-structured' ? 'structured' : '';
+        const normalizedHint = hintType?.replace(/-(?:dom|network|meta|structured)$/, '');
         let type = typeFromMime(mime) || normalizedHint || 'other';
         try {
             const u = new URL(url);
@@ -121,15 +132,44 @@
         }
     }
     function extractMediaUrlsFromText(text, baseUrl = document.baseURI || location.href) {
-        if (typeof text !== 'string' || text.length > 2_000_000 || !/(?:m3u8|\.mpd|\.mp4|\.webm|\.mkv|\.flv|\.mov)/i.test(text)) return;
-        const decoded = text.replace(/\\u002[fF]/g, '/').replace(/\\\//g, '/').replace(/&amp;/g, '&');
+        if (typeof text !== 'string' || text.length > 2_000_000 || !/(?:m3u8|\.mpd|\.mp4|\.webm|\.mkv|\.flv|\.mov|videoplayback|playback|stream(?:ing)?|[?&](?:mime|type)=video)/i.test(text)) return;
+        const decoded = text.replace(/\\u002[fF]/g, '/').replace(/\\u0026/gi, '&').replace(/\\u003[dD]/g, '=').replace(/\\\//g, '/').replace(/&amp;/g, '&');
         const re = /(?:https?:)?\/\/[^\s'"<>\\]+|(?:\.\.\/|\.\/|\/)?[^\s/'"<>\\]+(?:\/[^\s'"<>\\]+)*\.(?:m3u8|mpd|mp4|webm|mkv|flv|mov)(?:\?[^\s'"<>\\]*)?/gi;
         let match;
         while ((match = re.exec(decoded))) {
             let candidate = match[0].replace(/[),;\]}]+$/, '');
             try { candidate = new URL(candidate, baseUrl).href; } catch (_) { continue; }
-            if (videoExtSet.has(urlExtension(candidate))) categorizeUrl(candidate);
+            if (videoExtSet.has(urlExtension(candidate)) || hasPlayableEndpoint(candidate)) categorizeUrl(candidate, 'video-structured');
         }
+    }
+    function extractStructuredMedia(root, baseUrl = document.baseURI || location.href) {
+        if (!root || typeof root !== 'object') return;
+        const seen = new WeakSet();
+        let visited = 0;
+        const walk = (value, depth) => {
+            if (!value || typeof value !== 'object' || depth > 10 || visited++ > 10000 || seen.has(value)) return;
+            seen.add(value);
+            if (Array.isArray(value)) { value.forEach(item => walk(item, depth + 1)); return; }
+            const mime = String(value.mimeType || value.contentType || value.mime || '').toLowerCase();
+            for (const [key, item] of Object.entries(value)) {
+                if (typeof item === 'string' && /^(?:url|src|file|play_?url|playback_?url|video_?url|stream_?url|manifest_?url|hls_?url|dash_?url)$/i.test(key)) {
+                    let candidate = item;
+                    try { candidate = new URL(candidate, baseUrl).href; } catch (_) { continue; }
+                    const strongVideoKey = /^(?:play_?url|playback_?url|video_?url|stream_?url|manifest_?url|hls_?url|dash_?url)$/i.test(key);
+                    if (/^audio\//.test(mime)) categorizeUrl(candidate, 'audio', mime);
+                    else if (strongVideoKey || /^video\/|mpegurl|dash\+xml/.test(mime) || videoExtSet.has(urlExtension(candidate)) || hasPlayableEndpoint(candidate)) {
+                        categorizeUrl(candidate, 'video-structured', mime);
+                    }
+                } else if (key === 'signatureCipher' && typeof item === 'string') {
+                    const params = new URLSearchParams(item);
+                    // 带 s 的地址仍需播放器算法解密，不能作为“可播放资源”展示。
+                    if (!params.get('s') && params.get('url')) {
+                        categorizeUrl(params.get('url'), /^audio\//.test(mime) ? 'audio' : 'video-structured', mime);
+                    }
+                } else if (item && typeof item === 'object') walk(item, depth + 1);
+            }
+        };
+        walk(root, 0);
     }
     function scanElement(el) {
         if (!el || el.nodeType !== 1 || el.closest?.('#_hy-root')) return;
@@ -238,8 +278,11 @@
         const nativeJsonParse = JSON.parse;
         JSON.parse = function (text, reviver) {
             const result = nativeJsonParse.call(this, text, reviver);
-            if (typeof text === 'string' && text.length <= 2_000_000 && /(?:m3u8|\.mpd|\.mp4|\.webm)/i.test(text)) {
-                queueMicrotask(() => extractMediaUrlsFromText(text));
+            if (typeof text === 'string' && text.length <= 2_000_000) {
+                queueMicrotask(() => {
+                    extractMediaUrlsFromText(text);
+                    extractStructuredMedia(result);
+                });
             }
             return result;
         };
@@ -1124,7 +1167,7 @@ body._hy-editing [contenteditable="true"] {
                 </div>
                 <div id="_hy-about" style="display:none;">
                     <h4>${icon('info')} 功能介绍</h4>
-                    <p><strong>版本：</strong>v4.3.0（油猴移动版）</p>
+                    <p><strong>版本：</strong>v4.3.2（油猴移动版）</p>
                     <p><strong>智能嗅探：</strong>全自动嗅探网页图片、音视频、内嵌SVG资源。</p>
                     <p><strong>源码查看：</strong>一键查看并复制网页完整源代码。</p>
                     <p><strong>可视化编辑：</strong>开启后点击页面文字即可编辑（支持移动端触摸）。</p>
