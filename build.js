@@ -19,11 +19,9 @@ function stripModuleSyntax(content){
 
 function assertSyntax(label,content){
     try{
-        // 仅做语法解析，不执行用户脚本。
         new Function(content);
     }catch(error){
-        const line=error&&error.loc&&error.loc.line?` line ${error.loc.line}`:'';
-        throw new Error(`语法检查失败: ${label}${line}: ${error.message}`);
+        throw new Error(`语法检查失败: ${label}: ${error.message}`);
     }
 }
 
@@ -54,7 +52,23 @@ function buildUserScript(){
 
 (function(){'use strict';\n`;
 
-    const footer=`\nwindow.addEventListener('load',function(){App.init()});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){App.init()});else App.init();\n})();\n`;
+    const footer=`
+(function __rsBoot(){
+    if(window.__RS_APP_BOOTED__)return;
+    window.__RS_APP_BOOTED__=true;
+    try{
+        const result=App.init();
+        if(result&&typeof result.catch==='function')result.catch(function(error){
+            console.error('[资源嗅探 Pro] 初始化失败:',error);
+            window.__RS_APP_BOOTED__=false;
+        });
+    }catch(error){
+        console.error('[资源嗅探 Pro] 初始化异常:',error);
+        window.__RS_APP_BOOTED__=false;
+    }
+})();
+`;
+
     let allCode='';
     for(const file of sourceFiles){
         const filePath=path.join(__dirname,file);
