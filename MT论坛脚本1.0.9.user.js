@@ -241,6 +241,7 @@ function autoPage(){ if(!on('autoPage'))return; if(window.__autoPage)return;
 // ========== 导读自动下一页 ==========
 function guideNext(){ if(!on('guideNext'))return; if(!/mod=guide/.test(location.href))return; if(window.__guideNext)return; window.__guideNext=1;
   var LIST='.comiis_forumlist',ITEM='li.forumlist_li',DIST=900,st={page:1,loading:false,ended:false};
+  try{ var cp=new URLSearchParams(location.search).get('page'); cp=parseInt(cp||'1',10); if(isFinite(cp)&&cp>0)st.page=cp; }catch(e){}
   function curList(){return document.querySelector(LIST);}
   function curView(){try{return new URLSearchParams(location.search).get('view')||'newthread';}catch(e){return 'newthread';}}
   function nextPageUrl(){ return 'https://bbs.binmt.cc/forum.php?mod=guide&view='+curView()+'&page='+(st.page+1); }
@@ -287,9 +288,10 @@ function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; 
     try{var q=new URLSearchParams(location.search); if(q.get('tid'))return q.get('tid');}catch(e){} return ''; }
   function hasLocked(){ var s=document.querySelectorAll('.comiis_quote,.locked,div.locked,.t_f,.postmessage,.comiis_postli');
     for(var i=0;i<s.length;i++){ var t=s[i].textContent||''; if(/查看本帖隐藏内容请回复|回复本帖即可查看/.test(t))return true; } return false; }
-  function lockedPids(){ var o={}; var ns=document.querySelectorAll('.comiis_quote');
+  function lockedPids(){ var o={}; var ns=document.querySelectorAll('.comiis_quote,.locked,div.locked,.t_f,.postmessage,.comiis_postli');
     for(var i=0;i<ns.length;i++){ var t=ns[i].textContent||''; if(!/查看本帖隐藏内容请回复|回复本帖即可查看/.test(t))continue;
-      var el=ns[i]; for(var j=0;j<12&&el;j++){ var id=el.id||''; if(/^(pid|post_)\d+$/.test(id)){ var p=id.replace(/\D/g,''); if(p)o[p]=1; break; } el=el.parentElement; } }
+      var el=ns[i]; for(var j=0;j<12&&el;j++){ var id=el.id||''; if(/^(pid|post_)\d+$/.test(id)){ var p=id.replace(/\D/g,''); if(p)o[p]=1; break; } el=el.parentElement; }
+    }
     return Object.keys(o); }
   function hasMine(u){ if(!u)return false; var cs=document.querySelectorAll('div[id^="pid"],div[id^="post_"],div.comiis_postli');
     for(var i=0;i<cs.length;i++){ var c=cs[i]; if(!c.querySelector)continue; var aa=c.querySelector('a[href*="space-uid-"],a[href*="uid="]');
