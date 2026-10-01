@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         MT论坛移动端网页版增强
 // @namespace    https://bbs.binmt.cc/
-// @version      1.0.9
-// @description  在侧边栏注入 9项功能独立开关 
+// @version      1.0.10
+// @description  在侧边栏注入 9项功能独立开关
 // @match        https://bbs.binmt.cc/*
 // @match        http://bbs.binmt.cc/*
 // @connect      img.binmt.cc
@@ -91,6 +91,45 @@ function GET(u,cb){
   try{ if(typeof GM_xmlhttpRequest==='function'){ GM_xmlhttpRequest({method:'GET',url:u,onload:function(r){cb(r.status,r.responseText);},onerror:function(){cb(0,'');}}); return; } }catch(e){}
   fetch(u,{credentials:'include'}).then(function(r){return r.text();}).then(function(t){cb(200,t);}).catch(function(){cb(0,'');});
 }
+function matchesSel(el,sel){
+  if(!el||el.nodeType!==1)return false;
+  var fn=el.matches||el.webkitMatchesSelector||el.msMatchesSelector;
+  if(!fn)return false;
+  try{ return !!fn.call(el,sel); }catch(e){ return false; }
+}
+function pushRoot(list,node){
+  if(!node)return;
+  if(node===document)node=document.body||document.documentElement;
+  if(node&&node.nodeType===3)node=node.parentNode;
+  if(!node||node.nodeType!==1)return;
+  for(var i=list.length-1;i>=0;i--){
+    var cur=list[i];
+    if(cur===node||(cur.contains&&cur.contains(node)))return;
+    if(node.contains&&node.contains(cur))list.splice(i,1);
+  }
+  list.push(node);
+}
+function collectMutationRoots(muts){
+  var out=[];
+  for(var i=0;i<muts.length;i++){
+    var mt=muts[i];
+    if(mt.target)pushRoot(out,mt.target);
+    var adds=mt.addedNodes||[];
+    for(var j=0;j<adds.length;j++)pushRoot(out,adds[j]);
+  }
+  if(!out.length)pushRoot(out,document.body||document.documentElement);
+  return out;
+}
+function collectScoped(root,selector){
+  var out=[],base=root===document?(document.body||document.documentElement):root;
+  if(base&&base.nodeType===3)base=base.parentNode;
+  if(!base||base.nodeType!==1)return out;
+  if(matchesSel(base,selector))pushRoot(out,base);
+  var nodes=[];
+  try{ nodes=base.querySelectorAll(selector); }catch(e){ nodes=[]; }
+  for(var i=0;i<nodes.length;i++)pushRoot(out,nodes[i]);
+  return out;
+}
 
 // ========== URL 超链接 ==========
 function cleanUrl(raw){ if(!raw)return null; var s=String(raw)
@@ -105,7 +144,7 @@ function urlInjectStyle(){ if(document.getElementById('mt-url-style'))return;
 function makeClickable(root){
   try{ var box=root||document;
     var sel='a[href],.blockcode,pre,code,.postmessage,.comiis_postmessage,.message,.t_f,.plc,#postlist,.comiis_pcontent,.comiis_box,.article,.content,body';
-    var nodes=box.querySelectorAll(sel); var list=[]; for(var i=0;i<nodes.length;i++)list.push(nodes[i]);
+    var list=collectScoped(box,sel);
     if(!list.length&&document.body)list=[document.body];
     var re=/(^|[^a-z0-9])(h[\s\S]{0,3}?t[\s\S]{0,3}?t[\s\S]{0,3}?p[\s\S]{0,3}?s?[\s\S]{0,3}?[：:]\/\/[^\s"'<>()（）【】\[\]]+)/gi;
     for(var k=0;k<list.length;k++){ var c=list[k]; if(!c)continue;
@@ -113,6 +152,7 @@ function makeClickable(root){
       var it=document.createTreeWalker(c,4,null); var texts=[],node;
       while((node=it.nextNode())){ var p=node.parentNode; if(!p)continue;
         if(p.nodeName==='SCRIPT'||p.nodeName==='STYLE'||p.nodeName==='TEXTAREA')continue;
+        if(p.closest&&p.closest('a'))continue;
         if(p.getAttribute&&p.getAttribute('data-mt-url')==='1')continue;
         if(p.classList&&p.classList.contains('mt-url-local'))continue;
         var nv=node.nodeValue||''; if(nv.indexOf('http')<0&&nv.indexOf('ht')<0)continue;
@@ -130,7 +170,10 @@ function makeClickable(root){
 }
 function urlLink(){ if(!on('urlLink'))return; if(window.__urlDone)return; window.__urlDone=true;
   urlInjectStyle(); makeClickable(document);
-  var mo=new MutationObserver(function(){ clearTimeout(window.__urlT); window.__urlT=setTimeout(function(){makeClickable(document);},500); });
+  var pend=[];
+  function flush(){ window.__urlT=0; var roots=pend.slice(); pend.length=0; for(var i=0;i<roots.length;i++)makeClickable(roots[i]); }
+  function queue(root){ pushRoot(pend,root); clearTimeout(window.__urlT); window.__urlT=setTimeout(flush,180); }
+  var mo=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)queue(roots[i]); });
   mo.observe(document.documentElement,{childList:true,subtree:true}); }
 
 // ========== 代码复制按钮 ==========
@@ -150,13 +193,13 @@ function getCodeText(el){ var clone=el.cloneNode(true);
   var s=''; try{s=clone.textContent||'';}catch(e){}
   s=s.replace(/\u00a0/g,' ');
   return s.split('\n').filter(function(L){var x=L.replace(/\s/g,'');return !/^(本帖隐藏的内容|隐藏的内容|回复可见|回复后可见|登录后可见|登录可见|购买后可见|以下内容需要回复才能看到)[:：]?$/.test(x);}).join('\n'); }
-function collectBlocks(){ var picked=[];
+function collectBlocks(root){ var picked=[];
   function push(b){ if(!b||!b.nodeName)return; if(b.nodeName==='SCRIPT'||b.nodeName==='STYLE')return;
     if(b.getAttribute&&b.getAttribute('data-mt-copy')==='1')return;
     if(b.nodeName==='BLOCKQUOTE'||(b.closest&&b.closest('blockquote')))return;
     for(var k=0;k<picked.length;k++){ if(picked[k]!==b&&(picked[k].contains(b)||b.contains(picked[k])))return; } picked.push(b); }
   var sel='pre,.blockcode,.comiis_blockcode,.comiis_code,.codeblock';
-  var blocks=document.querySelectorAll(sel);
+  var blocks=collectScoped(root||document,sel);
   for(var i=0;i<blocks.length;i++){ var b=blocks[i];
     if(b.nodeName==='CODE'){ var pp=b.parentNode,hp=false; while(pp&&pp!==document.body){if(pp.nodeName==='PRE'){hp=true;break;}pp=pp.parentNode;} if(hp)continue; } push(b); }
   var inner=[]; for(var a=0;a<picked.length;a++){ var o=picked[a],hi=false;
@@ -169,10 +212,13 @@ function makeButtonFor(block){ if(block.getAttribute('data-mt-copy')==='1')retur
     var ok=copyText(getCodeText(block)); btn.textContent=ok?'已复制':'复制失败'; btn.style.background=ok?'#43a047':'#e53935';
     setTimeout(function(){btn.textContent='复制';btn.style.background='#1e88e5';},1500); };
   bar.appendChild(btn); if(block.parentNode)block.parentNode.insertBefore(bar,block); }
-function addCopyButtons(){ try{ var p=collectBlocks(); for(var n=0;n<p.length;n++)makeButtonFor(p[n]); }catch(e){} }
+function addCopyButtons(root){ try{ var p=collectBlocks(root); for(var n=0;n<p.length;n++)makeButtonFor(p[n]); }catch(e){} }
 function copyCode(){ if(!on('copyCode'))return; if(window.__copyDone)return; window.__copyDone=true;
-  copyInjectStyle(); addCopyButtons();
-  var mo=new MutationObserver(function(){ clearTimeout(window.__copyT); window.__copyT=setTimeout(addCopyButtons,500); });
+  copyInjectStyle(); addCopyButtons(document);
+  var pend=[];
+  function flush(){ window.__copyT=0; var roots=pend.slice(); pend.length=0; for(var i=0;i<roots.length;i++)addCopyButtons(roots[i]); }
+  function queue(root){ pushRoot(pend,root); clearTimeout(window.__copyT); window.__copyT=setTimeout(flush,180); }
+  var mo=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)queue(roots[i]); });
   mo.observe(document.documentElement,{childList:true,subtree:true}); }
 
 // ========== 自动上下页 ==========
@@ -319,30 +365,47 @@ function hideOnly(){ if(!on('hideOnly'))return; if(window.__hideOnly)return;
     while(p&&p!==document.body&&d++<10){ var tag=p.tagName||'',c=typeof p.className==='string'?p.className:'',id=p.id||'';
       if(/^(LI|TR|TBODY|ARTICLE)$/.test(tag)&&(/(?:^|[ _-])(?:forumlist_li|thread|topic|post)(?:[ _-]|$)/i.test(c)||/^normalthread_/i.test(id)))return p;
       if(!fb&&/^(LI|TR|ARTICLE)$/.test(tag))fb=p; p=p.parentElement; } return fb||n.parentElement; }
-  function scan(){ var links=document.querySelectorAll('a[href*="thread-"],a[href*="mod=viewthread"]');
+  function scan(root){ var links=collectScoped(root||document,'a[href*="thread-"],a[href*="mod=viewthread"]');
     for(var i=0;i<links.length;i++){ var n=links[i],c=itemOf(n);
       if(!c||c===document.body||c===document.documentElement||c.getAttribute('data-mt-hide-filtered'))continue;
       var u=n.href; if(!u)continue; c.setAttribute('data-mt-hide-filtered','checking'); c.style.display=''; mark(c,'检测中'); Q.push({c:c,u:u}); } pump(); }
-  window.__hideScan=scan; scan();
-  setTimeout(scan,500); setTimeout(scan,1500);
-  if(!window.__hoObs){ window.__hoObs=new MutationObserver(function(){scan();}); window.__hoObs.observe(document.documentElement,{childList:true,subtree:true}); }
+  var pend=[];
+  function flush(){ window.__hoT=0; var roots=pend.slice(); pend.length=0; for(var i=0;i<roots.length;i++)scan(roots[i]); }
+  function queue(root){ pushRoot(pend,root); clearTimeout(window.__hoT); window.__hoT=setTimeout(flush,180); }
+  window.__hideScan=function(root){ queue(root||document.body||document.documentElement); };
+  scan(document);
+  setTimeout(function(){ queue(document.body||document.documentElement); },500);
+  setTimeout(function(){ queue(document.body||document.documentElement); },1500);
+  if(!window.__hoObs){ window.__hoObs=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)queue(roots[i]); }); window.__hoObs.observe(document.documentElement,{childList:true,subtree:true}); }
 }
 
 // ========== 个人小黑屋屏蔽 ==========
 function personalBlack(){ if(!on('personalBlack'))return; if(window.__pBlack)return; window.__pBlack=true;
   var KEY='personalBlackList',TKEY='mtThreadOwner';
+  var ITEM_SEL='.comiis_forumlist .forumlist_li, .comiis_postlist .comiis_postli, #threadlist .forumlist_li, li.normalthread_, li.forumlist_li, li.comiis_postli';
   function readOwners(){ try{var v=localStorage.getItem(TKEY);if(!v)return{};var o=JSON.parse(v);if(!o||typeof o!=='object'||Object.prototype.toString.call(o)==='[object Array]')return{};return o;}catch(e){return{};} }
   function writeOwners(o){ try{localStorage.setItem(TKEY,JSON.stringify(o));}catch(e){} }
+  function itemOf(n){ var p=n&&n.nodeType===1?n:(n&&n.parentNode); while(p&&p!==document.body){ if(matchesSel(p,ITEM_SEL))return p; p=p.parentElement; } return null; }
+  function collectItems(root){
+    var out=[],base=root===document?(document.body||document.documentElement):root;
+    if(base&&base.nodeType===3)base=base.parentNode;
+    if(!base||base.nodeType!==1)return out;
+    var cur=itemOf(base); if(cur)pushRoot(out,cur);
+    var nodes=collectScoped(base,ITEM_SEL);
+    for(var i=0;i<nodes.length;i++)pushRoot(out,nodes[i]);
+    return out;
+  }
   function threadIdOf(it){ var as=it.querySelectorAll('a[href*="thread-"]'); for(var i=0;i<as.length;i++){var h=as[i].getAttribute('href')||'';var m=h.match(/thread-(\d+)/);if(m)return m[1];}return null; }
   function threadIdsIn(it){ var out=[],as=it.querySelectorAll('a[href*="thread-"]'); for(var i=0;i<as.length;i++){var h=as[i].getAttribute('href')||'';var m=h.match(/thread-(\d+)/);if(m&&out.indexOf(m[1])<0)out.push(m[1]);}return out; }
-  function uidOf(a){ if(!a)return null; var h=a.getAttribute('href')||''; var m=h.match(/uid=(\d+)/); if(m)return m[1]; var t=a.getAttribute('data-uid'); if(t)return String(t); return null; }
+  function uidOf(a){ if(!a)return null; var h=a.getAttribute('href')||''; var m=h.match(/uid=(\d+)/)||h.match(/space-uid-(\d+)/); if(m)return m[1]; var t=a.getAttribute('data-uid'); if(t)return String(t); return null; }
   function authorAnchor(item){ var u=item.querySelector('a.top_user'); if(u&&uidOf(u))return u;
     var ls=item.querySelectorAll('a[href*="uid="],a[href*="mod=space"]'); var fb=null;
     for(var i=0;i<ls.length;i++){ var a=ls[i]; if(!uidOf(a))continue; var t=(a.textContent||'').trim(); if(t)return a; if(!fb)fb=a; } return fb; }
-  function recordOwners(){ var items=document.querySelectorAll('li.forumlist_li, li.comiis_postli, li.normalthread_, .comiis_forumlist li');
-    var o=null; for(var i=0;i<items.length;i++){ var it=items[i]; var tid=threadIdOf(it); if(!tid)continue;
+  function recordOwners(root){ var items=collectItems(root||document),o=null,dirty=false;
+    for(var i=0;i<items.length;i++){ var it=items[i]; var tid=threadIdOf(it); if(!tid)continue;
       var a=authorAnchor(it); if(!a)continue; var u=uidOf(a); if(!u||u==='0')continue;
-      if(o===null)o=readOwners(); if(o[tid]!==u){o[tid]=u;} } if(o!==null)writeOwners(o); }
+      if(o===null)o=readOwners(); if(o[tid]!==u){o[tid]=u; dirty=true;} }
+    if(o!==null&&dirty)writeOwners(o); }
   function readList(){ var raw=null; try{ raw=localStorage.getItem(KEY); }catch(e){}
     if(!raw) return [];
     var arr=null; try{ arr=JSON.parse(raw); }catch(e2){ return []; }
@@ -387,22 +450,26 @@ function personalBlack(){ if(!on('personalBlack'))return; if(window.__pBlack)ret
       if(cb)cb(SRV); };
     xhr.onerror=function(){ SRV.error='网络错误'; if(cb)cb(SRV); }; xhr.send(); }catch(e){ SRV.error='请求异常:'+e; if(cb)cb(SRV); } }
   function ensureServerList(){ try{ var _ts=localStorage.getItem(TSKEY), _has=localStorage.getItem(SKEY);
-      if(!_has||!_ts||(Date.now()-Number(_ts))>604800000){ if(!window.__mtFetching){ window.__mtFetching=1; fetchServer(function(){ window.__mtFetching=0; }); } } }catch(e){} }
+      if(!_has||!_ts||(Date.now()-Number(_ts))>604800000){ if(!window.__mtFetching){ window.__mtFetching=1; fetchServer(function(){ window.__mtFetching=0; schedule(document.body||document.documentElement); }); } } }catch(e){} }
   function serverUidSet(){ var s={}; try{var v=localStorage.getItem(SKEY);
     if(v){var a=JSON.parse(v); if(a&&Object.prototype.toString.call(a)==='[object Array]'){for(var i=0;i<a.length;i++){var u=String(a[i]||'').replace(/\s+/g,'');if(/^\d+$/.test(u))s[u]=1;}}}}catch(e){}return s; }
   function uidSet(){ var s=nativeUidSet(); var l=readList(); for(var i=0;i<l.length;i++)s[l[i].uid]=1;
     var sb=serverUidSet(); for(var u in sb)s[u]=1; return s; }
-  function applyFilter(){ var set=uidSet(); var owners=readOwners(); if(Object.keys(set).length===0)return;
-    var items=document.querySelectorAll('.comiis_forumlist .forumlist_li, .comiis_postlist .comiis_postli, #threadlist .forumlist_li, li.normalthread_, li.forumlist_li, li.comiis_postli');
+  function applyFilter(root){ var set=uidSet(); var owners=readOwners(); var items=collectItems(root||document);
     for(var i=0;i<items.length;i++){ var it=items[i]; var hit=false;
-      var as=it.querySelectorAll('a[href*="uid="]'); for(var k=0;k<as.length;k++){var u=uidOf(as[k]);if(u&&set[u]){hit=true;break;}}
+      var as=it.querySelectorAll('a[href*="uid="],a[href*="space-uid-"],a[href*="mod=space"]'); for(var k=0;k<as.length;k++){var u=uidOf(as[k]);if(u&&set[u]){hit=true;break;}}
       if(!hit){ var tids=threadIdsIn(it); for(var t=0;t<tids.length;t++){var ow=owners[''+tids[t]]; if(ow&&set[ow]){hit=true;break;}} }
       if(hit){ it.style.display='none'; it.setAttribute('data-mt-black-filtered','1'); }
       else if(it.getAttribute('data-mt-black-filtered')){ it.style.display=''; it.removeAttribute('data-mt-black-filtered'); } } }
-  function run(){ applyFilter(); recordOwners(); ensureServerList(); }
-  run(); setTimeout(run,400); setTimeout(run,1200); setTimeout(run,2500);
-  if(!window.__pbTimer){ window.__pbTimer=setInterval(function(){try{run();}catch(e){}},1500); }
-  if(!window.__pbObs){ window.__pbObs=new MutationObserver(function(){run();}); window.__pbObs.observe(document.documentElement,{childList:true,subtree:true}); }
+  function run(root){ applyFilter(root); recordOwners(root); ensureServerList(); }
+  var pend=[];
+  function flush(){ window.__pbT=0; var roots=pend.slice(); pend.length=0; for(var i=0;i<roots.length;i++){ try{ run(roots[i]); }catch(e){} } }
+  function schedule(root){ pushRoot(pend,root); clearTimeout(window.__pbT); window.__pbT=setTimeout(flush,180); }
+  run(document);
+  setTimeout(function(){ schedule(document.body||document.documentElement); },400);
+  setTimeout(function(){ schedule(document.body||document.documentElement); },1500);
+  window.addEventListener('focus',function(){ schedule(document.body||document.documentElement); },true);
+  if(!window.__pbObs){ window.__pbObs=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)schedule(roots[i]); }); window.__pbObs.observe(document.documentElement,{childList:true,subtree:true}); }
 }
 
 // ========== UBB 快捷输入栏 ==========
@@ -836,8 +903,10 @@ function mtImageUpload(file,cb){
 function mtImageUploadForum(file,cb){
   var done=false;
   function finish(ok,res){ if(done)return; done=true; cb(ok,res); }
+  var credCache=null;
   // 从当前页面 DOM 提取 uid + hash（附件上传 token，内联在编辑器 uploadformdata 里）
   function extractUploadCred(){
+    if(credCache&&credCache.uid&&credCache.hash)return credCache;
     var html=document.documentElement.innerHTML;
     var uid=null,hash=null;
     var mu=html.match(/uploadformdata:\s*\{[^}]*uid:\s*["']?(\d+)["']?/i);
@@ -847,7 +916,8 @@ function mtImageUploadForum(file,cb){
     // 兜底：也尝试从独立字段 / 变量读取
     if(!uid && typeof window.discuz_uid!=='undefined'&&window.discuz_uid)uid=window.discuz_uid;
     if(!hash){ var m2=html.match(/uploadformdata\s*[:=]\s*\{[^}]*hash\s*[:=]\s*["']([^"']+)["']/i); if(m2)hash=m2[1]; }
-    return {uid:uid,hash:hash};
+    credCache={uid:uid,hash:hash};
+    return credCache;
   }
   var cred=extractUploadCred();
   if(!cred.uid||!cred.hash){ finish(false,'不在回帖/发帖页面，无法使用论坛图床'); return; }
@@ -860,11 +930,10 @@ function mtImageUploadForum(file,cb){
     .then(function(r){ return r.text(); })
     .then(function(txt){
       var raw=String(txt);
-      try{ console.log('[MT] swfupload 返回原文:', raw); }catch(e){}
       var a=raw.split('|');
       if(a[0]==='DISCUZUPLOAD' && a[2]==='0'){
         var relPath=a[5];
-        if(relPath){ finish(true,'https://cdn.binmt.cc/data/attachment/forum/'+relPath); }
+        if(relPath){ finish(true,(location.origin||'https://bbs.binmt.cc').replace(/\/$/,'')+'/data/attachment/forum/'+String(relPath).replace(/^\/+/,'')); }
         else{ finish(false,'上传成功但未获取到图片路径'); }
       } else {
         var code=a[2];
@@ -873,7 +942,7 @@ function mtImageUploadForum(file,cb){
         finish(false,'论坛不支持该图片：'+reason);
       }
     })
-    .catch(function(e){ try{console.log('[MT] swfupload 请求异常:',e);}catch(_){} finish(false,'论坛图床上传请求失败'); });
+    .catch(function(){ finish(false,'论坛图床上传请求失败'); });
 }
 
 // 路径二：降级 - 原 img.binmt.cc 图床两步上传（GET 首页取 csrf-token + cookie 会话 -> POST /upload）
