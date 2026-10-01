@@ -297,8 +297,8 @@ function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; 
   function isMobile(){ return !!document.getElementById('needmessage')&&!!document.getElementById('fastpostform'); }
   function done(t){ try{return !!localStorage.getItem(DP+ts()+'_'+t);}catch(e){return false;} }
   function markDone(t){ try{localStorage.setItem(DP+ts()+'_'+t,'1');}catch(e){} }
-  function pend(t){ try{return sessionStorage.getItem(PK+'_'+t)==='1';}catch(e){return false;} }
-  function setPend(t,o){ try{if(o)sessionStorage.setItem(PK+'_'+t,'1');else sessionStorage.removeItem(PK+'_'+t);}catch(e){} }
+  function pend(t){ try{var v=parseInt(sessionStorage.getItem(PK+'_'+t)||'0',10); if(!v||Date.now()-v>60000){sessionStorage.removeItem(PK+'_'+t);return false;} return true;}catch(e){return false;} }
+  function setPend(t,o){ try{if(o)sessionStorage.setItem(PK+'_'+t,String(Date.now()));else sessionStorage.removeItem(PK+'_'+t);}catch(e){} }
   function floodUntil(t){ try{var v=parseInt(localStorage.getItem(FUK+t)||'0',10);return isFinite(v)?v:0;}catch(e){return 0;} }
   function setFlood(t,ms){ try{if(ms>0)localStorage.setItem(FUK+t,String(Date.now()+ms));else localStorage.removeItem(FUK+t);}catch(e){} }
   function parseFloodWait(txt){
@@ -360,6 +360,9 @@ function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; 
     }catch(e){setPend(t,false);scheduleRun(t,5000);}},0);}
   function start(){if(!/thread-\d+/.test(location.pathname)&&!/mod=viewthread/i.test(location.search))return;run();}
   if(document.readyState==='complete'||document.readyState==='interactive')start();else window.addEventListener('DOMContentLoaded',start);
+  window.addEventListener('pageshow',function(){setTimeout(run,300);});
+  window.addEventListener('focus',function(){setTimeout(run,300);});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(run,300);});
 }
 // ========== 只看隐藏贴 ==========
 function hideOnly(){ if(!on('hideOnly'))return; if(window.__hideOnly)return;
