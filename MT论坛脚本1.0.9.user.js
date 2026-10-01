@@ -1095,3 +1095,20 @@ function ubbBar(){ if(!on('ubbBar'))return; if(window.__ubbDone)return; window._
 // ========== 启动 ==========
 function init(){
   buildPanel();
+  autoSign();
+  urlLink();
+  copyCode();
+  autoPage();
+  guideNext();
+  autoReply();
+  hideOnly();
+  personalBlack();
+  ubbBar();
+}
+if(document.readyState==='complete'||document.readyState==='interactive'){ init(); }
+else { window.addEventListener('DOMContentLoaded', init); }
+window.addEventListener('load', function(){
+  // 侧边栏可能是动态渲染的，稍后重试确保面板注入成功
+  setTimeout(buildPanel, 400);
+});
+})();
