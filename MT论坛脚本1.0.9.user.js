@@ -343,7 +343,7 @@ function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; 
     if(done(t)){unlock(t,ps,function(ok){if(!ok||hasLocked())scheduleUnlock(t,lockedPids(),1);});return;}
     if(pend(t))return;
     var fu=floodUntil(t),now=Date.now(); if(fu>now){scheduleRun(t,fu-now+500+Math.floor(Math.random()*1000));return;}
-    var f=document.getElementById('fastpostform'); if(f&&(f.querySelector('[name="seccodeverify"]')||f.querySelector('[name="secqaa']')))return;
+    var f=document.getElementById('fastpostform'); if(f&&(f.querySelector('[name="seccodeverify"]')||f.querySelector('[name="secqaa"]')))return;
     if(hasMine(u)){markDone(t);unlock(t,ps,function(ok){if(!ok||hasLocked())scheduleUnlock(t,lockedPids(),1);});return;}
     setPend(t,true);
     setTimeout(function(){try{
@@ -1092,20 +1092,3 @@ function ubbBar(){ if(!on('ubbBar'))return; if(window.__ubbDone)return; window._
 // ========== 启动 ==========
 function init(){
   buildPanel();
-  autoSign();
-  urlLink();
-  copyCode();
-  autoPage();
-  guideNext();
-  autoReply();
-  hideOnly();
-  personalBlack();
-  ubbBar();
-}
-if(document.readyState==='complete'||document.readyState==='interactive'){ init(); }
-else { window.addEventListener('DOMContentLoaded', init); }
-window.addEventListener('load', function(){
-  // 侧边栏可能是动态渲染的，稍后重试确保面板注入成功
-  setTimeout(buildPanel, 400);
-});
-})();
