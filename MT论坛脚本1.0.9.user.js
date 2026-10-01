@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MT论坛移动端网页版增强
 // @namespace    https://bbs.binmt.cc/
-// @version      1.0.10
+// @version      1.0.11
 // @description  在侧边栏注入 9项功能独立开关
 // @match        https://bbs.binmt.cc/*
 // @match        http://bbs.binmt.cc/*
@@ -276,7 +276,7 @@ function autoSign(){ if(!on('autoSign'))return;
 function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; window.__autoReply=true;
   if(!/thread-\d+/.test(location.pathname)&&!/mod=viewthread/i.test(location.search))return;
   var TEXTS=['看看隐藏','感谢分享','论坛有你更精彩','看看是什么','谢谢分享'];
-  var RIK='mtar_reply_index', DP='mtar_done_v10_', LRK='mtar_last_reply', FM=16000, PK='mtar_pending', RCM={};
+  var RIK='mtar_reply_index',DP='mtar_done_v11_',LRK='mtar_last_reply',FM=16000,PK='mtar_pending',FUK='mtar_flood_until_',RCM={};
   function ts(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function ri(){ var i=parseInt(localStorage.getItem(RIK)||'0',10); if(isNaN(i)||i<0)i=0; return i%TEXTS.length; }
   function rt(){ return TEXTS[ri()]; }
@@ -292,58 +292,75 @@ function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; 
       var el=ns[i]; for(var j=0;j<12&&el;j++){ var id=el.id||''; if(/^(pid|post_)\d+$/.test(id)){ var p=id.replace(/\D/g,''); if(p)o[p]=1; break; } el=el.parentElement; } }
     return Object.keys(o); }
   function hasMine(u){ if(!u)return false; var cs=document.querySelectorAll('div[id^="pid"],div[id^="post_"],div.comiis_postli');
-    for(var i=0;i<cs.length;i++){ var c=cs[i]; if(!c.querySelector)continue; var a=c.querySelector('a[href*="space-uid-"],a[href*="uid="]');
-      if(!a)continue; var h=a.getAttribute('href')||''; var m=h.match(/space-uid-(\d+)/)||h.match(/[?&]uid=(\d+)/); if(m&&m[1]===u)return true; } return false; }
+    for(var i=0;i<cs.length;i++){ var c=cs[i]; if(!c.querySelector)continue; var aa=c.querySelector('a[href*="space-uid-"],a[href*="uid="]');
+      if(!aa)continue; var h=aa.getAttribute('href')||''; var m=h.match(/space-uid-(\d+)/)||h.match(/[?&]uid=(\d+)/); if(m&&m[1]===u)return true; } return false; }
   function isMobile(){ return !!document.getElementById('needmessage')&&!!document.getElementById('fastpostform'); }
-  function done(t){ return !!localStorage.getItem(DP+ts()+'_'+t); }
-  function markDone(t){ localStorage.setItem(DP+ts()+'_'+t,'1'); }
-  function pend(t){ return sessionStorage.getItem(PK+'_'+t)==='1'; }
-  function setPend(t,o){ if(o)sessionStorage.setItem(PK+'_'+t,'1'); else sessionStorage.removeItem(PK+'_'+t); }
-  function submit(){ var f=document.getElementById('fastpostform'),mb=document.getElementById('needmessage');
-    if(!f||!mb)return{ok:false};
-    var act=(f.getAttribute('action')||'').replace(/&amp;/g,'&'); var url=act+'&handlekey=fastpost&loc=1&inajax=1';
+  function done(t){ try{return !!localStorage.getItem(DP+ts()+'_'+t);}catch(e){return false;} }
+  function markDone(t){ try{localStorage.setItem(DP+ts()+'_'+t,'1');}catch(e){} }
+  function pend(t){ try{return sessionStorage.getItem(PK+'_'+t)==='1';}catch(e){return false;} }
+  function setPend(t,o){ try{if(o)sessionStorage.setItem(PK+'_'+t,'1');else sessionStorage.removeItem(PK+'_'+t);}catch(e){} }
+  function floodUntil(t){ try{var v=parseInt(localStorage.getItem(FUK+t)||'0',10);return isFinite(v)?v:0;}catch(e){return 0;} }
+  function setFlood(t,ms){ try{if(ms>0)localStorage.setItem(FUK+t,String(Date.now()+ms));else localStorage.removeItem(FUK+t);}catch(e){} }
+  function parseFloodWait(txt){
+    var s=String(txt||''); var m=s.match(/(?:少于|间隔|等待|剩余|请(?:稍候|稍后))[^\d]{0,30}(\d+)\s*秒/i);
+    if(!m)m=s.match(/(\d+)\s*秒/i);
+    var n=m?parseInt(m[1],10):30; if(!isFinite(n)||n<1)n=30; if(n>3600)n=3600; return n;
+  }
+  function submit(cb){ var f=document.getElementById('fastpostform'),mb=document.getElementById('needmessage');
+    if(!f||!mb){cb({ok:false,fl:false,fs:0});return;}
+    var act=(f.getAttribute('action')||'').replace(/&amp;/g,'&'); if(!act){cb({ok:false,fl:false,fs:0});return;}
+    var url=act+(act.indexOf('?')>=0?'&':'?')+'handlekey=fastpost&loc=1&inajax=1';
     var fd=new URLSearchParams(); fd.set('formhash',f.elements.formhash?f.elements.formhash.value:'');
     if(f.elements.noticeauthor)fd.set('noticeauthor',f.elements.noticeauthor.value||'');
     fd.set('message',rt()); fd.set('replysubmit','回复');
-    var x=new XMLHttpRequest(); x.open('POST',url,false);
-    x.setRequestHeader('Content-Type','application/x-www-form-urlencoded'); x.setRequestHeader('X-Requested-With','XMLHttpRequest');
-    x.send(fd.toString()); var txt=x.responseText||'';
-    var isFlood=/两次发表间隔少于|间隔少于\s*\d+\s*秒|请稍候再发表|灌水/i.test(txt);
-    var ok=x.status===200&&/succeedhandle_fastpost|回复发布成功/.test(txt)&&!/errorhandle_fastpost/.test(txt)&&!isFlood;
-    var em=txt.match(/少于\s*(\d+)\s*秒/); var fl=isFlood||(!ok&&/两次发表间隔少于\s*\d+\s*秒/.test(txt));
-    var fs=em?parseInt(em[1],10):15; if(!isFinite(fs)||fs<1)fs=15;
-    try{if(ok)localStorage.setItem(LRK,String(Date.now()));}catch(e){}
-    return{ok:ok,fl:fl,fs:fs}; }
-  function viewpidHtml(t,p){ var x=new XMLHttpRequest();
-    x.open('POST','forum.php?mod=viewthread&tid='+t+'&viewpid='+p+'&mobile=2',false);
-    x.setRequestHeader('Content-Type','application/x-www-form-urlencoded'); x.setRequestHeader('X-Requested-With','XMLHttpRequest');
-    x.send(''); if(x.status!==200)return ''; var raw=x.responseText||''; var m=raw.match(/<!\[CDATA\[([\s\S]*?)\]\]>/); return m?m[1]:raw; }
-  function replaceFloor(t,p){ var html=viewpidHtml(t,p); if(!html||html.indexOf('id="pid'+p)<0)return false;
-    var tg=document.getElementById('pid'+p)||document.getElementById('post_'+p); if(!tg)return false;
-    var fr=document.createElement('div'); fr.innerHTML=html; var n=fr.querySelector('#pid'+p)||fr.querySelector('#post_'+p)||fr.firstElementChild;
-    if(!n)return false; tg.outerHTML=n.outerHTML; return true; }
-  function unlock(t,ps){ var d=0; for(var i=0;i<ps.length;i++){if(replaceFloor(t,ps[i]))d++;} return d>0; }
-  function run(){ var t=tid(); if(!t)return; if(!isMobile())return; if(!hasLocked())return;
-    var u=uid(); if(!u||u==='0')return; if(done(t))return; if(pend(t))return; if(hasMine(u)){markDone(t);return;}
-    var f=document.getElementById('fastpostform'); if(f&&(f.querySelector('[name="seccodeverify"]')||f.querySelector('[name="secqaa"]')))return;
-    var ps=lockedPids(); setPend(t,true);
-    setTimeout(function(){ try{
-      if(done(t)){setPend(t,false);return;} if(!hasLocked()){setPend(t,false);return;}
-      var mb=document.getElementById('needmessage');
-      if(mb&&mb.value&&mb.value.trim()&&mb.value.trim()!==rt()){setPend(t,false);return;}
-      var lr=parseInt(localStorage.getItem(LRK)||'0',10); var since=Date.now()-lr;
-      if(since<FM){ setPend(t,false); var w=FM-since+Math.floor(Math.random()*1000); setTimeout(function(){run();},w); return; }
-      var res=submit();
-      if(res.ok){ markDone(t); adv(); setPend(t,false); if(ps.length){unlock(t,ps);} if(!hasLocked()){} else{setTimeout(function(){location.reload();},800);} }
-      else{ setPend(t,false); var rc=RCM[t]||0;
-        if(res.fl){ RCM[t]=rc+1; var wait=res.fs*1000+2000+Math.random()*2000; setTimeout(function(){ setPend(t,false); run(); },wait); }
-        else{ /* 非频率限制类失败（验证码/内容异常等）：刷新页面让用户可手动处理 */ setTimeout(function(){ location.reload(); },1500); } }
-    }catch(e){setPend(t,false);} },0); }
-  function start(){ if(!/thread-\d+/.test(location.pathname)&&!/mod=viewthread/i.test(location.search))return; run(); }
-  if(document.readyState==='complete'||document.readyState==='interactive')start();
-  else window.addEventListener('DOMContentLoaded',start);
+    var x=new XMLHttpRequest(),ended=false;
+    function finish(v){if(ended)return;ended=true;cb(v);}
+    try{x.open('POST',url,true);x.withCredentials=true;x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.setRequestHeader('X-Requested-With','XMLHttpRequest');
+      x.onreadystatechange=function(){if(x.readyState!==4)return;var txt=x.responseText||'',isFlood=/两次发表间隔少于|间隔少于\s*\d+\s*秒|请稍候再发表|请稍后再发表|灌水/i.test(txt);
+        var ok=x.status===200&&/succeedhandle_fastpost|回复发布成功/.test(txt)&&!/errorhandle_fastpost/.test(txt)&&!isFlood;
+        finish({ok:ok,fl:isFlood,fs:isFlood?parseFloodWait(txt):0});};
+      x.onerror=function(){finish({ok:false,fl:false,fs:0});}; x.ontimeout=function(){finish({ok:false,fl:false,fs:0});}; x.timeout=20000; x.send(fd.toString());
+    }catch(e){finish({ok:false,fl:false,fs:0});}}
+  function viewpidHtml(t,p,cb){ var x=new XMLHttpRequest(),doneX=false;
+    function finish(v){if(doneX)return;doneX=true;cb(v);}
+    try{x.open('POST','forum.php?mod=viewthread&tid='+encodeURIComponent(t)+'&viewpid='+encodeURIComponent(p)+'&mobile=2',true);x.withCredentials=true;
+      x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.setRequestHeader('X-Requested-With','XMLHttpRequest');
+      x.onreadystatechange=function(){if(x.readyState!==4)return;if(x.status!==200){finish('');return;}var raw=x.responseText||'',m=raw.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);finish(m?m[1]:raw);};
+      x.onerror=function(){finish('');};x.ontimeout=function(){finish('');};x.timeout=15000;x.send('');
+    }catch(e){finish('');}}
+  function replaceFloor(t,p,cb){ viewpidHtml(t,p,function(html){ if(!html||html.indexOf('id="pid'+p)<0){cb(false);return;}
+      var tg=document.getElementById('pid'+p)||document.getElementById('post_'+p); if(!tg){cb(false);return;}
+      try{var fr=document.createElement('div');fr.innerHTML=html;var n=fr.querySelector('#pid'+p)||fr.querySelector('#post_'+p)||fr.firstElementChild;if(!n){cb(false);return;}tg.outerHTML=n.outerHTML;cb(true);}catch(e){cb(false);}});
+  }
+  function unlock(t,ps,cb){ if(!ps||!ps.length){cb(true);return;} var left=ps.length,okn=0;
+    for(var i=0;i<ps.length;i++){(function(p){replaceFloor(t,p,function(ok){if(ok)okn++;left--;if(left===0)cb(okn===ps.length);});})(ps[i]);}}
+  function scheduleRun(t,ms){ clearTimeout(window.__mtarTimer); window.__mtarTimer=setTimeout(function(){setPend(t,false);run();},Math.max(1000,ms)); }
+  function scheduleUnlock(t,ps,attempt){ clearTimeout(window.__mtarUnlockTimer);
+    window.__mtarUnlockTimer=setTimeout(function(){if(!hasLocked())return;unlock(t,ps,function(ok){if(ok&&!hasLocked())return;
+      if(attempt<5){scheduleUnlock(t,lockedPids(),attempt+1);}else{setTimeout(function(){if(hasLocked())location.reload();},1500);}});},attempt===0?300:Math.min(8000,1500*attempt));}
+  function run(){ var t=tid(); if(!t||!isMobile()||!hasLocked())return; var u=uid(); if(!u||u==='0')return;
+    var ps=lockedPids();
+    if(done(t)){unlock(t,ps,function(ok){if(!ok||hasLocked())scheduleUnlock(t,lockedPids(),1);});return;}
+    if(pend(t))return;
+    var fu=floodUntil(t),now=Date.now(); if(fu>now){scheduleRun(t,fu-now+500+Math.floor(Math.random()*1000));return;}
+    var f=document.getElementById('fastpostform'); if(f&&(f.querySelector('[name="seccodeverify"]')||f.querySelector('[name="secqaa']')))return;
+    if(hasMine(u)){markDone(t);unlock(t,ps,function(ok){if(!ok||hasLocked())scheduleUnlock(t,lockedPids(),1);});return;}
+    setPend(t,true);
+    setTimeout(function(){try{
+      if(!hasLocked()){setPend(t,false);return;}
+      var mb=document.getElementById('needmessage'); if(mb&&mb.value&&mb.value.trim()&&mb.value.trim()!==rt()){setPend(t,false);return;}
+      var lr=parseInt(localStorage.getItem(LRK)||'0',10),since=Date.now()-lr;
+      if(since<FM){setPend(t,false);scheduleRun(t,FM-since+Math.floor(Math.random()*1000));return;}
+      submit(function(res){setPend(t,false);
+        if(res.ok){markDone(t);adv();setFlood(t,0);try{localStorage.setItem(LRK,String(Date.now()));}catch(e){}
+          unlock(t,lockedPids(),function(ok){if(!ok||hasLocked())scheduleUnlock(t,lockedPids(),1);});return;}
+        if(res.fl){var wait=res.fs*1000+2000+Math.floor(Math.random()*2000);setFlood(t,wait);scheduleRun(t,wait+500);return;}
+        setTimeout(function(){if(hasLocked()&&!done(t))location.reload();},2000);
+      });
+    }catch(e){setPend(t,false);scheduleRun(t,5000);}},0);}
+  function start(){if(!/thread-\d+/.test(location.pathname)&&!/mod=viewthread/i.test(location.search))return;run();}
+  if(document.readyState==='complete'||document.readyState==='interactive')start();else window.addEventListener('DOMContentLoaded',start);
 }
-
 // ========== 只看隐藏贴 ==========
 function hideOnly(){ if(!on('hideOnly'))return; if(window.__hideOnly)return;
   if(/\/thread-[^\/]+\.html/i.test(location.pathname))return; window.__hideOnly=true;
