@@ -1,15 +1,14 @@
 // ==UserScript==
 // @name         MT论坛移动端网页版增强
 // @namespace    https://bbs.binmt.cc/
-// @version      1.0.8 
-// @description  在侧边栏注入 9项功能独立开关 
+// @version      1.0.17
+// @description  在侧边栏注入 9项功能独立开关
 // @match        https://bbs.binmt.cc/*
 // @match        http://bbs.binmt.cc/*
 // @connect      img.binmt.cc
 // @connect      https://img.binmt.cc
 // @connect      icdn.binmt.cc
 // @connect      https://icdn.binmt.cc
-// @connect      *
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
@@ -91,6 +90,45 @@ function GET(u,cb){
   try{ if(typeof GM_xmlhttpRequest==='function'){ GM_xmlhttpRequest({method:'GET',url:u,onload:function(r){cb(r.status,r.responseText);},onerror:function(){cb(0,'');}}); return; } }catch(e){}
   fetch(u,{credentials:'include'}).then(function(r){return r.text();}).then(function(t){cb(200,t);}).catch(function(){cb(0,'');});
 }
+function matchesSel(el,sel){
+  if(!el||el.nodeType!==1)return false;
+  var fn=el.matches||el.webkitMatchesSelector||el.msMatchesSelector;
+  if(!fn)return false;
+  try{ return !!fn.call(el,sel); }catch(e){ return false; }
+}
+function pushRoot(list,node){
+  if(!node)return;
+  if(node===document)node=document.body||document.documentElement;
+  if(node&&node.nodeType===3)node=node.parentNode;
+  if(!node||node.nodeType!==1)return;
+  for(var i=list.length-1;i>=0;i--){
+    var cur=list[i];
+    if(cur===node||(cur.contains&&cur.contains(node)))return;
+    if(node.contains&&node.contains(cur))list.splice(i,1);
+  }
+  list.push(node);
+}
+function collectMutationRoots(muts){
+  var out=[];
+  for(var i=0;i<muts.length;i++){
+    var mt=muts[i];
+    if(mt.target)pushRoot(out,mt.target);
+    var adds=mt.addedNodes||[];
+    for(var j=0;j<adds.length;j++)pushRoot(out,adds[j]);
+  }
+  if(!out.length)pushRoot(out,document.body||document.documentElement);
+  return out;
+}
+function collectScoped(root,selector){
+  var out=[],base=root===document?(document.body||document.documentElement):root;
+  if(base&&base.nodeType===3)base=base.parentNode;
+  if(!base||base.nodeType!==1)return out;
+  if(matchesSel(base,selector))pushRoot(out,base);
+  var nodes=[];
+  try{ nodes=base.querySelectorAll(selector); }catch(e){ nodes=[]; }
+  for(var i=0;i<nodes.length;i++)pushRoot(out,nodes[i]);
+  return out;
+}
 
 // ========== URL 超链接 ==========
 function cleanUrl(raw){ if(!raw)return null; var s=String(raw)
@@ -105,7 +143,7 @@ function urlInjectStyle(){ if(document.getElementById('mt-url-style'))return;
 function makeClickable(root){
   try{ var box=root||document;
     var sel='a[href],.blockcode,pre,code,.postmessage,.comiis_postmessage,.message,.t_f,.plc,#postlist,.comiis_pcontent,.comiis_box,.article,.content,body';
-    var nodes=box.querySelectorAll(sel); var list=[]; for(var i=0;i<nodes.length;i++)list.push(nodes[i]);
+    var list=collectScoped(box,sel);
     if(!list.length&&document.body)list=[document.body];
     var re=/(^|[^a-z0-9])(h[\s\S]{0,3}?t[\s\S]{0,3}?t[\s\S]{0,3}?p[\s\S]{0,3}?s?[\s\S]{0,3}?[：:]\/\/[^\s"'<>()（）【】\[\]]+)/gi;
     for(var k=0;k<list.length;k++){ var c=list[k]; if(!c)continue;
@@ -113,6 +151,7 @@ function makeClickable(root){
       var it=document.createTreeWalker(c,4,null); var texts=[],node;
       while((node=it.nextNode())){ var p=node.parentNode; if(!p)continue;
         if(p.nodeName==='SCRIPT'||p.nodeName==='STYLE'||p.nodeName==='TEXTAREA')continue;
+        if(p.closest&&p.closest('a'))continue;
         if(p.getAttribute&&p.getAttribute('data-mt-url')==='1')continue;
         if(p.classList&&p.classList.contains('mt-url-local'))continue;
         var nv=node.nodeValue||''; if(nv.indexOf('http')<0&&nv.indexOf('ht')<0)continue;
@@ -130,7 +169,10 @@ function makeClickable(root){
 }
 function urlLink(){ if(!on('urlLink'))return; if(window.__urlDone)return; window.__urlDone=true;
   urlInjectStyle(); makeClickable(document);
-  var mo=new MutationObserver(function(){ clearTimeout(window.__urlT); window.__urlT=setTimeout(function(){makeClickable(document);},500); });
+  var pend=[];
+  function flush(){ window.__urlT=0; var roots=pend.slice(); pend.length=0; for(var i=0;i<roots.length;i++)makeClickable(roots[i]); }
+  function queue(root){ pushRoot(pend,root); clearTimeout(window.__urlT); window.__urlT=setTimeout(flush,180); }
+  var mo=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)queue(roots[i]); });
   mo.observe(document.documentElement,{childList:true,subtree:true}); }
 
 // ========== 代码复制按钮 ==========
@@ -150,13 +192,13 @@ function getCodeText(el){ var clone=el.cloneNode(true);
   var s=''; try{s=clone.textContent||'';}catch(e){}
   s=s.replace(/\u00a0/g,' ');
   return s.split('\n').filter(function(L){var x=L.replace(/\s/g,'');return !/^(本帖隐藏的内容|隐藏的内容|回复可见|回复后可见|登录后可见|登录可见|购买后可见|以下内容需要回复才能看到)[:：]?$/.test(x);}).join('\n'); }
-function collectBlocks(){ var picked=[];
+function collectBlocks(root){ var picked=[];
   function push(b){ if(!b||!b.nodeName)return; if(b.nodeName==='SCRIPT'||b.nodeName==='STYLE')return;
     if(b.getAttribute&&b.getAttribute('data-mt-copy')==='1')return;
     if(b.nodeName==='BLOCKQUOTE'||(b.closest&&b.closest('blockquote')))return;
     for(var k=0;k<picked.length;k++){ if(picked[k]!==b&&(picked[k].contains(b)||b.contains(picked[k])))return; } picked.push(b); }
   var sel='pre,.blockcode,.comiis_blockcode,.comiis_code,.codeblock';
-  var blocks=document.querySelectorAll(sel);
+  var blocks=collectScoped(root||document,sel);
   for(var i=0;i<blocks.length;i++){ var b=blocks[i];
     if(b.nodeName==='CODE'){ var pp=b.parentNode,hp=false; while(pp&&pp!==document.body){if(pp.nodeName==='PRE'){hp=true;break;}pp=pp.parentNode;} if(hp)continue; } push(b); }
   var inner=[]; for(var a=0;a<picked.length;a++){ var o=picked[a],hi=false;
@@ -169,48 +211,249 @@ function makeButtonFor(block){ if(block.getAttribute('data-mt-copy')==='1')retur
     var ok=copyText(getCodeText(block)); btn.textContent=ok?'已复制':'复制失败'; btn.style.background=ok?'#43a047':'#e53935';
     setTimeout(function(){btn.textContent='复制';btn.style.background='#1e88e5';},1500); };
   bar.appendChild(btn); if(block.parentNode)block.parentNode.insertBefore(bar,block); }
-function addCopyButtons(){ try{ var p=collectBlocks(); for(var n=0;n<p.length;n++)makeButtonFor(p[n]); }catch(e){} }
+function addCopyButtons(root){ try{ var p=collectBlocks(root); for(var n=0;n<p.length;n++)makeButtonFor(p[n]); }catch(e){} }
 function copyCode(){ if(!on('copyCode'))return; if(window.__copyDone)return; window.__copyDone=true;
-  copyInjectStyle(); addCopyButtons();
-  var mo=new MutationObserver(function(){ clearTimeout(window.__copyT); window.__copyT=setTimeout(addCopyButtons,500); });
+  copyInjectStyle(); addCopyButtons(document);
+  var pend=[];
+  function flush(){ window.__copyT=0; var roots=pend.slice(); pend.length=0; for(var i=0;i<roots.length;i++)addCopyButtons(roots[i]); }
+  function queue(root){ pushRoot(pend,root); clearTimeout(window.__copyT); window.__copyT=setTimeout(flush,180); }
+  var mo=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)queue(roots[i]); });
   mo.observe(document.documentElement,{childList:true,subtree:true}); }
 
 // ========== 自动上下页 ==========
 function autoPage(){ if(!on('autoPage'))return; if(window.__autoPage)return;
-  if(!/thread-/.test(location.pathname))return; window.__autoPage=true;
-  var req=false;
-  function nextUrl(){ var n=document.querySelector('.comiis_multi_box a.nxt'); if(n){ var h=n.getAttribute('href')||''; return h.indexOf('javascript')>=0?'':h; } var ns=document.querySelectorAll('a.bg_f.b_ok'); n=ns[ns.length-1]; return n?n.getAttribute('href')||'':''; }
-  function loadNext(){ if(req)return; var u=nextUrl(); if(!u||u.indexOf('javascript')>=0)return; req=true;
-    fetch(u,{credentials:'include'}).then(function(r){return r.text();}).then(function(html){ req=false;
-      var tmp=document.createElement('div'); tmp.innerHTML=html;
-      var items=tmp.querySelectorAll('.comiis_postli.comiis_list_readimgs.nfqsqi');
-      var target=document.querySelector('.comiis_postlist.kqide');
-      var bs=tmp.querySelector('.comiis_multi_box.bg_f.b_t.b_b.mb10');
-      if(bs){ var bd=document.querySelector('.comiis_multi_box.bg_f.b_t.b_b.mb10'); if(bd)bd.replaceWith(bs); }
-      if(target&&items.length){ for(var i=0;i<items.length;i++)target.appendChild(items[i]); }
-    }).catch(function(){req=false;}); }
-  window.addEventListener('scroll',function(){ var d=document.documentElement; if(d.scrollHeight-d.scrollTop-d.clientHeight<500)loadNext(); },{passive:true});
+  // 兼容两种 URL 格式：伪静态 /thread-{tid}-{page}-1.html 与动态 /forum.php?mod=viewthread&tid={tid}&page={page}
+  if(!/thread-\d+/.test(location.pathname) && !/mod=viewthread/i.test(location.search))return; window.__autoPage=true;
+  var isStatic=/thread-\d+/.test(location.pathname);
+  var ITEM_SEL='.comiis_postli.comiis_list_readimgs.nfqsqi';
+  var TARGET_SEL='.comiis_postlist.kqide';
+  var MULTI_SEL='.comiis_multi_box.bg_f.b_t.b_b.mb10';
+  var busy=false, lastLoadAt=0, PAGE_COOL=5000;
+  // 页面状态：已加载的页码范围（闭区间）。初始只有当前页。
+  var st={min:curPage(),max:curPage(),total:totalPage(),tid:tid()};
+
+  // ---- 从 URL 解析帖子 id 与当前页 ----
+  function tid(){ var m=location.pathname.match(/thread-(\d+)/); if(m)return m[1];
+    try{var q=new URLSearchParams(location.search); if(q.get('tid'))return q.get('tid');}catch(e){} return ''; }
+  function curPage(){ if(isStatic){ var m=location.pathname.match(/thread-\d+-(\d+)-\d/); if(m){var p=parseInt(m[1],10); if(isFinite(p)&&p>0)return p;} }
+    else { try{var q=new URLSearchParams(location.search); var pg=q.get('page'); pg=parseInt(pg||'1',10); if(isFinite(pg)&&pg>0)return pg;}catch(e){} }
+    var sel=document.querySelector('#dumppage'); if(sel&&sel.selectedIndex>=0)return sel.selectedIndex+1; return 1; }
+  function totalPage(){ var sel=document.querySelector('#dumppage'); if(sel&&sel.options){return Math.max(1,sel.options.length);}
+    var as=document.querySelectorAll('.comiis_page a'); return 1; }
+
+  // ---- 构造指定页 URL（主用手段，稳定可靠） ----
+  // 与原页 URL 格式保持一致：伪静态用 thread-{tid}-{p}-1.html，动态用 forum.php?mod=viewthread&tid={tid}&page={p}
+  function pageUrl(p){
+    if(isStatic) return 'https://bbs.binmt.cc/thread-'+st.tid+'-'+p+'-1.html';
+    var q=new URLSearchParams(location.search); var extra=[];
+    // 保留 mobile / from / 等其它参数，避免与原页不一致
+    for(var key of ['mobile','from','mobile2']){ if(q.get(key)) extra.push(key+'='+encodeURIComponent(q.get(key))); }
+    var s='forum.php?mod=viewthread&tid='+encodeURIComponent(st.tid)+'&page='+p;
+    if(extra.length)s+='&'+extra.join('&');
+    return new URL(s,location.origin).href;
+  }
+
+  // ---- 分页条里所有 <a>（按顺序：上一页 / 页码select / 下一页），仅作兜底 ----
+  function pagerLinks(){ var box=document.querySelector(MULTI_SEL); if(!box)return [];
+    var as=box.querySelectorAll('a.bg_f.b_ok'); var out=[];
+    for(var i=0;i<as.length;i++){ var h=(as[i].getAttribute('href')||'');
+      if(/javascript/i.test(h)||!h){ out.push(''); continue; }
+      // 仅保留可解析出「上一页/下一页」页码的链接
+      var pm=h.match(/thread-(\d+)-(\d+)-\d/);
+      if(pm)out.push({url:(/^https?:\/\//i.test(h)?h:new URL(h,location.origin).href),page:parseInt(pm[2],10)});
+      else out.push(null); }
+    return out; }
+
+  // 上一页 URL：优先 pageUrl 构造；若构造结果无效，回退到分页条中页码 = st.min-1 的链接
+  function prevUrl(){ var need=st.min-1; if(need<1){ return ''; }
+    var links=pagerLinks();
+    for(var i=0;i<links.length;i++){ if(links[i]&&links[i].page===need)return links[i].url; }
+    return pageUrl(need); }
+
+  // 下一页 URL：优先 pageUrl 构造；若构造结果无效，回退到分页条中页码 = st.max+1 的链接
+  function nextUrl(){ var need=st.max+1; if(need>st.total)return '';
+    var links=pagerLinks();
+    for(var i=0;i<links.length;i++){ if(links[i]&&links[i].page===need)return links[i].url; }
+    return pageUrl(need); }
+
+  // ---- 从抓取的 HTML 中提取评论项与分页条 ----
+  function parseHtml(html){ var tmp=document.createElement('div'); tmp.innerHTML=html;
+    var items=tmp.querySelectorAll(ITEM_SEL);
+    return {items:items}; }
+
+  // 获取当前列表容器
+  function target(){ return document.querySelector(TARGET_SEL); }
+
+  // 收集当前已存在的 pid 集合
+  // 提取评论项的去重键：优先真实 pid（id 尾随数字），否则退化为「楼层号 + 内容指纹」兜底
+  function itemKey(it){
+    var id=it.id||''; var m=id.match(/(\d+)$/); if(m)return 'pid:'+m[1];
+    // 兜底：用内容文本 hash，避免 id 无数字尾导致 key 为空、去重完全失效
+    var txt=(it.textContent||'').replace(/\s+/g,' ');
+    if(txt.length>200)txt=txt.slice(0,200);
+    return 'hash:'+txt;
+  }
+  function existingPids(){ var o={}; var t=target(); if(!t)return o;
+    var ns=t.querySelectorAll(ITEM_SEL);
+    for(var i=0;i<ns.length;i++){ var k=itemKey(ns[i]); if(k)o[k]=1; }
+    return o; }
+
+  // 去重后插入：prepend=true 插到最前，否则追加到末尾
+  function insertItems(items,prepend){ var t=target(); if(!t)return 0;
+    var seen=existingPids(); var n=0;
+    var arr=Array.prototype.slice.call(items);
+    if(prepend)arr.reverse();
+    // 批量插入：用 DocumentFragment 一次性挂载，避免逐条 insertBefore 造成的多次重排/顿挫
+    var frag=document.createDocumentFragment();
+    for(var i=0;i<arr.length;i++){ var it=arr[i]; var key=itemKey(it);
+      if(key&&seen[key])continue; if(key)seen[key]=1; n++;
+      frag.appendChild(it); }
+    if(prepend)t.insertBefore(frag,t.firstChild); else t.appendChild(frag);
+    return n; }
+
+  // ---- 向下加载（下一页，追加到末尾） ----
+  var loadedPages={}; // 已成功抓取过的页号集合，防「分页错位导致同一页被抓两次」
+  function loadNext(){ if(busy)return; if(st.max>=st.total)return; if(Date.now()-lastLoadAt<PAGE_COOL)return;
+    var need=st.max+1;
+    if(loadedPages[need]){ st.max=need; return; } // 该页已加载过，直接跳过不重复抓
+    busy=true; lastLoadAt=Date.now();
+    var u=nextUrl()||pageUrl(need);
+    fetch(u,{credentials:'include'}).then(function(r){return r.text();}).then(function(html){ busy=false;
+      var p=parseHtml(html);
+      if(!p.items.length)return;
+      loadedPages[need]=1;
+      st.max++;
+      insertItems(p.items,false);
+    }).catch(function(){busy=false;}); }
+
+  // ---- 向上加载（上一页，前插到开头） ----
+  var prevCool=0; // 向上加载后的冷却时间戳，防止前插后立即再次触发 atTop
+  function loadPrev(){ if(busy)return; if(st.min<=1)return; if(Date.now()-lastLoadAt<PAGE_COOL)return;
+    var need=st.min-1;
+    if(loadedPages['p'+need]){ st.min=need; return; } // 该页已加载过，跳过
+    busy=true; lastLoadAt=Date.now();
+    var u=prevUrl(); if(!u)u=pageUrl(need);
+    fetch(u,{credentials:'include'}).then(function(r){return r.text();}).then(function(html){ busy=false;
+      var p=parseHtml(html);
+      if(!p.items.length)return;
+      loadedPages['p'+need]=1;
+      var t=target();
+      var anchor=t?t.firstElementChild:null;
+      // 前插前：记录锚点（原第一条，如131#）相对视口顶部的偏移量，
+      // 以及文档当前滚动位置，用于插入后把它恢复到完全相同的位置，做到「原地无缝」
+      var offset=anchor?anchor.getBoundingClientRect().top:0;
+      var oldScroll=window.pageYOffset||document.documentElement.scrollTop||0;
+      st.min--;
+      var inserted=insertItems(p.items,true);
+      // 前插会让锚点下移 inserted 条的高度；
+      // 用「锚点当前绝对位置 - 前插前它相对视口的偏移」直接锁定回原视觉位置。
+      // 用带小数的一次性 scrollTo 保持亚像素精度，避免多次补正造成的抖动。
+      if(inserted>0 && anchor){
+        var newTop=anchor.getBoundingClientRect().top+(window.pageYOffset||document.documentElement.scrollTop||0)-offset;
+        window.scrollTo(0, newTop);
+      } else if(inserted>0){
+        // 无锚点时兜底：保持原滚动位置不变（不额外跳动）
+        window.scrollTo(0, oldScroll);
+      }
+      prevCool=Date.now(); // 仅成功前插后才进入冷却，避免「未加载成功却锁死」
+    }).catch(function(){busy=false;}); }
+
+  // ---- 滚动触发 ----
+  var raf=null;
+  function schedule(){ if(raf)return;
+    raf=requestAnimationFrame(function(){ raf=null;
+      var d=document.documentElement;
+      var atBottom=(d.scrollHeight-d.scrollTop-d.clientHeight)<500;
+      // 放宽顶部阈值：锚点可能把 scrollTop 停在中部，但只要列表顶距视口足够近就算「靠近顶部」
+      var listTopAt=(function(){ var t=target(); return t?t.getBoundingClientRect().top:Infinity; })();
+      var atTop=(d.scrollTop<200) || (listTopAt>-300 && listTopAt<300);
+      var cooled=(Date.now()-prevCool)<400; // 前插后 400ms 内抑制向上加载，防止连环翻页又不过度锁死
+      // 独立判断（不再用 else if 互斥）：靠近底部加载下一页，靠近顶部加载上一页，
+      // 避免「锚点居中时 atBottom 吞掉向上加载」的问题
+      if(atBottom)loadNext();
+      if(atTop && !cooled)loadPrev();
+    }); }
+  window.addEventListener('scroll',schedule,{passive:true});
+  // 补充触发点：手指/滚动停止（touchend、scroll 静止）后再判断一次，
+  // 修复「快速滑动在顶部停留过短而错过 rAF 触发窗口」的问题
+  function settle(){
+    clearTimeout(window.__mtSettle);
+    window.__mtSettle=setTimeout(function(){ schedule(); },120);
+  }
+  window.addEventListener('touchend',settle,{passive:true});
+  window.addEventListener('scroll',settle,{passive:true});
+
+  // 初始：若内容不足以撑满一屏，主动向下加载
+  setTimeout(function(){ var d=document.documentElement;
+    if(target()&&d.scrollHeight<=d.clientHeight+500 && st.max<st.total)loadNext(); },800);
 }
 
-// ========== 导读自动下一页 ==========
+// ========== 导读自动上下页 ==========
 function guideNext(){ if(!on('guideNext'))return; if(!/mod=guide/.test(location.href))return; if(window.__guideNext)return; window.__guideNext=1;
-  var LIST='.comiis_forumlist',ITEM='li.forumlist_li',DIST=900,st={page:1,loading:false,ended:false};
+  var LIST='.comiis_forumlist',ITEM='li.forumlist_li',DIST=900,busy=false,lastLoadAt=0,PAGE_COOL=5000;
+  // 页面状态：已加载的页码范围（闭区间）。初始只有当前页。
+  var st={min:curPage(),max:curPage(),total:totalPage()};
+
+  // ---- 解析当前页 / 总页数 ----
+  function curPage(){ var sel=document.querySelector('#dumppage');
+    if(sel&&sel.selectedIndex>=0)return sel.selectedIndex+1;
+    try{ var cp=new URLSearchParams(location.search).get('page'); cp=parseInt(cp||'1',10); if(isFinite(cp)&&cp>0)return cp; }catch(e){}
+    return 1; }
+  function totalPage(){ var sel=document.querySelector('#dumppage');
+    if(sel&&sel.options)return Math.max(1,sel.options.length);
+    return 1; }
+  // 从 URL 解析 view 与 index 参数，用于构造分页 URL
+  function param(k,d){ try{var v=new URLSearchParams(location.search).get(k); return v||d;}catch(e){return d;} }
+  function qs(p){ var q=new URLSearchParams(); q.set('mod','guide');
+    var idx=param('index',''); if(idx)q.set('index',idx);
+    q.set('view',param('view','newthread')); q.set('page',String(p));
+    return 'https://bbs.binmt.cc/forum.php?'+q.toString(); }
+
   function curList(){return document.querySelector(LIST);}
-  function curView(){try{return new URLSearchParams(location.search).get('view')||'newthread';}catch(e){return 'newthread';}}
-  function nextPageUrl(){ return 'https://bbs.binmt.cc/forum.php?mod=guide&view='+curView()+'&page='+(st.page+1); }
-  function loadNext(){ if(st.loading||st.ended)return; var d=curList(); if(!d)return; st.loading=true;
-    fetch(nextPageUrl(),{credentials:'include'}).then(function(r){return r.text();}).then(function(html){ st.loading=false;
-      var tmp=document.createElement('div'); tmp.innerHTML=html; var src=tmp.querySelector(LIST);
-      var items=src?src.querySelectorAll(ITEM):[]; var d2=curList(); if(!d2||!items.length){st.ended=true;return;}
-      var seen={}; var ex=d2.querySelectorAll(ITEM); for(var i=0;i<ex.length;i++){var a=ex[i].querySelector('a[href*="thread-"],a[href*="tid="]'); if(a)seen[a.href]=1;}
-      var appended=0; for(var j=0;j<items.length;j++){ var a=items[j].querySelector('a[href*="thread-"],a[href*="tid="]'); var key=a?a.href:('i'+j);
-        if(key&&seen[key])continue; if(key)seen[key]=1; d2.appendChild(items[j]); appended++; }
-      st.page++; if(appended===0)st.ended=true;
-    }).catch(function(){st.loading=false;st.ended=true;}); }
+
+  // 收集当前已存在的帖子链接集合（去重键）
+  function existingKeys(){ var o={}; var d=curList(); if(!d)return o;
+    var ex=d.querySelectorAll(ITEM);
+    for(var i=0;i<ex.length;i++){ var key=itemKey(ex[i]); if(key)o[key]=1; }
+    return o; }
+  function itemKey(it){ var a=it.querySelector('a[href*="thread-"],a[href*="tid="]'); return a?a.href:''; }
+
+  // 去重后插入：prepend=true 插到最前，否则追加到末尾
+  function insertItems(items,prepend){ var d=curList(); if(!d)return 0;
+    var seen=existingKeys(); var n=0;
+    var arr=Array.prototype.slice.call(items);
+    if(prepend)arr.reverse();
+    var frag=document.createDocumentFragment();
+    for(var i=0;i<arr.length;i++){ var it=arr[i]; var key=itemKey(it);
+      if(key&&seen[key])continue; if(key)seen[key]=1; n++;
+      frag.appendChild(it); }
+    if(prepend)d.insertBefore(frag,d.firstChild); else d.appendChild(frag);
+    return n; }
+
+  // 从抓取 HTML 中提取列表项
+  function parseItems(html){ var tmp=document.createElement('div'); tmp.innerHTML=html;
+    var src=tmp.querySelector(LIST);
+    return src?src.querySelectorAll(ITEM):[]; }
+
+  // ---- 向下加载（下一页，追加到末尾） ----
+  function loadNext(){ if(busy)return; if(st.max>=st.total)return; if(Date.now()-lastLoadAt<PAGE_COOL)return; busy=true; lastLoadAt=Date.now();
+    var need=st.max+1;
+    fetch(qs(need),{credentials:'include'}).then(function(r){return r.text();}).then(function(html){ busy=false;
+      var items=parseItems(html);
+      if(!items.length)return;
+      st.max++;
+      insertItems(items,false);
+    }).catch(function(){busy=false;}); }
+
+  // ---- 滚动触发 ----
   var raf=null; function check(){ if(raf)return; raf=requestAnimationFrame(function(){ raf=null;
-    var d=document.documentElement; if((d.scrollHeight-d.scrollTop-d.clientHeight)<DIST)loadNext(); }); }
+    var d=document.documentElement;
+    var atBottom=(d.scrollHeight-d.scrollTop-d.clientHeight)<DIST;
+    if(atBottom)loadNext(); }); }
   window.addEventListener('scroll',check,{passive:true});
-  setTimeout(function(){ var d=document.documentElement; if(curList()&&d.scrollHeight<=d.clientHeight+DIST)loadNext(); },1200);
+  // 初始：若内容不足以撑满一屏，主动向下加载
+  setTimeout(function(){ var d=document.documentElement;
+    if(curList()&&d.scrollHeight<=d.clientHeight+DIST && st.max<st.total)loadNext(); },1200);
 }
 
 // ========== 自动签到 ==========
@@ -230,7 +473,7 @@ function autoSign(){ if(!on('autoSign'))return;
 function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; window.__autoReply=true;
   if(!/thread-\d+/.test(location.pathname)&&!/mod=viewthread/i.test(location.search))return;
   var TEXTS=['看看隐藏','感谢分享','论坛有你更精彩','看看是什么','谢谢分享'];
-  var RIK='mtar_reply_index', DP='mtar_done_v10_', LRK='mtar_last_reply', FM=16000, PK='mtar_pending', RCM={};
+  var RIK='mtar_reply_index',DP='mtar_done_v11_',LRK='mtar_last_reply',FM=90000,PK='mtar_pending',FUK='mtar_flood_until_',RCM={};
   function ts(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function ri(){ var i=parseInt(localStorage.getItem(RIK)||'0',10); if(isNaN(i)||i<0)i=0; return i%TEXTS.length; }
   function rt(){ return TEXTS[ri()]; }
@@ -241,67 +484,90 @@ function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; 
     try{var q=new URLSearchParams(location.search); if(q.get('tid'))return q.get('tid');}catch(e){} return ''; }
   function hasLocked(){ var s=document.querySelectorAll('.comiis_quote,.locked,div.locked,.t_f,.postmessage,.comiis_postli');
     for(var i=0;i<s.length;i++){ var t=s[i].textContent||''; if(/查看本帖隐藏内容请回复|回复本帖即可查看/.test(t))return true; } return false; }
-  function lockedPids(){ var o={}; var ns=document.querySelectorAll('.comiis_quote');
+  function lockedPids(){ var o={}; var ns=document.querySelectorAll('.comiis_quote,.locked,div.locked,.t_f,.postmessage,.comiis_postli');
     for(var i=0;i<ns.length;i++){ var t=ns[i].textContent||''; if(!/查看本帖隐藏内容请回复|回复本帖即可查看/.test(t))continue;
-      var el=ns[i]; for(var j=0;j<12&&el;j++){ var id=el.id||''; if(/^(pid|post_)\d+$/.test(id)){ var p=id.replace(/\D/g,''); if(p)o[p]=1; break; } el=el.parentElement; } }
+      var el=ns[i]; for(var j=0;j<12&&el;j++){ var id=el.id||''; if(/^(pid|post_)\d+$/.test(id)){ var p=id.replace(/\D/g,''); if(p)o[p]=1; break; } el=el.parentElement; }
+    }
     return Object.keys(o); }
   function hasMine(u){ if(!u)return false; var cs=document.querySelectorAll('div[id^="pid"],div[id^="post_"],div.comiis_postli');
-    for(var i=0;i<cs.length;i++){ var c=cs[i]; if(!c.querySelector)continue; var a=c.querySelector('a[href*="space-uid-"],a[href*="uid="]');
-      if(!a)continue; var h=a.getAttribute('href')||''; var m=h.match(/space-uid-(\d+)/)||h.match(/[?&]uid=(\d+)/); if(m&&m[1]===u)return true; } return false; }
+    for(var i=0;i<cs.length;i++){ var c=cs[i]; if(!c.querySelector)continue; var aa=c.querySelector('a[href*="space-uid-"],a[href*="uid="]');
+      if(!aa)continue; var h=aa.getAttribute('href')||''; var m=h.match(/space-uid-(\d+)/)||h.match(/[?&]uid=(\d+)/); if(m&&m[1]===u)return true; } return false; }
   function isMobile(){ return !!document.getElementById('needmessage')&&!!document.getElementById('fastpostform'); }
-  function done(t){ return !!localStorage.getItem(DP+ts()+'_'+t); }
-  function markDone(t){ localStorage.setItem(DP+ts()+'_'+t,'1'); }
-  function pend(t){ return sessionStorage.getItem(PK+'_'+t)==='1'; }
-  function setPend(t,o){ if(o)sessionStorage.setItem(PK+'_'+t,'1'); else sessionStorage.removeItem(PK+'_'+t); }
-  function submit(){ var f=document.getElementById('fastpostform'),mb=document.getElementById('needmessage');
-    if(!f||!mb)return{ok:false};
-    var act=(f.getAttribute('action')||'').replace(/&amp;/g,'&'); var url=act+'&handlekey=fastpost&loc=1&inajax=1';
+  function done(t){ try{return !!localStorage.getItem(DP+ts()+'_'+t);}catch(e){return false;} }
+  function markDone(t){ try{localStorage.setItem(DP+ts()+'_'+t,'1');}catch(e){} }
+  function pend(t){ try{var v=parseInt(sessionStorage.getItem(PK+'_'+t)||'0',10); if(!v||Date.now()-v>60000){sessionStorage.removeItem(PK+'_'+t);return false;} return true;}catch(e){return false;} }
+  function setPend(t,o){ try{if(o)sessionStorage.setItem(PK+'_'+t,String(Date.now()));else sessionStorage.removeItem(PK+'_'+t);}catch(e){} }
+  function floodUntil(t){ try{var v=parseInt(localStorage.getItem(FUK+t)||'0',10);return isFinite(v)?v:0;}catch(e){return 0;} }
+  function setFlood(t,ms){ try{if(ms>0)localStorage.setItem(FUK+t,String(Date.now()+ms));else localStorage.removeItem(FUK+t);}catch(e){} }
+  function parseFloodWait(txt){
+    var s=String(txt||''); var m=s.match(/(?:少于|间隔|等待|剩余|请(?:稍候|稍后))[^\d]{0,30}(\d+)\s*秒/i);
+    if(!m)m=s.match(/(\d+)\s*秒/i);
+    var n=m?parseInt(m[1],10):30; if(!isFinite(n)||n<1)n=30; if(n>3600)n=3600; return n;
+  }
+  function submit(cb){ var f=document.getElementById('fastpostform'),mb=document.getElementById('needmessage');
+    if(!f||!mb){cb({ok:false,fl:false,fs:0});return;}
+    var act=(f.getAttribute('action')||'').replace(/&amp;/g,'&'); if(!act){cb({ok:false,fl:false,fs:0});return;}
+    var url=act+(act.indexOf('?')>=0?'&':'?')+'handlekey=fastpost&loc=1&inajax=1';
     var fd=new URLSearchParams(); fd.set('formhash',f.elements.formhash?f.elements.formhash.value:'');
     if(f.elements.noticeauthor)fd.set('noticeauthor',f.elements.noticeauthor.value||'');
     fd.set('message',rt()); fd.set('replysubmit','回复');
-    var x=new XMLHttpRequest(); x.open('POST',url,false);
-    x.setRequestHeader('Content-Type','application/x-www-form-urlencoded'); x.setRequestHeader('X-Requested-With','XMLHttpRequest');
-    x.send(fd.toString()); var txt=x.responseText||'';
-    var isFlood=/两次发表间隔少于|间隔少于\s*\d+\s*秒|请稍候再发表|灌水/i.test(txt);
-    var ok=x.status===200&&/succeedhandle_fastpost|回复发布成功/.test(txt)&&!/errorhandle_fastpost/.test(txt)&&!isFlood;
-    var em=txt.match(/少于\s*(\d+)\s*秒/); var fl=isFlood||(!ok&&/两次发表间隔少于\s*\d+\s*秒/.test(txt));
-    var fs=em?parseInt(em[1],10):15; if(!isFinite(fs)||fs<1)fs=15;
-    try{if(ok)localStorage.setItem(LRK,String(Date.now()));}catch(e){}
-    return{ok:ok,fl:fl,fs:fs}; }
-  function viewpidHtml(t,p){ var x=new XMLHttpRequest();
-    x.open('POST','forum.php?mod=viewthread&tid='+t+'&viewpid='+p+'&mobile=2',false);
-    x.setRequestHeader('Content-Type','application/x-www-form-urlencoded'); x.setRequestHeader('X-Requested-With','XMLHttpRequest');
-    x.send(''); if(x.status!==200)return ''; var raw=x.responseText||''; var m=raw.match(/<!\[CDATA\[([\s\S]*?)\]\]>/); return m?m[1]:raw; }
-  function replaceFloor(t,p){ var html=viewpidHtml(t,p); if(!html||html.indexOf('id="pid'+p)<0)return false;
-    var tg=document.getElementById('pid'+p)||document.getElementById('post_'+p); if(!tg)return false;
-    var fr=document.createElement('div'); fr.innerHTML=html; var n=fr.querySelector('#pid'+p)||fr.querySelector('#post_'+p)||fr.firstElementChild;
-    if(!n)return false; tg.outerHTML=n.outerHTML; return true; }
-  function unlock(t,ps){ var d=0; for(var i=0;i<ps.length;i++){if(replaceFloor(t,ps[i]))d++;} return d>0; }
-  function run(){ var t=tid(); if(!t)return; if(!isMobile())return; if(!hasLocked())return;
-    var u=uid(); if(!u||u==='0')return; if(done(t))return; if(pend(t))return; if(hasMine(u)){markDone(t);return;}
+    var x=new XMLHttpRequest(),ended=false;
+    function finish(v){if(ended)return;ended=true;cb(v);}
+    try{x.open('POST',url,true);x.withCredentials=true;x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.setRequestHeader('X-Requested-With','XMLHttpRequest');
+      x.onreadystatechange=function(){if(x.readyState!==4)return;var txt=x.responseText||'',isFlood=/两次发表间隔少于|间隔少于\s*\d+\s*秒|请稍候再发表|请稍后再发表|灌水/i.test(txt);
+        var ok=x.status===200&&/succeedhandle_fastpost|回复发布成功/.test(txt)&&!/errorhandle_fastpost/.test(txt)&&!isFlood;
+        finish({ok:ok,fl:isFlood,fs:isFlood?parseFloodWait(txt):0});};
+      x.onerror=function(){finish({ok:false,fl:false,fs:0});}; x.ontimeout=function(){finish({ok:false,fl:false,fs:0});}; x.timeout=20000; x.send(fd.toString());
+    }catch(e){finish({ok:false,fl:false,fs:0});}}
+  function viewpidHtml(t,p,cb){ var x=new XMLHttpRequest(),doneX=false;
+    function finish(v){if(doneX)return;doneX=true;cb(v);}
+    try{x.open('POST','forum.php?mod=viewthread&tid='+encodeURIComponent(t)+'&viewpid='+encodeURIComponent(p)+'&mobile=2',true);x.withCredentials=true;
+      x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');x.setRequestHeader('X-Requested-With','XMLHttpRequest');
+      x.onreadystatechange=function(){if(x.readyState!==4)return;if(x.status!==200){finish('');return;}var raw=x.responseText||'',m=raw.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);finish(m?m[1]:raw);};
+      x.onerror=function(){finish('');};x.ontimeout=function(){finish('');};x.timeout=15000;x.send('');
+    }catch(e){finish('');}}
+  function replaceFloor(t,p,cb){ viewpidHtml(t,p,function(html){ if(!html||html.indexOf('id="pid'+p)<0){cb(false);return;}
+      var tg=document.getElementById('pid'+p)||document.getElementById('post_'+p); if(!tg){cb(false);return;}
+      try{var fr=document.createElement('div');fr.innerHTML=html;var n=fr.querySelector('#pid'+p)||fr.querySelector('#post_'+p)||fr.firstElementChild;if(!n){cb(false);return;}tg.outerHTML=n.outerHTML;cb(true);}catch(e){cb(false);}});
+  }
+  function unlock(t,ps,cb){ if(!ps||!ps.length){cb(true);return;} var arr=ps.slice(),idx=0,okn=0;
+    function one(){ if(idx>=arr.length){cb(okn===arr.length);return;} var p=arr[idx++];
+      replaceFloor(t,p,function(ok){if(ok)okn++; setTimeout(one,1200+Math.floor(Math.random()*1800));}); }
+    one(); }
+  function scheduleRun(t,ms){ clearTimeout(window.__mtarTimer); window.__mtarTimer=setTimeout(function(){setPend(t,false);run();},Math.max(1000,ms)); }
+  function scheduleUnlock(t,ps,attempt){ clearTimeout(window.__mtarUnlockTimer);
+    window.__mtarUnlockTimer=setTimeout(function(){if(!hasLocked())return;unlock(t,ps,function(ok){if(ok&&!hasLocked())return;
+      if(attempt<5){scheduleUnlock(t,lockedPids(),attempt+1);}else{setTimeout(function(){if(hasLocked())location.reload();},1500);}});},attempt===0?300:Math.min(8000,1500*attempt));}
+  function run(){ var t=tid(); if(!t||!isMobile()||!hasLocked())return; var u=uid(); if(!u||u==='0')return;
+    var ps=lockedPids();
+    if(done(t)){unlock(t,ps,function(ok){if(!ok||hasLocked())scheduleUnlock(t,lockedPids(),1);});return;}
+    if(pend(t))return;
+    var fu=floodUntil(t),now=Date.now(); if(fu>now){scheduleRun(t,fu-now+500+Math.floor(Math.random()*1000));return;}
     var f=document.getElementById('fastpostform'); if(f&&(f.querySelector('[name="seccodeverify"]')||f.querySelector('[name="secqaa"]')))return;
-    var ps=lockedPids(); setPend(t,true);
-    setTimeout(function(){ try{
-      if(done(t)){setPend(t,false);return;} if(!hasLocked()){setPend(t,false);return;}
-      var mb=document.getElementById('needmessage');
-      if(mb&&mb.value&&mb.value.trim()&&mb.value.trim()!==rt()){setPend(t,false);return;}
-      var lr=parseInt(localStorage.getItem(LRK)||'0',10); var since=Date.now()-lr;
-      if(since<FM){ setPend(t,false); var w=FM-since+Math.floor(Math.random()*1000); setTimeout(function(){run();},w); return; }
-      var res=submit();
-      if(res.ok){ markDone(t); adv(); setPend(t,false); if(ps.length){unlock(t,ps);} if(!hasLocked()){} else{setTimeout(function(){location.reload();},800);} }
-      else{ setPend(t,false); var rc=RCM[t]||0;
-        if(res.fl){ RCM[t]=rc+1; var wait=res.fs*1000+2000+Math.random()*2000; setTimeout(function(){ setPend(t,false); run(); },wait); }
-        else{ /* 非频率限制类失败（验证码/内容异常等）：刷新页面让用户可手动处理 */ setTimeout(function(){ location.reload(); },1500); } }
-    }catch(e){setPend(t,false);} },0); }
-  function start(){ if(!/thread-\d+/.test(location.pathname)&&!/mod=viewthread/i.test(location.search))return; run(); }
-  if(document.readyState==='complete'||document.readyState==='interactive')start();
-  else window.addEventListener('DOMContentLoaded',start);
+    if(hasMine(u)){markDone(t);unlock(t,ps,function(ok){if(!ok||hasLocked())scheduleUnlock(t,lockedPids(),1);});return;}
+    setPend(t,true);
+    setTimeout(function(){try{
+      if(!hasLocked()){setPend(t,false);return;}
+      var mb=document.getElementById('needmessage'); if(mb&&mb.value&&mb.value.trim()&&mb.value.trim()!==rt()){setPend(t,false);return;}
+      var lr=parseInt(localStorage.getItem(LRK)||'0',10),since=Date.now()-lr;
+      if(since<FM){setPend(t,false);scheduleRun(t,FM-since+Math.floor(Math.random()*1000));return;}
+      submit(function(res){setPend(t,false);
+        if(res.ok){markDone(t);adv();setFlood(t,0);try{localStorage.setItem(LRK,String(Date.now()));}catch(e){}
+          unlock(t,lockedPids(),function(ok){if(!ok||hasLocked())scheduleUnlock(t,lockedPids(),1);});return;}
+        if(res.fl){var wait=res.fs*1000+10000+Math.floor(Math.random()*10000);setFlood(t,wait);scheduleRun(t,wait+500);return;}
+        var failWait=300000+Math.floor(Math.random()*120000); setFlood(t,failWait); scheduleRun(t,failWait+1000);
+      });
+    }catch(e){setPend(t,false);scheduleRun(t,5000);}},0);}
+  function start(){if(!/thread-\d+/.test(location.pathname)&&!/mod=viewthread/i.test(location.search))return;run();}
+  if(document.readyState==='complete'||document.readyState==='interactive')start();else window.addEventListener('DOMContentLoaded',start);
+  window.addEventListener('pageshow',function(){setTimeout(run,300);});
+  window.addEventListener('focus',function(){setTimeout(run,300);});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(run,300);});
 }
-
 // ========== 只看隐藏贴 ==========
 function hideOnly(){ if(!on('hideOnly'))return; if(window.__hideOnly)return;
   if(/\/thread-[^\/]+\.html/i.test(location.pathname))return; window.__hideOnly=true;
-  var Q=[],active=0,MAX=3;
+  var Q=[],active=0,MAX=1;
   function mark(c,t){ var b=c.querySelector('[data-mt-hide-status]');
     if(!b){ b=document.createElement('span'); b.setAttribute('data-mt-hide-status','1');
       b.style.cssText='font-size:11px;color:#999;margin-left:6px;';
@@ -319,30 +585,47 @@ function hideOnly(){ if(!on('hideOnly'))return; if(window.__hideOnly)return;
     while(p&&p!==document.body&&d++<10){ var tag=p.tagName||'',c=typeof p.className==='string'?p.className:'',id=p.id||'';
       if(/^(LI|TR|TBODY|ARTICLE)$/.test(tag)&&(/(?:^|[ _-])(?:forumlist_li|thread|topic|post)(?:[ _-]|$)/i.test(c)||/^normalthread_/i.test(id)))return p;
       if(!fb&&/^(LI|TR|ARTICLE)$/.test(tag))fb=p; p=p.parentElement; } return fb||n.parentElement; }
-  function scan(){ var links=document.querySelectorAll('a[href*="thread-"],a[href*="mod=viewthread"]');
+  function scan(root){ var links=collectScoped(root||document,'a[href*="thread-"],a[href*="mod=viewthread"]');
     for(var i=0;i<links.length;i++){ var n=links[i],c=itemOf(n);
       if(!c||c===document.body||c===document.documentElement||c.getAttribute('data-mt-hide-filtered'))continue;
       var u=n.href; if(!u)continue; c.setAttribute('data-mt-hide-filtered','checking'); c.style.display=''; mark(c,'检测中'); Q.push({c:c,u:u}); } pump(); }
-  window.__hideScan=scan; scan();
-  setTimeout(scan,500); setTimeout(scan,1500);
-  if(!window.__hoObs){ window.__hoObs=new MutationObserver(function(){scan();}); window.__hoObs.observe(document.documentElement,{childList:true,subtree:true}); }
+  var pend=[];
+  function flush(){ window.__hoT=0; var roots=pend.slice(); pend.length=0; for(var i=0;i<roots.length;i++)scan(roots[i]); }
+  function queue(root){ pushRoot(pend,root); clearTimeout(window.__hoT); window.__hoT=setTimeout(flush,180); }
+  window.__hideScan=function(root){ queue(root||document.body||document.documentElement); };
+  scan(document);
+  setTimeout(function(){ queue(document.body||document.documentElement); },500);
+  setTimeout(function(){ queue(document.body||document.documentElement); },1500);
+  if(!window.__hoObs){ window.__hoObs=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)queue(roots[i]); }); window.__hoObs.observe(document.documentElement,{childList:true,subtree:true}); }
 }
 
 // ========== 个人小黑屋屏蔽 ==========
 function personalBlack(){ if(!on('personalBlack'))return; if(window.__pBlack)return; window.__pBlack=true;
   var KEY='personalBlackList',TKEY='mtThreadOwner';
+  var ITEM_SEL='.comiis_forumlist .forumlist_li, .comiis_postlist .comiis_postli, #threadlist .forumlist_li, li.normalthread_, li.forumlist_li, li.comiis_postli';
   function readOwners(){ try{var v=localStorage.getItem(TKEY);if(!v)return{};var o=JSON.parse(v);if(!o||typeof o!=='object'||Object.prototype.toString.call(o)==='[object Array]')return{};return o;}catch(e){return{};} }
   function writeOwners(o){ try{localStorage.setItem(TKEY,JSON.stringify(o));}catch(e){} }
+  function itemOf(n){ var p=n&&n.nodeType===1?n:(n&&n.parentNode); while(p&&p!==document.body){ if(matchesSel(p,ITEM_SEL))return p; p=p.parentElement; } return null; }
+  function collectItems(root){
+    var out=[],base=root===document?(document.body||document.documentElement):root;
+    if(base&&base.nodeType===3)base=base.parentNode;
+    if(!base||base.nodeType!==1)return out;
+    var cur=itemOf(base); if(cur)pushRoot(out,cur);
+    var nodes=collectScoped(base,ITEM_SEL);
+    for(var i=0;i<nodes.length;i++)pushRoot(out,nodes[i]);
+    return out;
+  }
   function threadIdOf(it){ var as=it.querySelectorAll('a[href*="thread-"]'); for(var i=0;i<as.length;i++){var h=as[i].getAttribute('href')||'';var m=h.match(/thread-(\d+)/);if(m)return m[1];}return null; }
   function threadIdsIn(it){ var out=[],as=it.querySelectorAll('a[href*="thread-"]'); for(var i=0;i<as.length;i++){var h=as[i].getAttribute('href')||'';var m=h.match(/thread-(\d+)/);if(m&&out.indexOf(m[1])<0)out.push(m[1]);}return out; }
-  function uidOf(a){ if(!a)return null; var h=a.getAttribute('href')||''; var m=h.match(/uid=(\d+)/); if(m)return m[1]; var t=a.getAttribute('data-uid'); if(t)return String(t); return null; }
+  function uidOf(a){ if(!a)return null; var h=a.getAttribute('href')||''; var m=h.match(/uid=(\d+)/)||h.match(/space-uid-(\d+)/); if(m)return m[1]; var t=a.getAttribute('data-uid'); if(t)return String(t); return null; }
   function authorAnchor(item){ var u=item.querySelector('a.top_user'); if(u&&uidOf(u))return u;
     var ls=item.querySelectorAll('a[href*="uid="],a[href*="mod=space"]'); var fb=null;
     for(var i=0;i<ls.length;i++){ var a=ls[i]; if(!uidOf(a))continue; var t=(a.textContent||'').trim(); if(t)return a; if(!fb)fb=a; } return fb; }
-  function recordOwners(){ var items=document.querySelectorAll('li.forumlist_li, li.comiis_postli, li.normalthread_, .comiis_forumlist li');
-    var o=null; for(var i=0;i<items.length;i++){ var it=items[i]; var tid=threadIdOf(it); if(!tid)continue;
+  function recordOwners(root){ var items=collectItems(root||document),o=null,dirty=false;
+    for(var i=0;i<items.length;i++){ var it=items[i]; var tid=threadIdOf(it); if(!tid)continue;
       var a=authorAnchor(it); if(!a)continue; var u=uidOf(a); if(!u||u==='0')continue;
-      if(o===null)o=readOwners(); if(o[tid]!==u){o[tid]=u;} } if(o!==null)writeOwners(o); }
+      if(o===null)o=readOwners(); if(o[tid]!==u){o[tid]=u; dirty=true;} }
+    if(o!==null&&dirty)writeOwners(o); }
   function readList(){ var raw=null; try{ raw=localStorage.getItem(KEY); }catch(e){}
     if(!raw) return [];
     var arr=null; try{ arr=JSON.parse(raw); }catch(e2){ return []; }
@@ -367,15 +650,24 @@ function personalBlack(){ if(!on('personalBlack'))return; if(window.__pBlack)ret
     if(!fh){ try{var m=(document.documentElement.innerHTML||'').match(/formhash=([0-9a-zA-Z]{6,})/); if(m)fh=m[1];}catch(e2){} }
     if(!fh){ try{fh=window.formhash||'';}catch(e3){} } return fh; }
   function parseServerHtml(t){ var list=[],seen={}; if(!t)return list;
-    var reBlock=/<li[^>]*class=["']?[^"'>]*\bb_t\b[^"'>]*["']?[^>]*>([\s\S]*?)<\/li>/gi; var bm;
-    while((bm=reBlock.exec(t))){ var block=bm[1]||'',uid='',name='';
-      var mTit=block.match(/<p[^>]*class=["']?[^"'>]*\btit\b[^"'>]*["']?[^>]*>[\s\S]*?<a[^>]*href=["'][^"']*\buid=(\d+)[^"']*\bdo=profile[^"']*["'][^>]*>([\s\S]*?)<\/a>/i)||block.match(/<p[^>]*class=["']?[^"'>]*\btit\b[^"'>]*["']?[^>]*>[\s\S]*?<a[^>]*href=["'][^"']*\bdo=profile[^"']*\buid=(\d+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i);
-      if(mTit){ uid=mTit[1]; name=String(mTit[2]||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim(); }
-      if(!uid){ var mDel=block.match(/href=["'][^"']*subop=delete[^"']*\buid=(\d+)[^"']*["']/i)||block.match(/href=["'][^"']*\buid=(\d+)[^"']*subop=delete[^"']*["']/i);
-        if(mDel)uid=mDel[1]; if(!uid){ var mProf=block.match(/href=["'][^"']*\buid=(\d+)[^"']*\bdo=profile[^"']*["']/i); if(mProf)uid=mProf[1]; } }
-      if(uid&&!seen[uid]){ seen[uid]=1; list.push({uid:uid,user:name,_server:true}); } }
-    if(!list.length){ var reTit=/<p[^>]*class=["']?[^"'>]*\btit\b[^"'>]*["']?[^>]*>[\s\S]*?<a[^>]*href=["'][^"']*\buid=(\d+)[^"']*\bdo=profile[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi; var m2;
-      while((m2=reTit.exec(t))){ var u2=m2[1]; if(!seen[u2]){ seen[u2]=1; list.push({uid:u2,user:String(m2[2]||'').replace(/<[^>]*>/g,'').trim(),_server:true}); } } }
+    // 优先用 DOM 解析，避免论坛模板调整空格、属性顺序或 class 后正则失效。
+    var box=document.createElement('div'); box.innerHTML=t;
+    var nodes=box.querySelectorAll('li.b_t,li[class*=" b_t "],li[class^="b_t "],li[class$=" b_t"],li');
+    for(var i=0;i<nodes.length;i++){
+      var links=nodes[i].querySelectorAll('a[href*="uid="],a[href*="space-uid-"]');
+      for(var j=0;j<links.length;j++){
+        var h=links[j].getAttribute('href')||'',m=h.match(/[?&]uid=(\d+)/)||h.match(/space-uid-(\d+)/);
+        if(!m)continue;
+        var uid=m[1]; if(!uid||seen[uid])continue;
+        var nm=(links[j].textContent||'').replace(/\s+/g,' ').trim();
+        if(!nm)continue;
+        seen[uid]=1; list.push({uid:uid,user:nm,_server:true}); break;
+      }
+    }
+    // DOM 解析没有结果时保留原来的正则兼容路径。
+    if(!list.length){
+      var re=/(?:uid=|space-uid-)(\d+)/g,m2; while((m2=re.exec(t))){var u2=m2[1];if(!seen[u2]){seen[u2]=1;list.push({uid:u2,user:'',_server:true});}}
+    }
     if(!SRV.formhash){ var mfh=t.match(/name=["']?formhash["']?[^>]*value=["']([0-9a-zA-Z]+)["']/i)||t.match(/formhash=([0-9a-zA-Z]{6,})/); if(mfh)SRV.formhash=mfh[1]; }
     if(!SRV.myUid){ var mm=t.match(/home\.php\?mod=space&(?:amp;)?uid=(\d+)&(?:amp;)?do=friend/i); if(mm)SRV.myUid=mm[1]; }
     return list; }
@@ -383,26 +675,38 @@ function personalBlack(){ if(!on('personalBlack'))return; if(window.__pBlack)ret
     try{ localStorage.setItem(SKEY,JSON.stringify(ids)); localStorage.setItem(TSKEY,String(Date.now())); }catch(e){} }
   function fetchServer(cb){ try{ var xhr=new XMLHttpRequest(); xhr.open('GET','https://bbs.binmt.cc/'+SLIST_URL,true); xhr.withCredentials=true;
     xhr.onreadystatechange=function(){ if(xhr.readyState!==4)return; var t=xhr.responseText||'';
-      try{ SRV.list=parseServerHtml(t); SRV.loaded=true; SRV.error=''; if(!SRV.formhash)SRV.formhash=getFormhash(); syncServerCache(); }catch(e){ SRV.error='解析失败:'+e; }
+      try{
+        if(xhr.status!==200){ SRV.error='HTTP '+xhr.status; if(cb)cb(SRV); return; }
+        if(/登录|请先登录|用户名|密码/.test(t)&&!/[\s\S]{0,200}黑名单/.test(t)){ SRV.error='会话失效'; if(cb)cb(SRV); return; }
+        var parsed=parseServerHtml(t);
+        SRV.list=parsed; SRV.loaded=true; SRV.error='';
+        if(!SRV.formhash)SRV.formhash=getFormhash(); syncServerCache();
+      }catch(e){ SRV.error='解析失败:'+e; }
       if(cb)cb(SRV); };
     xhr.onerror=function(){ SRV.error='网络错误'; if(cb)cb(SRV); }; xhr.send(); }catch(e){ SRV.error='请求异常:'+e; if(cb)cb(SRV); } }
-  function ensureServerList(){ try{ var _ts=localStorage.getItem(TSKEY), _has=localStorage.getItem(SKEY);
-      if(!_has||!_ts||(Date.now()-Number(_ts))>604800000){ if(!window.__mtFetching){ window.__mtFetching=1; fetchServer(function(){ window.__mtFetching=0; }); } } }catch(e){} }
+  function ensureServerList(force){ try{ var _ts=localStorage.getItem(TSKEY), _has=localStorage.getItem(SKEY);
+      var stale=!_has||!_ts||(Date.now()-Number(_ts))>21600000;
+      if(force||stale){ if(!window.__mtFetching){ window.__mtFetching=1; fetchServer(function(){ window.__mtFetching=0; schedule(document.body||document.documentElement); }); } } }catch(e){} }
   function serverUidSet(){ var s={}; try{var v=localStorage.getItem(SKEY);
     if(v){var a=JSON.parse(v); if(a&&Object.prototype.toString.call(a)==='[object Array]'){for(var i=0;i<a.length;i++){var u=String(a[i]||'').replace(/\s+/g,'');if(/^\d+$/.test(u))s[u]=1;}}}}catch(e){}return s; }
   function uidSet(){ var s=nativeUidSet(); var l=readList(); for(var i=0;i<l.length;i++)s[l[i].uid]=1;
     var sb=serverUidSet(); for(var u in sb)s[u]=1; return s; }
-  function applyFilter(){ var set=uidSet(); var owners=readOwners(); if(Object.keys(set).length===0)return;
-    var items=document.querySelectorAll('.comiis_forumlist .forumlist_li, .comiis_postlist .comiis_postli, #threadlist .forumlist_li, li.normalthread_, li.forumlist_li, li.comiis_postli');
+  function applyFilter(root){ var set=uidSet(); var owners=readOwners(); var items=collectItems(root||document);
     for(var i=0;i<items.length;i++){ var it=items[i]; var hit=false;
-      var as=it.querySelectorAll('a[href*="uid="]'); for(var k=0;k<as.length;k++){var u=uidOf(as[k]);if(u&&set[u]){hit=true;break;}}
+      var as=it.querySelectorAll('a[href*="uid="],a[href*="space-uid-"],a[href*="mod=space"]'); for(var k=0;k<as.length;k++){var u=uidOf(as[k]);if(u&&set[u]){hit=true;break;}}
       if(!hit){ var tids=threadIdsIn(it); for(var t=0;t<tids.length;t++){var ow=owners[''+tids[t]]; if(ow&&set[ow]){hit=true;break;}} }
       if(hit){ it.style.display='none'; it.setAttribute('data-mt-black-filtered','1'); }
       else if(it.getAttribute('data-mt-black-filtered')){ it.style.display=''; it.removeAttribute('data-mt-black-filtered'); } } }
-  function run(){ applyFilter(); recordOwners(); ensureServerList(); }
-  run(); setTimeout(run,400); setTimeout(run,1200); setTimeout(run,2500);
-  if(!window.__pbTimer){ window.__pbTimer=setInterval(function(){try{run();}catch(e){}},1500); }
-  if(!window.__pbObs){ window.__pbObs=new MutationObserver(function(){run();}); window.__pbObs.observe(document.documentElement,{childList:true,subtree:true}); }
+  function run(root){ applyFilter(root); recordOwners(root); ensureServerList(false); }
+  var pend=[];
+  function flush(){ window.__pbT=0; var roots=pend.slice(); pend.length=0; for(var i=0;i<roots.length;i++){ try{ run(roots[i]); }catch(e){} } }
+  function schedule(root){ pushRoot(pend,root); clearTimeout(window.__pbT); window.__pbT=setTimeout(flush,180); }
+  run(document);
+  setTimeout(function(){ schedule(document.body||document.documentElement); },400);
+  setTimeout(function(){ schedule(document.body||document.documentElement); },1500);
+  window.addEventListener('focus',function(){ ensureServerList(false); schedule(document.body||document.documentElement); },true);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden){ensureServerList(false);schedule(document.body||document.documentElement);}},true);
+  if(!window.__pbObs){ window.__pbObs=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)schedule(roots[i]); }); window.__pbObs.observe(document.documentElement,{childList:true,subtree:true}); }
 }
 
 // ========== UBB 快捷输入栏 ==========
@@ -615,9 +919,13 @@ function mtDialogStyle(){ if(document.getElementById('mt-dlg-style'))return;
     '#mt-dlg-actions{display:flex;justify-content:flex-end;align-items:center;padding:6px 18px 18px;gap:8px;}'+
     '#mt-dlg-actions .mb{min-width:60px;padding:11px 16px;border:none;background:none;font-size:15px;font-weight:500;letter-spacing:.3px;text-align:center;cursor:pointer;color:#6b7280;border-radius:10px;transition:background .15s;}'+
     '#mt-dlg-actions .mb.primary{color:#3a76f0;font-weight:600;}'+
-    '#mt-dlg-actions .mb:active{background:#eef1f6;}'+
-    '#mt-dlg-actions .mb:hover{background:#f3f5f9;}';
-  (document.head||document.documentElement).appendChild(st); }
+     '#mt-dlg-actions .mb:active{background:#eef1f6;}'+
+     '#mt-dlg-actions .mb:hover{background:#f3f5f9;}'+
+     '.mt-align-wrap{display:flex;gap:8px;padding:0 18px;margin:4px 0 6px;}'+
+     '.mt-align-wrap .mt-align-opt{flex:1;padding:11px 0;border:1px solid #e0e2e6;border-radius:10px;font-size:15px;font-weight:500;text-align:center;cursor:pointer;color:#3a76f0;background:#f7f9fc;transition:background .15s;}'+
+     '.mt-align-wrap .mt-align-opt:active{background:#eef1f6;}'+
+     '.mt-align-wrap .mt-align-opt:hover{background:#eef1f6;}';
+   (document.head||document.documentElement).appendChild(st); }
 function mtDialogShell(title){ try{
   mtDialogStyle();
   var mask=document.createElement('div'); mask.id='mt-dlg-mask';
@@ -694,21 +1002,23 @@ function mtSizeDialog(){ try{
 function mtAlignMenu(){ try{
   var sh=mtDialogShell('对齐文本'); if(!sh)return;
   var opts=[['left','居左'],['center','居中'],['right','居右']];
-  var wrap=document.createElement('div'); wrap.id='mt-dlg-actions'; wrap.style.cssText='margin:4px 0 8px;';
+  var wrap=document.createElement('div'); wrap.className='mt-align-wrap';
   function apply(v){ try{
     var sel=ubbSelText();
     if(sel){ ubbChangeText('needmessage','[align='+v+']','[/align]'); }
     else { var ta=document.getElementById('needmessage'); ubbInsertText(ta,'[align='+v+'][/align]'); }
   }catch(e){} sh.close(); }
   opts.forEach(function(o){
-    var b=document.createElement('div'); b.className='mb primary'; b.textContent=o[1];
+    var b=document.createElement('div'); b.className='mt-align-opt'; b.textContent=o[1];
     b.addEventListener('click',function(){ apply(o[0]); });
     wrap.appendChild(b);
   });
+  sh.body.appendChild(wrap);
+  var actions=document.createElement('div'); actions.id='mt-dlg-actions';
   var cb=document.createElement('div'); cb.className='mb'; cb.textContent='取消';
   cb.addEventListener('click',function(){ sh.close(); });
-  wrap.appendChild(cb);
-  sh.body.appendChild(wrap);
+  actions.appendChild(cb);
+  sh.body.appendChild(actions);
 }catch(e){} }
 // 网络视频：视频地址弹窗
 function mtMediaDialog(){ try{
@@ -778,8 +1088,108 @@ function mtImageDialog(){
     });
   });
 }
-// 两步上传：GET 首页取 csrf-token + cookie 会话 -> POST /upload
+// ========== 图片上传（优先：论坛同源 swfupload；降级：MT论坛图床 img.binmt.cc）==========
+// 主入口：先走论坛同源上传（无跨域，Via 可用），失败再降级到 img.binmt.cc 图床
+// 图片大小上限（字节）。0 表示不限制。论坛附件一般建议 ≤ 2MB。
+var MT_IMG_MAX_SIZE = 0;
+
+// 对图片做归一化：webp 等论坛 swfupload 不支持的格式，用 Canvas 转成 png 再上传。
+// 返回 Promise<File>（可原样返回或用转换后的 File 替换）。
+function mtImageNormalize(file){
+  return new Promise(function(resolve){
+    var ext = (file.name||'').split('.').pop().toLowerCase();
+    // 论坛 swfupload 图片白名单（Discuz 默认）：jpg/jpeg/gif/png/bmp
+    var okExt = {jpg:1, jpeg:1, gif:1, png:1, bmp:1};
+    if(okExt[ext]){ resolve(file); return; }   // 支持格式：原样直传
+    // 不支持格式（webp/heic/avif 等）：尝试用 Canvas 转 png
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      try{
+        var c = document.createElement('canvas');
+        c.width = img.naturalWidth; c.height = img.naturalHeight;
+        var ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        c.toBlob(function(blob){
+          if(blob){
+            var newName = (file.name||'image').replace(/\.[^.]+$/,'') + '.png';
+            var f = new File([blob], newName, {type:'image/png'});
+            resolve(f);
+          } else { resolve(file); }  // 转失败：原样返回，让后续逻辑提示
+        }, 'image/png');
+      }catch(e){ URL.revokeObjectURL(url); resolve(file); }
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 function mtImageUpload(file,cb){
+  var done=false;
+  function finish(ok,res){ if(done)return; done=true; cb(ok,res); }
+  mtImageNormalize(file).then(function(f){
+    // 大小限制（默认关闭 MT_IMG_MAX_SIZE=0；如需开启设 >0 字节）
+    if(MT_IMG_MAX_SIZE && f && f.size && f.size > MT_IMG_MAX_SIZE){
+      finish(false,'图片超过 ' + Math.round(MT_IMG_MAX_SIZE/1024/1024) + 'MB，请压缩后重试');
+      return;
+    }
+    mtImageUploadForum(f,function(ok,res){
+      if(ok){ finish(true,res); return; }
+      // 论坛同源上传失败 -> 降级到 img.binmt.cc 图床
+      mtImageUploadBed(f,finish);
+    });
+  }).catch(function(){ finish(false,'图片处理失败'); });
+}
+
+// 路径一：论坛同源附件上传（Discuz misc.php?mod=swfupload），无跨域限制，Via 环境 100% 可用
+function mtImageUploadForum(file,cb){
+  var done=false;
+  function finish(ok,res){ if(done)return; done=true; cb(ok,res); }
+  var credCache=null;
+  // 从当前页面 DOM 提取 uid + hash（附件上传 token，内联在编辑器 uploadformdata 里）
+  function extractUploadCred(){
+    if(credCache&&credCache.uid&&credCache.hash)return credCache;
+    var html=document.documentElement.innerHTML;
+    var uid=null,hash=null;
+    var mu=html.match(/uploadformdata:\s*\{[^}]*uid:\s*["']?(\d+)["']?/i);
+    var mh=html.match(/hash:\s*["']([0-9a-f]{32})["']/i);
+    if(mu)uid=mu[1];
+    if(mh)hash=mh[1];
+    // 兜底：也尝试从独立字段 / 变量读取
+    if(!uid && typeof window.discuz_uid!=='undefined'&&window.discuz_uid)uid=window.discuz_uid;
+    if(!hash){ var m2=html.match(/uploadformdata\s*[:=]\s*\{[^}]*hash\s*[:=]\s*["']([^"']+)["']/i); if(m2)hash=m2[1]; }
+    credCache={uid:uid,hash:hash};
+    return credCache;
+  }
+  var cred=extractUploadCred();
+  if(!cred.uid||!cred.hash){ finish(false,'不在回帖/发帖页面，无法使用论坛图床'); return; }
+  var fd=new FormData();
+  fd.append('uid',cred.uid);
+  fd.append('hash',cred.hash);
+  fd.append('Filedata',file,file.name||'image.png');
+  var url='misc.php?mod=swfupload&operation=upload&type=image&inajax=yes&infloat=yes&simple=2';
+  fetch(url,{method:'POST',credentials:'include',body:fd})
+    .then(function(r){ return r.text(); })
+    .then(function(txt){
+      var raw=String(txt);
+      var a=raw.split('|');
+      if(a[0]==='DISCUZUPLOAD' && a[2]==='0'){
+        var relPath=a[5];
+        if(relPath){ finish(true,(location.origin||'https://bbs.binmt.cc').replace(/\/$/,'')+'/data/attachment/forum/'+String(relPath).replace(/^\/+/,'')); }
+        else{ finish(false,'上传成功但未获取到图片路径'); }
+      } else {
+        var code=a[2];
+        var STATUSMSG={'1':'不支持该扩展名','2':'服务器限制无法上传那么大的附件','3':'用户组限制无法上传那么大的附件','5':'文件类型限制无法上传该格式','6':'今日已无法上传更多文件','7':'请选择图片文件','8':'附件文件无法保存','9':'没有合法的文件被上传','10':'非法操作','11':'今日已无法上传更大的附件','-1':'内部服务器错误'};
+        var reason=STATUSMSG[code]||('错误码 '+code);
+        finish(false,'论坛不支持该图片：'+reason);
+      }
+    })
+    .catch(function(){ finish(false,'论坛图床上传请求失败'); });
+}
+
+// 路径二：降级 - 原 img.binmt.cc 图床两步上传（GET 首页取 csrf-token + cookie 会话 -> POST /upload）
+function mtImageUploadBed(file,cb){
   var BASE='https://img.binmt.cc';
   var useGM=(typeof GM_xmlhttpRequest==='function');
   function failWhy(){ return useGM ? '图床上传失败（请检查脚本跨域授权 @connect）' : '图床上传失败（当前环境缺少 GM_xmlhttpRequest，跨域受限，请尝试手动输入链接）'; }
@@ -867,16 +1277,87 @@ function mtImageUpload(file,cb){
   }
   getToken();
 }
-function ubbInjectStyle(){ if(document.getElementById('mt-ubb-style'))return;
+ function ubbInjectStyle(){ if(document.getElementById('mt-ubb-style'))return;
   var st=document.createElement('style'); st.id='mt-ubb-style';
-  st.textContent='#mt-ubb-bar{display:flex;flex-wrap:wrap;gap:4px;padding:6px 10px;background:#f5f7fa;border:1px solid #e5e5e5;border-bottom:none;}'+
-    '#mt-ubb-bar .ub{display:inline-block;padding:3px 8px;border:1px solid #d0d0d0;border-radius:3px;background:#fff;color:#333;font-size:12px;line-height:16px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}'+
-    '#mt-ubb-bar .ub:active{background:#1e88e5;color:#fff;border-color:#1e88e5;}';
+  st.textContent=
+    // 工具栏容器：改为可横向滚动（触屏原生滚动），解除 swiper 对 transform 的锁定
+    '#comiis_mh_sub{overflow-x:auto!important;overflow-y:hidden!important;touch-action:pan-x!important;-webkit-overflow-scrolling:touch;scrollbar-width:none;}'+
+    '#comiis_mh_sub::-webkit-scrollbar{display:none;}'+
+    '.swiper-wrapper.comiis_post_ico{display:flex!important;flex-wrap:nowrap!important;align-items:center;gap:6px;padding:6px 10px;width:max-content!important;transform:none!important;transition:none!important;}'+
+    // 快速回复框工具栏（无 swiper，直接是 flex 容器），同样设为可横向滚动
+    '.comiis_post_ico.comiis_minipost_icot{display:flex!important;flex-wrap:nowrap!important;align-items:center;gap:6px;padding:6px 10px;overflow-x:auto!important;overflow-y:hidden!important;touch-action:pan-x!important;-webkit-overflow-scrolling:touch;scrollbar-width:none;}'+
+    '.comiis_post_ico.comiis_minipost_icot::-webkit-scrollbar{display:none;}'+
+    // 胶囊按钮（原生按钮统一外观），覆盖 swiper 版与快速回复框版两种容器
+    '.swiper-wrapper.comiis_post_ico a,'+
+    '.comiis_post_ico.comiis_minipost_icot a{display:inline-flex!important;align-items:center;justify-content:center;height:28px;padding:0 11px!important;border:1px solid #e0e4e8;border-radius:14px;background:#fff;color:#444;font-size:12.5px;flex:none!important;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;box-sizing:border-box!important;margin:0!important;line-height:1;white-space:nowrap!important;}'+
+    // 隐藏原生按钮里的 comiis_font 图标字体（只保留文字）
+    '.swiper-wrapper.comiis_post_ico a i.comiis_font::before,.comiis_post_ico.comiis_minipost_icot a i.comiis_font::before{display:none!important;}'+
+    // 原生按钮文字颜色/字体统一
+    '.swiper-wrapper.comiis_post_ico a i.comiis_font,.swiper-wrapper.comiis_post_ico a em,'+
+    '.comiis_post_ico.comiis_minipost_icot a i.comiis_font,.comiis_post_ico.comiis_minipost_icot a em{color:#444!important;font-style:normal!important;font-size:inherit!important;font-weight:400!important;}'+
+    '.swiper-wrapper.comiis_post_ico a:active,'+
+    '.comiis_post_ico.comiis_minipost_icot a:active{background:#3a76f0;color:#fff;border-color:#3a76f0;}'+
+    // UBB 快捷输入栏：独立成一行，横排在原生工具栏下方，可横向滚动
+    '.mt-ubb-row{display:flex!important;flex-wrap:nowrap!important;align-items:center;gap:6px;padding:6px 10px;overflow-x:auto!important;overflow-y:hidden!important;touch-action:pan-x!important;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:#fff;border-bottom:1px solid #eef1f4;overscroll-behavior-x:contain!important;overscroll-behavior-y:contain!important;}'+
+    '.mt-ubb-row::-webkit-scrollbar{display:none;}'+
+    '.mt-ubb-row .ub{display:inline-flex!important;align-items:center;justify-content:center;height:28px;padding:0 11px!important;border:1px solid #e0e4e8;border-radius:14px;background:#fff;color:#444;font-size:12.5px;flex:none!important;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;box-sizing:border-box!important;margin:0!important;line-height:1;white-space:nowrap!important;}'+
+    '.mt-ubb-row .ub:active{background:#3a76f0;color:#fff;border-color:#3a76f0;}'+
+    // 快速回复框（非 swiper）里 UBB 按钮是 span.ub（非 a），需单独补胶囊样式
+    '.comiis_post_ico.comiis_minipost_icot .ub{display:inline-flex!important;align-items:center;justify-content:center;height:28px;padding:0 11px!important;border:1px solid #e0e4e8;border-radius:14px;background:#fff;color:#444;font-size:12.5px;flex:none!important;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;box-sizing:border-box!important;margin:0!important;line-height:1;white-space:nowrap!important;}'+
+    '.comiis_post_ico.comiis_minipost_icot .ub:active{background:#3a76f0;color:#fff;border-color:#3a76f0;}'+
+    // 快速回复框「回复」按钮：摘出后独立一行，重写为通栏主按钮
+    '.mt-reply-submit-row{display:block!important;float:none!important;margin:8px 10px 4px!important;}'+
+    '.mt-reply-submit-row input#fastpostsubmit{display:block!important;width:100%!important;height:38px!important;line-height:38px!important;border:none!important;border-radius:19px!important;background:#3a76f0!important;color:#fff!important;font-size:15px!important;font-weight:600!important;cursor:pointer;-webkit-tap-highlight-color:transparent;}'+
+    '.mt-reply-submit-row input#fastpostsubmit:active{background:#2f63cf!important;}';
   (document.head||document.documentElement).appendChild(st); }
 function ubbBuildBar(){ var ta=document.getElementById('needmessage'); if(!ta)return null;
-  if(document.getElementById('mt-ubb-bar'))return document.getElementById('mt-ubb-bar');
+  if(window.__mtUbbDone)return window.__mtUbbWrap||null;
+  // 优先 swiper 结构（发帖页/独立回复页），否则快速回复框的普通工具栏
+  var wrap=document.querySelector('.swiper-wrapper.comiis_post_ico');
+  var isSwiper=!!wrap;
+  if(!wrap){ wrap=document.querySelector('.comiis_post_ico.comiis_minipost_icot'); }
+  if(!wrap)return null;
   ubbInjectStyle();
-  var bar=document.createElement('div'); bar.id='mt-ubb-bar';
+  var as=wrap.querySelectorAll('a');
+  // 去掉原生按钮里的 comiis_font 图标字体（只删 PUA 图标字符文本节点，保留 i/em 结构，点击行为不受影响）
+  for(var k=0;k<as.length;k++){ (function(a){
+    if(a.id==='fastpostsubmit')return;
+    var ics=a.querySelectorAll('i.comiis_font');
+    for(var x=0;x<ics.length;x++){ (function(ic){
+      var nodes=ic.childNodes;
+      for(var n=nodes.length-1;n>=0;n--){
+        var node=nodes[n];
+        if(node.nodeType===3){
+          var txt=node.nodeValue||'';
+          var clean=txt.replace(/[\ue000-\uf8ff]/g,'').trim();
+          if(clean){ node.nodeValue=clean; } else { ic.removeChild(node); }
+        }
+      }
+    })(ics[x]); }
+  })(as[k]); }
+  // 阻止 swiper 库接管横向手势（仅 swiper 结构存在 comiis_mh_sub）
+  if(isSwiper){
+    var sub=document.getElementById('comiis_mh_sub');
+    if(sub && !sub.__mtTouchStop){ sub.__mtTouchStop=true;
+      ['touchstart','touchmove','touchend'].forEach(function(ev){
+        sub.addEventListener(ev,function(e){ e.stopPropagation(); },true);
+      });
+    }
+  }
+  // 快速回复框：把「回复」提交按钮从横向滚动工具栏中摘出，独立成一行，重写 UI
+  if(!isSwiper){
+    var submitLine=document.getElementById('fastpostsubmitline');
+    if(submitLine && submitLine.parentNode===wrap){
+      wrap.after(submitLine);          // 移到工具栏容器之后，成为独立一行
+      submitLine.className+=' mt-reply-submit-row';
+    }
+  }
+  // UBB 快捷输入栏：
+  // - swiper 结构（发帖页/独立回复页）：独立成一行，不混入原生工具栏，避免污染 $(this).index()。
+  // - 快速回复框（非 swiper，原生是「表情/图片/...」）：保持一栏设计，UBB 插在同一栏；并移除原生「图片」按钮
+  //   （UBB 栏里的「网络图片」功能更好，原生图片按钮多余）。
+  var bar=document.createElement('div');
+  bar.className='mt-ubb-row';
   var list=ubbList();
   for(var i=0;i<list.length;i++){ (function(item){
     var b=document.createElement('span'); b.className='ub'; b.textContent=item.name;
@@ -896,14 +1377,77 @@ function ubbBuildBar(){ var ta=document.getElementById('needmessage'); if(!ta)re
     });
     bar.appendChild(b);
   })(list[i]); }
-  if(ta.parentNode)ta.parentNode.insertBefore(bar,ta); else ta.insertAdjacentElement('beforebegin',bar);
-  return bar; }
+  // 移除原生「图片」按钮（快速回复框独有；UBB 的「网络图片」已替代它）
+  if(!isSwiper){
+    for(var p=0;p<as.length;p++){ (function(a){
+      if((a.textContent||'').indexOf('图片')>=0){ a.parentNode.removeChild(a); }
+    })(as[p]); }
+  }
+  if(isSwiper){
+    // swiper：UBB 独立成一行，挂到最外层工具栏容器之后
+    var outer=wrap.closest('.comiis_post_ico.comiis_minipost_icot')||wrap.parentNode;
+    if(outer && outer.parentNode){ outer.parentNode.insertBefore(bar, outer.nextSibling); }
+    else { wrap.after(bar); }
+  } else {
+    // 快速回复框：保持一栏，把 UBB 按钮逐个插到原工具栏末尾
+    var tip=wrap.querySelector('span.ub');
+    if(tip){ tip.parentNode.removeChild(tip); } // 防御：避免重复
+    while(bar.children.length){ wrap.appendChild(bar.children[0]); } // 依次移入，避免动态长度问题
+    bar=wrap; // 之后的手势拦截/返回值都指向 wrap（实际容器）
+  }
+  // 阻止 UBB 栏横向滑动时把 touch 手势冒泡到页面，误触网站「打开侧边栏设定」逻辑。
+  // 只阻止冒泡（stopPropagation），不影响容器自身的原生横向滚动。
+  var touchTarget=bar;
+  if(!touchTarget.__mtTouchStop){ touchTarget.__mtTouchStop=true;
+    ['touchstart','touchmove','touchend'].forEach(function(ev){
+      touchTarget.addEventListener(ev,function(e){ e.stopPropagation(); },true);
+    });
+  }
+  window.__mtUbbDone=true;
+  window.__mtUbbWrap=touchTarget;
+  return touchTarget; }
 function ubbBar(){ if(!on('ubbBar'))return; if(window.__ubbDone)return; window.__ubbDone=true;
-  function tryBuild(){ var ta=document.getElementById('needmessage'); if(ta&&!document.getElementById('mt-ubb-bar'))ubbBuildBar(); }
+  function tryBuild(){ var ta=document.getElementById('needmessage'); if(ta&&!window.__mtUbbDone)ubbBuildBar(); }
   tryBuild();
   var mo=new MutationObserver(function(){ clearTimeout(window.__ubbT); window.__ubbT=setTimeout(tryBuild,300); });
   mo.observe(document.documentElement,{childList:true,subtree:true});
   window.addEventListener('focus',function(){setTimeout(tryBuild,100);},true); }
+
+// ========== 回复跳转：点击「回复」时直接进入独立回复页（有完整工具栏与 UBB 注入） ==========
+function replyRedirect(){
+  if(window.__mtReplyRedirect)return; window.__mtReplyRedirect=true;
+  // 捕获阶段拦截，抢先于论坛自身的 dialog 弹窗逻辑
+  document.addEventListener('click',function(e){
+    var t=e.target; if(!t||!t.closest)return;
+    var a=t.closest('a'); if(!a)return;
+    var h=(a.getAttribute('href')||'').replace(/&amp;/g,'&');
+    // 命中「回复」链接（指向 action=reply 且带 fid/tid）
+    var m=h.match(/action=reply(?:&|$)/);
+    if(!m)return;
+    // 提取 fid / tid
+    var fid=(h.match(/[?&]fid=(\d+)/)||[])[1];
+    var tid=(h.match(/[?&]tid=(\d+)/)||[])[1];
+    if(!fid||!tid)return;
+    // 目标：独立回复页 URL。必须保留「回复指定楼层/用户」所需的参数，
+    // 否则点击某条评论的「回复」会退化成回复楼主，无法给指定人回复。
+    // 保留 repquote(引用楼层)/reppost(回复楼层)/extra/page/quotemsg 等关键参数。
+    var keep=['repquote','reppost','extra','page','quotemsg','noticetrimstr','noticeauthormsg','pid'];
+    var extra=[];
+    try{
+      var u=new URL(h,location.href);
+      for(var i=0;i<keep.length;i++){
+        var v=u.searchParams.get(keep[i]);
+        if(v!=null) extra.push(keep[i]+'='+encodeURIComponent(v));
+      }
+    }catch(err){}
+    var target='https://bbs.binmt.cc/forum.php?mod=post&action=reply&fid='+fid+'&tid='+tid;
+    if(extra.length) target+='&'+extra.join('&');
+    // 已经是目标 URL 时（点右上角按钮本身）不重复处理
+    if(h===target)return;
+    e.preventDefault(); e.stopPropagation();
+    location.href=target;
+  },true);
+}
 
 // ========== 启动 ==========
 function init(){
@@ -917,6 +1461,7 @@ function init(){
   hideOnly();
   personalBlack();
   ubbBar();
+  replyRedirect();
 }
 if(document.readyState==='complete'||document.readyState==='interactive'){ init(); }
 else { window.addEventListener('DOMContentLoaded', init); }
