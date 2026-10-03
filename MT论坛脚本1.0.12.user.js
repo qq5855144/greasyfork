@@ -9,7 +9,6 @@
 // @connect      https://img.binmt.cc
 // @connect      icdn.binmt.cc
 // @connect      https://icdn.binmt.cc
-// @connect      *
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
@@ -229,7 +228,7 @@ function autoPage(){ if(!on('autoPage'))return; if(window.__autoPage)return;
   var ITEM_SEL='.comiis_postli.comiis_list_readimgs.nfqsqi';
   var TARGET_SEL='.comiis_postlist.kqide';
   var MULTI_SEL='.comiis_multi_box.bg_f.b_t.b_b.mb10';
-  var busy=false;
+  var busy=false, lastLoadAt=0, PAGE_COOL=5000;
   // 页面状态：已加载的页码范围（闭区间）。初始只有当前页。
   var st={min:curPage(),max:curPage(),total:totalPage(),tid:tid()};
 
@@ -314,10 +313,10 @@ function autoPage(){ if(!on('autoPage'))return; if(window.__autoPage)return;
 
   // ---- 向下加载（下一页，追加到末尾） ----
   var loadedPages={}; // 已成功抓取过的页号集合，防「分页错位导致同一页被抓两次」
-  function loadNext(){ if(busy)return; if(st.max>=st.total)return;
+  function loadNext(){ if(busy)return; if(st.max>=st.total)return; if(Date.now()-lastLoadAt<PAGE_COOL)return;
     var need=st.max+1;
     if(loadedPages[need]){ st.max=need; return; } // 该页已加载过，直接跳过不重复抓
-    busy=true;
+    busy=true; lastLoadAt=Date.now();
     var u=nextUrl()||pageUrl(need);
     fetch(u,{credentials:'include'}).then(function(r){return r.text();}).then(function(html){ busy=false;
       var p=parseHtml(html);
@@ -329,10 +328,10 @@ function autoPage(){ if(!on('autoPage'))return; if(window.__autoPage)return;
 
   // ---- 向上加载（上一页，前插到开头） ----
   var prevCool=0; // 向上加载后的冷却时间戳，防止前插后立即再次触发 atTop
-  function loadPrev(){ if(busy)return; if(st.min<=1)return;
+  function loadPrev(){ if(busy)return; if(st.min<=1)return; if(Date.now()-lastLoadAt<PAGE_COOL)return;
     var need=st.min-1;
     if(loadedPages['p'+need]){ st.min=need; return; } // 该页已加载过，跳过
-    busy=true;
+    busy=true; lastLoadAt=Date.now();
     var u=prevUrl(); if(!u)u=pageUrl(need);
     fetch(u,{credentials:'include'}).then(function(r){return r.text();}).then(function(html){ busy=false;
       var p=parseHtml(html);
@@ -391,7 +390,7 @@ function autoPage(){ if(!on('autoPage'))return; if(window.__autoPage)return;
 
 // ========== 导读自动上下页 ==========
 function guideNext(){ if(!on('guideNext'))return; if(!/mod=guide/.test(location.href))return; if(window.__guideNext)return; window.__guideNext=1;
-  var LIST='.comiis_forumlist',ITEM='li.forumlist_li',DIST=900,busy=false;
+  var LIST='.comiis_forumlist',ITEM='li.forumlist_li',DIST=900,busy=false,lastLoadAt=0,PAGE_COOL=5000;
   // 页面状态：已加载的页码范围（闭区间）。初始只有当前页。
   var st={min:curPage(),max:curPage(),total:totalPage()};
 
@@ -437,7 +436,7 @@ function guideNext(){ if(!on('guideNext'))return; if(!/mod=guide/.test(location.
     return src?src.querySelectorAll(ITEM):[]; }
 
   // ---- 向下加载（下一页，追加到末尾） ----
-  function loadNext(){ if(busy)return; if(st.max>=st.total)return; busy=true;
+  function loadNext(){ if(busy)return; if(st.max>=st.total)return; if(Date.now()-lastLoadAt<PAGE_COOL)return; busy=true; lastLoadAt=Date.now();
     var need=st.max+1;
     fetch(qs(need),{credentials:'include'}).then(function(r){return r.text();}).then(function(html){ busy=false;
       var items=parseItems(html);
@@ -474,7 +473,7 @@ function autoSign(){ if(!on('autoSign'))return;
 function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; window.__autoReply=true;
   if(!/thread-\d+/.test(location.pathname)&&!/mod=viewthread/i.test(location.search))return;
   var TEXTS=['看看隐藏','感谢分享','论坛有你更精彩','看看是什么','谢谢分享'];
-  var RIK='mtar_reply_index',DP='mtar_done_v11_',LRK='mtar_last_reply',FM=16000,PK='mtar_pending',FUK='mtar_flood_until_',RCM={};
+  var RIK='mtar_reply_index',DP='mtar_done_v11_',LRK='mtar_last_reply',FM=90000,PK='mtar_pending',FUK='mtar_flood_until_',RCM={};
   function ts(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function ri(){ var i=parseInt(localStorage.getItem(RIK)||'0',10); if(isNaN(i)||i<0)i=0; return i%TEXTS.length; }
   function rt(){ return TEXTS[ri()]; }
@@ -531,8 +530,10 @@ function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; 
       var tg=document.getElementById('pid'+p)||document.getElementById('post_'+p); if(!tg){cb(false);return;}
       try{var fr=document.createElement('div');fr.innerHTML=html;var n=fr.querySelector('#pid'+p)||fr.querySelector('#post_'+p)||fr.firstElementChild;if(!n){cb(false);return;}tg.outerHTML=n.outerHTML;cb(true);}catch(e){cb(false);}});
   }
-  function unlock(t,ps,cb){ if(!ps||!ps.length){cb(true);return;} var left=ps.length,okn=0;
-    for(var i=0;i<ps.length;i++){(function(p){replaceFloor(t,p,function(ok){if(ok)okn++;left--;if(left===0)cb(okn===ps.length);});})(ps[i]);}}
+  function unlock(t,ps,cb){ if(!ps||!ps.length){cb(true);return;} var arr=ps.slice(),idx=0,okn=0;
+    function one(){ if(idx>=arr.length){cb(okn===arr.length);return;} var p=arr[idx++];
+      replaceFloor(t,p,function(ok){if(ok)okn++; setTimeout(one,1200+Math.floor(Math.random()*1800));}); }
+    one(); }
   function scheduleRun(t,ms){ clearTimeout(window.__mtarTimer); window.__mtarTimer=setTimeout(function(){setPend(t,false);run();},Math.max(1000,ms)); }
   function scheduleUnlock(t,ps,attempt){ clearTimeout(window.__mtarUnlockTimer);
     window.__mtarUnlockTimer=setTimeout(function(){if(!hasLocked())return;unlock(t,ps,function(ok){if(ok&&!hasLocked())return;
@@ -553,8 +554,8 @@ function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; 
       submit(function(res){setPend(t,false);
         if(res.ok){markDone(t);adv();setFlood(t,0);try{localStorage.setItem(LRK,String(Date.now()));}catch(e){}
           unlock(t,lockedPids(),function(ok){if(!ok||hasLocked())scheduleUnlock(t,lockedPids(),1);});return;}
-        if(res.fl){var wait=res.fs*1000+2000+Math.floor(Math.random()*2000);setFlood(t,wait);scheduleRun(t,wait+500);return;}
-        setTimeout(function(){if(hasLocked()&&!done(t))location.reload();},2000);
+        if(res.fl){var wait=res.fs*1000+10000+Math.floor(Math.random()*10000);setFlood(t,wait);scheduleRun(t,wait+500);return;}
+        var failWait=300000+Math.floor(Math.random()*120000); setFlood(t,failWait); scheduleRun(t,failWait+1000);
       });
     }catch(e){setPend(t,false);scheduleRun(t,5000);}},0);}
   function start(){if(!/thread-\d+/.test(location.pathname)&&!/mod=viewthread/i.test(location.search))return;run();}
@@ -566,7 +567,7 @@ function autoReply(){ if(!on('autoReply'))return; if(window.__autoReply)return; 
 // ========== 只看隐藏贴 ==========
 function hideOnly(){ if(!on('hideOnly'))return; if(window.__hideOnly)return;
   if(/\/thread-[^\/]+\.html/i.test(location.pathname))return; window.__hideOnly=true;
-  var Q=[],active=0,MAX=3;
+  var Q=[],active=0,MAX=1;
   function mark(c,t){ var b=c.querySelector('[data-mt-hide-status]');
     if(!b){ b=document.createElement('span'); b.setAttribute('data-mt-hide-status','1');
       b.style.cssText='font-size:11px;color:#999;margin-left:6px;';
