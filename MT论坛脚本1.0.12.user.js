@@ -650,15 +650,24 @@ function personalBlack(){ if(!on('personalBlack'))return; if(window.__pBlack)ret
     if(!fh){ try{var m=(document.documentElement.innerHTML||'').match(/formhash=([0-9a-zA-Z]{6,})/); if(m)fh=m[1];}catch(e2){} }
     if(!fh){ try{fh=window.formhash||'';}catch(e3){} } return fh; }
   function parseServerHtml(t){ var list=[],seen={}; if(!t)return list;
-    var reBlock=/<li[^>]*class=["']?[^"'>]*\bb_t\b[^"'>]*["']?[^>]*>([\s\S]*?)<\/li>/gi; var bm;
-    while((bm=reBlock.exec(t))){ var block=bm[1]||'',uid='',name='';
-      var mTit=block.match(/<p[^>]*class=["']?[^"'>]*\btit\b[^"'>]*["']?[^>]*>[\s\S]*?<a[^>]*href=["'][^"']*\buid=(\d+)[^"']*\bdo=profile[^"']*["'][^>]*>([\s\S]*?)<\/a>/i)||block.match(/<p[^>]*class=["']?[^"'>]*\btit\b[^"'>]*["']?[^>]*>[\s\S]*?<a[^>]*href=["'][^"']*\bdo=profile[^"']*\buid=(\d+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i);
-      if(mTit){ uid=mTit[1]; name=String(mTit[2]||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim(); }
-      if(!uid){ var mDel=block.match(/href=["'][^"']*subop=delete[^"']*\buid=(\d+)[^"']*["']/i)||block.match(/href=["'][^"']*\buid=(\d+)[^"']*subop=delete[^"']*["']/i);
-        if(mDel)uid=mDel[1]; if(!uid){ var mProf=block.match(/href=["'][^"']*\buid=(\d+)[^"']*\bdo=profile[^"']*["']/i); if(mProf)uid=mProf[1]; } }
-      if(uid&&!seen[uid]){ seen[uid]=1; list.push({uid:uid,user:name,_server:true}); } }
-    if(!list.length){ var reTit=/<p[^>]*class=["']?[^"'>]*\btit\b[^"'>]*["']?[^>]*>[\s\S]*?<a[^>]*href=["'][^"']*\buid=(\d+)[^"']*\bdo=profile[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi; var m2;
-      while((m2=reTit.exec(t))){ var u2=m2[1]; if(!seen[u2]){ seen[u2]=1; list.push({uid:u2,user:String(m2[2]||'').replace(/<[^>]*>/g,'').trim(),_server:true}); } } }
+    // 优先用 DOM 解析，避免论坛模板调整空格、属性顺序或 class 后正则失效。
+    var box=document.createElement('div'); box.innerHTML=t;
+    var nodes=box.querySelectorAll('li.b_t,li[class*=" b_t "],li[class^="b_t "],li[class$=" b_t"],li');
+    for(var i=0;i<nodes.length;i++){
+      var links=nodes[i].querySelectorAll('a[href*="uid="],a[href*="space-uid-"]');
+      for(var j=0;j<links.length;j++){
+        var h=links[j].getAttribute('href')||'',m=h.match(/[?&]uid=(\d+)/)||h.match(/space-uid-(\d+)/);
+        if(!m)continue;
+        var uid=m[1]; if(!uid||seen[uid])continue;
+        var nm=(links[j].textContent||'').replace(/\s+/g,' ').trim();
+        if(!nm)continue;
+        seen[uid]=1; list.push({uid:uid,user:nm,_server:true}); break;
+      }
+    }
+    // DOM 解析没有结果时保留原来的正则兼容路径。
+    if(!list.length){
+      var re=/(?:uid=|space-uid-)(\d+)/g,m2; while((m2=re.exec(t))){var u2=m2[1];if(!seen[u2]){seen[u2]=1;list.push({uid:u2,user:'',_server:true});}}
+    }
     if(!SRV.formhash){ var mfh=t.match(/name=["']?formhash["']?[^>]*value=["']([0-9a-zA-Z]+)["']/i)||t.match(/formhash=([0-9a-zA-Z]{6,})/); if(mfh)SRV.formhash=mfh[1]; }
     if(!SRV.myUid){ var mm=t.match(/home\.php\?mod=space&(?:amp;)?uid=(\d+)&(?:amp;)?do=friend/i); if(mm)SRV.myUid=mm[1]; }
     return list; }
@@ -666,11 +675,18 @@ function personalBlack(){ if(!on('personalBlack'))return; if(window.__pBlack)ret
     try{ localStorage.setItem(SKEY,JSON.stringify(ids)); localStorage.setItem(TSKEY,String(Date.now())); }catch(e){} }
   function fetchServer(cb){ try{ var xhr=new XMLHttpRequest(); xhr.open('GET','https://bbs.binmt.cc/'+SLIST_URL,true); xhr.withCredentials=true;
     xhr.onreadystatechange=function(){ if(xhr.readyState!==4)return; var t=xhr.responseText||'';
-      try{ SRV.list=parseServerHtml(t); SRV.loaded=true; SRV.error=''; if(!SRV.formhash)SRV.formhash=getFormhash(); syncServerCache(); }catch(e){ SRV.error='解析失败:'+e; }
+      try{
+        if(xhr.status!==200){ SRV.error='HTTP '+xhr.status; if(cb)cb(SRV); return; }
+        if(/登录|请先登录|用户名|密码/.test(t)&&!/[\s\S]{0,200}黑名单/.test(t)){ SRV.error='会话失效'; if(cb)cb(SRV); return; }
+        var parsed=parseServerHtml(t);
+        SRV.list=parsed; SRV.loaded=true; SRV.error='';
+        if(!SRV.formhash)SRV.formhash=getFormhash(); syncServerCache();
+      }catch(e){ SRV.error='解析失败:'+e; }
       if(cb)cb(SRV); };
     xhr.onerror=function(){ SRV.error='网络错误'; if(cb)cb(SRV); }; xhr.send(); }catch(e){ SRV.error='请求异常:'+e; if(cb)cb(SRV); } }
-  function ensureServerList(){ try{ var _ts=localStorage.getItem(TSKEY), _has=localStorage.getItem(SKEY);
-      if(!_has||!_ts||(Date.now()-Number(_ts))>604800000){ if(!window.__mtFetching){ window.__mtFetching=1; fetchServer(function(){ window.__mtFetching=0; schedule(document.body||document.documentElement); }); } } }catch(e){} }
+  function ensureServerList(force){ try{ var _ts=localStorage.getItem(TSKEY), _has=localStorage.getItem(SKEY);
+      var stale=!_has||!_ts||(Date.now()-Number(_ts))>21600000;
+      if(force||stale){ if(!window.__mtFetching){ window.__mtFetching=1; fetchServer(function(){ window.__mtFetching=0; schedule(document.body||document.documentElement); }); } } }catch(e){} }
   function serverUidSet(){ var s={}; try{var v=localStorage.getItem(SKEY);
     if(v){var a=JSON.parse(v); if(a&&Object.prototype.toString.call(a)==='[object Array]'){for(var i=0;i<a.length;i++){var u=String(a[i]||'').replace(/\s+/g,'');if(/^\d+$/.test(u))s[u]=1;}}}}catch(e){}return s; }
   function uidSet(){ var s=nativeUidSet(); var l=readList(); for(var i=0;i<l.length;i++)s[l[i].uid]=1;
@@ -681,14 +697,15 @@ function personalBlack(){ if(!on('personalBlack'))return; if(window.__pBlack)ret
       if(!hit){ var tids=threadIdsIn(it); for(var t=0;t<tids.length;t++){var ow=owners[''+tids[t]]; if(ow&&set[ow]){hit=true;break;}} }
       if(hit){ it.style.display='none'; it.setAttribute('data-mt-black-filtered','1'); }
       else if(it.getAttribute('data-mt-black-filtered')){ it.style.display=''; it.removeAttribute('data-mt-black-filtered'); } } }
-  function run(root){ applyFilter(root); recordOwners(root); ensureServerList(); }
+  function run(root){ applyFilter(root); recordOwners(root); ensureServerList(false); }
   var pend=[];
   function flush(){ window.__pbT=0; var roots=pend.slice(); pend.length=0; for(var i=0;i<roots.length;i++){ try{ run(roots[i]); }catch(e){} } }
   function schedule(root){ pushRoot(pend,root); clearTimeout(window.__pbT); window.__pbT=setTimeout(flush,180); }
   run(document);
   setTimeout(function(){ schedule(document.body||document.documentElement); },400);
   setTimeout(function(){ schedule(document.body||document.documentElement); },1500);
-  window.addEventListener('focus',function(){ schedule(document.body||document.documentElement); },true);
+  window.addEventListener('focus',function(){ ensureServerList(false); schedule(document.body||document.documentElement); },true);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden){ensureServerList(false);schedule(document.body||document.documentElement);}},true);
   if(!window.__pbObs){ window.__pbObs=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)schedule(roots[i]); }); window.__pbObs.observe(document.documentElement,{childList:true,subtree:true}); }
 }
 
