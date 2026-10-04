@@ -331,7 +331,6 @@
     });
   }
   injectSidebarMenu();
-  panel.querySelector('[data-x]').addEventListener('click', function () { panel.classList.remove('open'); });
   panel.querySelector('[data-back]').addEventListener('click', function () {
     panel.classList.remove('open');
     try { document.body.style.overflow = ''; } catch (e) {}
@@ -346,8 +345,6 @@
       var list = readList(); if (idx >= 0 && idx < list.length) { var who = list[idx].user || ('UID ' + list[idx].uid); list.splice(idx, 1); if (writeList(list)) { toast('已移出：' + who); render(); applyFilter(); } else toast('写入失败'); }
       return;
     }
-    var c2 = e.target.closest ? e.target.closest('.mtbh-card') : null;
-    if (c2) { var u = c2.getAttribute('data-uid'); if (u && /^[0-9]+$/.test(u)) location.href = BASE + 'home.php?mod=space&uid=' + encodeURIComponent(u) + '&do=profile'; }
   });
 
   function boot() {
