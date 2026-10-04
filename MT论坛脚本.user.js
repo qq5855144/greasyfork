@@ -725,77 +725,119 @@ function personalBlack(){ if(!on('personalBlack'))return; if(window.__pBlack)ret
   if(!window.__pbObs){ window.__pbObs=new MutationObserver(function(muts){ var roots=collectMutationRoots(muts); for(var i=0;i<roots.length;i++)schedule(roots[i]); }); window.__pbObs.observe(document.documentElement,{childList:true,subtree:true}); }
 
   // ===== 黑名单管理独立页面（纯本地）=====
-  function buildManagerStyle(){ if(document.getElementById('mt-blackmgr-style'))return;
+  // ===== 黑名单管理独立页面（纯本地）=====
+  function buildManagerStyle(){
+    if(document.getElementById('mt-blackmgr-style'))return;
     var st=document.createElement('style'); st.id='mt-blackmgr-style';
-    st.textContent='.mt-blackmgr-page{position:fixed;inset:0;background:#f5f6f7;z-index:99990;display:flex;flex-direction:column;overflow:hidden;}'+
-      '.mt-blackmgr-nav{display:flex;align-items:center;height:48px;padding:0 8px;background:#fff;border-bottom:1px solid #eee;flex:none;}'+
-      '.mt-blackmgr-back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#333;cursor:pointer;}'+
-      '.mt-blackmgr-navtit{flex:1;text-align:center;font-size:16px;font-weight:600;color:#333;}'+
-      '.mt-blackmgr-navright{width:40px;height:40px;}'+
-      '.mt-blackmgr-hero{background:#fff;padding:16px 16px 14px;flex:none;}'+
-      '.mt-blackmgr-hero h1{font-size:22px;font-weight:700;color:#333;margin:0;}'+
-      '.mt-blackmgr-hero p{font-size:13px;color:#999;margin:4px 0 0;}'+
-      '.mt-blackmgr-addrow{display:flex;gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid #f5f5f5;flex:none;}'+
-      '.mt-blackmgr-addrow input{flex:1;border:1px solid #ddd;border-radius:8px;padding:8px 12px;font-size:14px;outline:none;background:#f5f6f7;}'+
-      '.mt-blackmgr-addrow input:focus{border-color:#3a76f0;background:#fff;}'+
-      '.mt-blackmgr-addrow button{flex:none;border:none;background:#3a76f0;color:#fff;font-size:14px;padding:8px 16px;border-radius:8px;cursor:pointer;}'+
-      '.mt-blackmgr-list{overflow-y:auto;flex:1;padding:8px 0;-webkit-overflow-scrolling:touch;}'+
-      '.mt-blackmgr-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border-bottom:1px solid #f5f5f5;}'+
-      '.mt-blackmgr-avatar{width:44px;height:44px;border-radius:50%;background:#e8e8e8;flex:none;margin-right:12px;object-fit:cover;cursor:pointer;}'+
-      '.mt-blackmgr-info{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;}'+
-      '.mt-blackmgr-name{font-size:16px;color:#333;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'+
-      '.mt-blackmgr-uid{font-size:12px;color:#999;}'+
-      '.mt-blackmgr-del{flex:none;margin-left:12px;color:#e53935;font-size:13px;padding:6px 14px;border:1px solid #e53935;border-radius:16px;cursor:pointer;}'+
-      '.mt-blackmgr-empty{padding:48px 16px;text-align:center;color:#999;font-size:14px;}';
-    (document.head||document.documentElement).appendChild(st); }
-  function openBlackManager(){ buildManagerStyle();
-    var old=document.getElementById('mt-blackmgr-page'); if(old)old.parentNode&&old.parentNode.removeChild(old);
-    var page=document.createElement('div'); page.className='mt-blackmgr-page'; page.id='mt-blackmgr-page';
-    // 顶部导航
-    var nav=document.createElement('div'); nav.className='mt-blackmgr-nav';
-    var back=document.createElement('span'); back.className='mt-blackmgr-back'; back.textContent='←';
-    back.addEventListener('click',function(){ page.parentNode&&page.parentNode.removeChild(page); });
-    var navtit=document.createElement('div'); navtit.className='mt-blackmgr-navtit'; navtit.textContent='个人小黑屋';
-    var navright=document.createElement('span'); navright.className='mt-blackmgr-navright';
-    nav.appendChild(back); nav.appendChild(navtit); nav.appendChild(navright); page.appendChild(nav);
-    // 标题区
-    var hero=document.createElement('div'); hero.className='mt-blackmgr-hero';
-    var h1=document.createElement('h1'); h1.textContent='个人小黑屋';
-    var sub=document.createElement('p'); sub.textContent='本地管理你的屏蔽列表';
-    hero.appendChild(h1); hero.appendChild(sub); page.appendChild(hero);
-    // 添加入口
-    var addrow=document.createElement('div'); addrow.className='mt-blackmgr-addrow';
-    var inp=document.createElement('input'); inp.type='text'; inp.placeholder='输入用户 UID 添加';
-    var addbtn=document.createElement('button'); addbtn.textContent='添加';
-    addbtn.addEventListener('click',function(){ var v=(inp.value||'').trim(); if(/^\d+$/.test(v)&&v!=='0'){ addBlack(v,''); renderList(); schedule(document.body||document.documentElement); inp.value=''; } });
-    addrow.appendChild(inp); addrow.appendChild(addbtn); page.appendChild(addrow);
-    // 列表
-    var list=document.createElement('div'); list.className='mt-blackmgr-list';
-    function renderList(){ list.innerHTML=''; var l=readList();
-      if(!l.length){ var e=document.createElement('div'); e.className='mt-blackmgr-empty'; e.textContent='暂未拉黑任何用户'; list.appendChild(e); return; }
+    st.textContent=
+      '.mt-blackmgr-page{position:fixed;inset:0;background:#f3f5f8;z-index:99990;display:flex;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}'+
+      '.mt-blackmgr-nav{display:flex;align-items:center;min-height:92px;padding:12px 16px 14px;background:#3f7ff0;color:#fff;box-sizing:border-box;flex:none;box-shadow:0 2px 8px rgba(45,94,180,.18);}'+
+      '.mt-blackmgr-back{width:40px;height:40px;display:flex;align-items:center;justify-content:flex-start;flex:none;font-size:34px;line-height:40px;font-weight:300;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent;}'+
+      '.mt-blackmgr-navtit{min-width:0;display:flex;flex-direction:column;justify-content:center;flex:1;font-size:19px;line-height:1.35;font-weight:700;color:#fff;}'+
+      '.mt-blackmgr-navtit:after{content:"本地管理你的屏蔽列表";display:block;margin-top:3px;font-size:12px;line-height:1.4;font-weight:400;color:rgba(255,255,255,.82);}'+
+      '.mt-blackmgr-navright{display:none;}'+
+      '.mt-blackmgr-hero,.mt-blackmgr-addrow{display:none;}'+
+      '.mt-blackmgr-list{overflow-y:auto;flex:1;padding:14px 14px 28px;-webkit-overflow-scrolling:touch;box-sizing:border-box;}'+
+      '.mt-blackmgr-item{display:flex;align-items:center;width:100%;min-height:78px;margin:0 0 12px;padding:14px 15px;background:#fff;border-radius:14px;box-sizing:border-box;box-shadow:0 3px 12px rgba(34,52,84,.08);}'+
+      '.mt-blackmgr-avatar{width:48px;height:48px;border-radius:50%;background:#e9edf3;flex:none;margin-right:13px;object-fit:cover;cursor:pointer;}'+
+      '.mt-blackmgr-info{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0;flex:1;}'+
+      '.mt-blackmgr-name{font-size:16px;line-height:22px;color:#222;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'+
+      '.mt-blackmgr-uid{font-size:12px;line-height:17px;color:#9aa1ad;}'+
+      '.mt-blackmgr-del{flex:none;margin-left:12px;color:#f05b76;font-size:14px;line-height:22px;font-weight:600;padding:4px 3px;cursor:pointer;-webkit-tap-highlight-color:transparent;}'+
+      '.mt-blackmgr-empty{padding:70px 16px;text-align:center;color:#9aa1ad;font-size:14px;}';
+    (document.head||document.documentElement).appendChild(st);
+  }
+  function openBlackManager(){
+    buildManagerStyle();
+    var old=document.getElementById('mt-blackmgr-page');
+    if(old)old.parentNode&&old.parentNode.removeChild(old);
+
+    var page=document.createElement('div');
+    page.className='mt-blackmgr-page';
+    page.id='mt-blackmgr-page';
+
+    var nav=document.createElement('div');
+    nav.className='mt-blackmgr-nav';
+
+    var back=document.createElement('span');
+    back.className='mt-blackmgr-back';
+    back.textContent='‹';
+    back.setAttribute('aria-label','返回');
+    back.addEventListener('click',function(){
+      page.parentNode&&page.parentNode.removeChild(page);
+    });
+
+    var navtit=document.createElement('div');
+    navtit.className='mt-blackmgr-navtit';
+    navtit.textContent='个人小黑屋';
+
+    nav.appendChild(back);
+    nav.appendChild(navtit);
+    page.appendChild(nav);
+
+    var list=document.createElement('div');
+    list.className='mt-blackmgr-list';
+
+    function renderList(){
+      list.innerHTML='';
+      var l=readList();
+      if(!l.length){
+        var e=document.createElement('div');
+        e.className='mt-blackmgr-empty';
+        e.textContent='暂未拉黑任何用户';
+        list.appendChild(e);
+        return;
+      }
       for(var i=0;i<l.length;i++){ (function(entry){
-        var item=document.createElement('div'); item.className='mt-blackmgr-item';
-        // 头像
-        var av=document.createElement('img'); av.className='mt-blackmgr-avatar';
+        var item=document.createElement('div');
+        item.className='mt-blackmgr-item';
+
+        var av=document.createElement('img');
+        av.className='mt-blackmgr-avatar';
         var avsrc=entry.avatar||('https://bbs.binmt.cc/uc_server/avatar.php?uid='+entry.uid+'&size=middle');
-        av.src=avsrc; av.setAttribute('referrerpolicy','no-referrer');
+        av.src=avsrc;
+        av.setAttribute('referrerpolicy','no-referrer');
         av.addEventListener('error',function(){ this.style.display='none'; });
-        av.addEventListener('click',function(){ var u=entry.uid; window.open('/home.php?mod=space&uid='+u,'_blank'); });
-        // 信息区（用户名 + UID）
-        var info=document.createElement('div'); info.className='mt-blackmgr-info';
-        var nm=document.createElement('div'); nm.className='mt-blackmgr-name';
-        var nmt=(entry.user||'').trim(); nm.textContent=nmt||('用户 '+entry.uid);
-        var uidsp=document.createElement('div'); uidsp.className='mt-blackmgr-uid'; uidsp.textContent='UID '+entry.uid;
-        info.appendChild(nm); info.appendChild(uidsp);
-        var del=document.createElement('span'); del.className='mt-blackmgr-del'; del.textContent='移出';
-        del.addEventListener('click',function(){ removeBlack(entry.uid); renderList(); schedule(document.body||document.documentElement); });
-        item.appendChild(av); item.appendChild(info); item.appendChild(del); list.appendChild(item);
-      })(l[i]); } }
+        av.addEventListener('click',function(){
+          var u=entry.uid;
+          window.open('/home.php?mod=space&uid='+u,'_blank');
+        });
+
+        var info=document.createElement('div');
+        info.className='mt-blackmgr-info';
+
+        var nm=document.createElement('div');
+        nm.className='mt-blackmgr-name';
+        var nmt=(entry.user||'').trim();
+        nm.textContent=nmt||('用户 '+entry.uid);
+
+        var uidsp=document.createElement('div');
+        uidsp.className='mt-blackmgr-uid';
+        uidsp.textContent='UID '+entry.uid;
+
+        info.appendChild(nm);
+        info.appendChild(uidsp);
+
+        var del=document.createElement('span');
+        del.className='mt-blackmgr-del';
+        del.textContent='移出';
+        del.addEventListener('click',function(){
+          removeBlack(entry.uid);
+          renderList();
+          schedule(document.body||document.documentElement);
+        });
+
+        item.appendChild(av);
+        item.appendChild(info);
+        item.appendChild(del);
+        list.appendChild(item);
+      })(l[i]); }
+    }
+
     page.appendChild(list);
     renderList();
     document.body.appendChild(page);
   }
-  // 暴露给侧边栏「管理」按钮使用
   window.openBlackManager=openBlackManager;
 }
 
