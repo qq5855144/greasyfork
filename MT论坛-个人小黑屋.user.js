@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         MT论坛 - 个人小黑屋（侧边栏 + 全局屏蔽）
 // @namespace    https://bbs.binmt.cc/
-// @version      1.2.0
-// @description  在 MT论坛 注入「个人小黑屋」：①通过网页端侧边栏菜单（访问推广下方）打开黑名单管理面板（个人+论坛「我的屏蔽」+Discuz服务端三源合并，支持移出/清空/刷新）②按 UID 全局屏蔽黑名单用户发布的帖子/楼层。
+// @version      1.3.0
+// @description  参考移动端「个人小黑屋」页面重做管理面板：全屏列表、头像卡片、无 UID 手动添加、无右上角菜单。
 // @author       Operit
 // @match        *://bbs.binmt.cc/*
 // @grant        none
@@ -222,10 +222,54 @@
   }
   function scan() { applyFilter(); recordOwners(); ensureServerList(); }
 
-  var CSS = '.mtbh-panel{position:fixed;right:-360px;top:0;width:340px;max-width:90vw;height:100vh;background:#fff;color:#222;box-shadow:-4px 0 18px rgba(0,0,0,.28);transition:right .25s ease;z-index:2147483002;display:flex;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}.mtbh-panel.open{right:0;}.mtbh-head{display:flex;align-items:center;gap:8px;padding:14px 14px 10px;border-bottom:1px solid #ececec;flex:0 0 auto;}.mtbh-head .t{font-size:16px;font-weight:700;flex:1 1 auto;}.mtbh-head .x{cursor:pointer;font-size:18px;color:#999;padding:0 6px;}.mtbh-count{font-size:12px;color:#888;padding:2px 14px 8px;border-bottom:1px solid #f0f0f0;flex:0 0 auto;}.mtbh-toolbar{display:flex;gap:8px;padding:8px 14px;border-bottom:1px solid #f0f0f0;flex:0 0 auto;}.mtbh-toolbar button{border:1px solid #e0e0e0;background:#fafafa;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;color:#333;}.mtbh-toolbar button.b1{background:#3f8cff;border-color:#3f8cff;color:#fff;}.mtbh-toolbar button.b2{background:#ff4d4f;border-color:#ff4d4f;color:#fff;}.mtbh-list{flex:1 1 auto;overflow-y:auto;padding:8px 0 60px;-webkit-overflow-scrolling:touch;}.mtbh-card{display:flex;align-items:center;gap:10px;padding:10px 14px;margin:2px 0;cursor:pointer;}.mtbh-card:hover{background:#f7f7f7;}.mtbh-av{width:38px;height:38px;border-radius:50%;overflow:hidden;flex:0 0 38px;background:#eee;}.mtbh-av img{width:100%;height:100%;object-fit:cover;display:block;}.mtbh-info{flex:1 1 auto;min-width:0;}.mtbh-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.mtbh-meta{font-size:11px;color:#999;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.mtbh-tag{font-size:10px;color:#3f8cff;font-weight:400;}.mtbh-del{flex:0 0 auto;border:none;background:transparent;color:#ff4d4f;font-size:12px;padding:6px 8px;cursor:pointer;}.mtbh-empty{text-align:center;color:#aaa;font-size:13px;padding:50px 20px;}.mtbh-toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:rgba(0,0,0,.82);color:#fff;font-size:13px;padding:9px 16px;border-radius:20px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:2147483003;max-width:80%;text-align:center;}.mtbh-toast.on{opacity:1;}@media (prefers-color-scheme:dark){.mtbh-panel{background:#1e1e1e;color:#eaeaea;}.mtbh-head{border-color:#2c2c2c;}.mtbh-count,.mtbh-toolbar{border-color:#2c2c2c;}.mtbh-toolbar button{background:#2a2a2a;border-color:#3a3a3a;color:#ddd;}.mtbh-card:hover{background:#2a2a2a;}.mtbh-av{background:#333;}.mtbh-meta{color:#888;}.mtbh-empty{color:#777;}}';
+  var CSS =
+    '.mtbh-panel{position:fixed;inset:0;width:100%;height:100vh;max-width:none;background:#f5f5f5;color:#222;z-index:2147483002;display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;}' +
+    '.mtbh-panel.open{display:flex;}' +
+    '.mtbh-head{height:112px;box-sizing:border-box;flex:0 0 112px;display:flex;align-items:flex-end;padding:0 22px 18px;background:#55b9e9;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.16);}' +
+    '.mtbh-head .back{width:42px;height:42px;display:flex;align-items:center;justify-content:center;margin:0 18px 0 0;font-size:42px;font-weight:200;line-height:38px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;}' +
+    '.mtbh-head .title-wrap{min-width:0;display:flex;flex-direction:column;justify-content:flex-end;}' +
+    '.mtbh-head .t{font-size:29px;line-height:1.15;font-weight:700;letter-spacing:.2px;}' +
+    '.mtbh-head .sub{font-size:18px;line-height:1.25;font-weight:400;opacity:.92;margin-top:8px;}' +
+    '.mtbh-count{display:none;}' +
+    '.mtbh-toolbar{display:none;}' +
+    '.mtbh-list{flex:1 1 auto;overflow-y:auto;padding:48px 32px 36px;-webkit-overflow-scrolling:touch;box-sizing:border-box;}' +
+    '.mtbh-card{display:flex;align-items:center;gap:28px;min-height:160px;box-sizing:border-box;padding:24px 28px;margin:0 0 22px;background:#fff;border-radius:28px;box-shadow:0 5px 15px rgba(0,0,0,.08);cursor:default;-webkit-tap-highlight-color:transparent;}' +
+    '.mtbh-card:last-child{margin-bottom:0;}' +
+    '.mtbh-card:active{transform:scale(.995);}' +
+    '.mtbh-av{width:104px;height:104px;border-radius:50%;overflow:hidden;flex:0 0 104px;background:#e7e9ec;}' +
+    '.mtbh-av img{width:100%;height:100%;object-fit:cover;display:block;}' +
+    '.mtbh-info{flex:1 1 auto;min-width:0;align-self:center;}' +
+    '.mtbh-name{font-size:29px;line-height:1.25;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+    '.mtbh-meta{font-size:23px;line-height:1.3;color:#7b7f84;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+    '.mtbh-tag{display:none;}' +
+    '.mtbh-del{flex:0 0 auto;border:0;background:transparent;color:#ef777d;font-size:25px;line-height:1;padding:16px 0 16px 18px;cursor:pointer;font-weight:400;-webkit-tap-highlight-color:transparent;}' +
+    '.mtbh-del:active{opacity:.55;}' +
+    '.mtbh-empty{text-align:center;color:#aaa;font-size:16px;padding:80px 20px;}' +
+    '.mtbh-toast{position:fixed;left:50%;bottom:36px;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;font-size:14px;padding:10px 18px;border-radius:20px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:2147483003;max-width:80%;text-align:center;}' +
+    '.mtbh-toast.on{opacity:1;}' +
+    '@media (max-width:520px){' +
+      '.mtbh-head{height:112px;flex-basis:112px;padding:0 20px 16px;}' +
+      '.mtbh-head .back{width:38px;height:38px;font-size:38px;margin-right:14px;}' +
+      '.mtbh-head .t{font-size:27px;}' +
+      '.mtbh-head .sub{font-size:17px;margin-top:7px;}' +
+      '.mtbh-list{padding:48px 32px 28px;}' +
+      '.mtbh-card{gap:28px;min-height:158px;padding:24px 28px;border-radius:27px;margin-bottom:22px;}' +
+      '.mtbh-av{width:104px;height:104px;flex-basis:104px;}' +
+      '.mtbh-name{font-size:27px;}' +
+      '.mtbh-meta{font-size:22px;}' +
+      '.mtbh-del{font-size:24px;padding-left:10px;}' +
+    '}' +
+    '@media (max-width:390px){' +
+      '.mtbh-list{padding-left:18px;padding-right:18px;}' +
+      '.mtbh-card{gap:18px;padding-left:20px;padding-right:18px;}' +
+      '.mtbh-av{width:82px;height:82px;flex-basis:82px;}' +
+      '.mtbh-name{font-size:23px;}' +
+      '.mtbh-meta{font-size:18px;}' +
+      '.mtbh-del{font-size:20px;}' +
+    '}';
   var style = document.createElement('style'); style.textContent = CSS; document.head.appendChild(style);
   var panel = document.createElement('div'); panel.className = 'mtbh-panel';
-  panel.innerHTML = '<div class="mtbh-head"><span class="t">🕳️ 个人小黑屋</span><span class="x" data-x>✕</span></div><div class="mtbh-count" data-count>读取中…</div><div class="mtbh-toolbar"><button class="b1" data-refresh>刷新</button><button class="b2" data-clear>清空</button></div><div class="mtbh-list" data-list></div>';
+  panel.innerHTML = '<div class="mtbh-head"><span class="back" data-back aria-label="返回">‹</span><div class="title-wrap"><div class="t">个人小黑屋</div><div class="sub">本地管理你的屏蔽列表</div></div></div><div class="mtbh-count" data-count></div><div class="mtbh-toolbar"></div><div class="mtbh-list" data-list></div>';
   var toastEl = document.createElement('div'); toastEl.className = 'mtbh-toast';
   document.body.appendChild(panel); document.body.appendChild(toastEl);
   var listEl = panel.querySelector('[data-list]'); var countEl = panel.querySelector('[data-count]'); var toastTimer = null;
@@ -246,9 +290,7 @@
       var avHtml = av ? '<img src="' + av + '" onerror="this.style.display=\'none\'">' : '';
       var name = it.user ? esc(it.user) : (it.uid ? ('UID: ' + esc(it.uid)) : '未知用户');
       var meta = []; if (it.uid) meta.push('UID ' + esc(it.uid));
-      if (group === 'native') { meta.push('论坛「我的屏蔽」'); meta.push(it._opt === 'user' ? '按用户名' : '按 UID'); }
-      else if (it.time) meta.push('拉黑于 ' + esc(fmtTime(it.time)));
-      var tag = (group === 'native') ? ' <span class="mtbh-tag">[系统]</span>' : (group === 'server' ? ' <span class="mtbh-tag">[服务端]</span>' : '');
+      var tag = '';
       var delKey = (group === 'native') ? esc(it.uid ? ('uid:' + it.uid) : ('user:' + it.user)) : esc(it.uid);
       return '<div class="mtbh-card" data-uid="' + esc(it.uid) + '" data-delkey="' + delKey + '" data-group="' + group + '" data-idx="' + idx + '"><div class="mtbh-av">' + avHtml + '</div><div class="mtbh-info"><div class="mtbh-name">' + name + tag + '</div><div class="mtbh-meta">' + (meta.join(' · ') || '&nbsp;') + '</div></div><button class="mtbh-del" data-del>移出</button></div>';
     }
@@ -259,7 +301,12 @@
     listEl.innerHTML = html;
   }
 
-    function openPanel() { panel.classList.add('open'); render(); if (!SERVER.loaded) fetchServer(function () { render(); }); }
+    function openPanel() {
+    panel.classList.add('open');
+    try { document.body.style.overflow = 'hidden'; } catch (e) {}
+    render();
+    fetchServer(function () { render(); });
+  }
   function injectSidebarMenu() {
     var ul = document.querySelector('UL.comiis_left_Touch.bdew');
     if (!ul) return;
@@ -285,16 +332,9 @@
   }
   injectSidebarMenu();
   panel.querySelector('[data-x]').addEventListener('click', function () { panel.classList.remove('open'); });
-  panel.querySelector('[data-refresh]').addEventListener('click', function () { toast('正在刷新…'); fetchServer(function () { render(); toast('已刷新'); }); });
-  panel.querySelector('[data-clear]').addEventListener('click', function () {
-    var list = readList(); var natN = readNativeUid().length; var svN = (SERVER.list || []).length;
-    var total = list.length + natN + svN;
-    if (!total) { toast('黑名单已经是空的'); return; }
-    if (window.confirm('确定清空全部黑名单？\n个人 ' + list.length + ' 条 · 系统 ' + natN + ' 条 · 服务端 ' + svN + ' 条')) {
-      writeList([]); clearNativeUid();
-      if (svN > 0) { toast('正在清空服务端黑名单…'); var uids = (SERVER.list || []).map(function (x) { return x.uid; }); var k = 0; function step() { if (k >= uids.length) { SERVER.list = []; syncServerCache(); render(); toast('已清空'); applyFilter(); return; } removeServer(uids[k++], function () { setTimeout(step, 300); }); } step(); }
-      else { toast('已清空'); render(); applyFilter(); }
-    }
+  panel.querySelector('[data-back]').addEventListener('click', function () {
+    panel.classList.remove('open');
+    try { document.body.style.overflow = ''; } catch (e) {}
   });
   listEl.addEventListener('click', function (e) {
     var delBtn = e.target.closest ? e.target.closest('[data-del]') : null;
@@ -319,7 +359,7 @@
     if (!SERVER.loaded) fetchServer(function () { render(); });
   }
 
-  window.__mtbh = { render: render, scan: scan, applyFilter: applyFilter, fetch: fetchServer, list: readList, native: readNativeUid, server: SERVER, open: function () { panel.classList.add('open'); render(); }, close: function () { panel.classList.remove('open'); } };
+  window.__mtbh = { render: render, scan: scan, applyFilter: applyFilter, fetch: fetchServer, list: readList, native: readNativeUid, server: SERVER, open: function () { openPanel(); }, close: function () { panel.classList.remove('open'); try { document.body.style.overflow = ''; } catch (e) {} } };
   boot();
   console.log('[小黑屋] 侧边栏 + 全局屏蔽已注入');
 })();
