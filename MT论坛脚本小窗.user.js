@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MT论坛移动端网页版增强
 // @namespace    https://bbs.binmt.cc/
-// @version 1.0.27
+// @version 1.0.28
 // @description  在侧边栏注入 12项功能独立开关
 // @match        https://bbs.binmt.cc/*
 // @match        http://bbs.binmt.cc/*
