@@ -1,0 +1,151 @@
+name: one-time MT UBB hotfix
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/.mt-ubb-hotfix.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch UBB lifecycle
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          p = Path("MT论坛脚本小窗.user.js")
+          s = p.read_text(encoding="utf-8")
+
+          old_start = "function ubbBar(){"
+          old_end = "\n}\n\n// ========== 回复跳转：点击「回复」时直接进入独立回复页"
+          a = s.find(old_start)
+          if a < 0:
+              raise SystemExit("ubbBar start not found")
+          b = s.find(old_end, a)
+          if b < 0:
+              raise SystemExit("ubbBar end not found")
+
+          new_fn = r'''function ubbBar(){
+  if(!on('ubbBar'))return;
+  // 只安装一次监听器，但不要把「已经注入过一次」当成永久状态。
+  // 小窗里的回复编辑器可能由 AJAX/PJAX 替换，旧的 needmessage/工具栏会被整个重建。
+  if(window.__ubbLifecycleInstalled)return;
+  window.__ubbLifecycleInstalled=true;
+
+  var lastTa=null,lastWrap=null,lastUrl='';
+  function currentWrap(){
+    return document.querySelector('.swiper-wrapper.comiis_post_ico') ||
+      document.querySelector('.comiis_post_ico.comiis_minipost_icot');
+  }
+  function tryBuild(force){
+    try{
+      var ta=document.getElementById('needmessage');
+      var wrap=currentWrap();
+      var href=String(location.href||'');
+      if(!ta||!wrap)return;
+
+      // 编辑器或工具栏被站点重新创建后，必须清掉旧实例状态。
+      if(force || ta!==lastTa || wrap!==lastWrap || href!==lastUrl){
+        if(window.__mtUbbWrap && window.__mtUbbWrap!==wrap){
+          try{window.__mtUbbWrap.removeAttribute('data-mt-ubb-owner');}catch(e){}
+        }
+        window.__mtUbbDone=false;
+        window.__mtUbbWrap=null;
+        lastTa=ta;
+        lastWrap=wrap;
+        lastUrl=href;
+      }
+
+      if(!window.__mtUbbDone){
+        ubbBuildBar();
+      }
+    }catch(e){}
+  }
+
+  tryBuild(true);
+
+  var mo=new MutationObserver(function(){
+    clearTimeout(window.__ubbT);
+    window.__ubbT=setTimeout(function(){tryBuild(false);},120);
+  });
+  mo.observe(document.documentElement,{childList:true,subtree:true});
+
+  function retrySoon(){
+    tryBuild(true);
+    setTimeout(function(){tryBuild(false);},100);
+    setTimeout(function(){tryBuild(false);},300);
+    setTimeout(function(){tryBuild(false);},700);
+    setTimeout(function(){tryBuild(false);},1200);
+    setTimeout(function(){tryBuild(false);},2000);
+  }
+
+  window.addEventListener('focus',function(){setTimeout(function(){tryBuild(false);},100);},true);
+  window.addEventListener('pageshow',retrySoon,true);
+  window.addEventListener('load',retrySoon,true);
+  window.addEventListener('popstate',retrySoon,true);
+  window.addEventListener('hashchange',retrySoon,true);
+
+  // Discuz/主题模板有时通过 history.pushState/replaceState 切换回复编辑器，
+  // 但没有真正刷新 iframe 文档；补一层 URL 变化检测。
+  try{
+    ['pushState','replaceState'].forEach(function(name){
+      var fn=window.history&&window.history[name];
+      if(typeof fn==='function'&&!fn.__mtUbbWrapped){
+        var wrapped=function(){
+          var r=fn.apply(this,arguments);
+          setTimeout(retrySoon,0);
+          return r;
+        };
+        wrapped.__mtUbbWrapped=true;
+        window.history[name]=wrapped;
+      }
+    });
+  }catch(e){}
+
+  // 小窗/异步 iframe 在部分用户脚本管理器中可能比 load 晚执行，
+  // 在回复编辑器出现后的短时间内持续探测，避免只在第一次 load 时错过。
+  var end=Date.now()+12000;
+  var timer=setInterval(function(){
+    try{
+      tryBuild(false);
+      if(Date.now()>end){
+        clearInterval(timer);
+      }
+    }catch(e){
+      clearInterval(timer);
+    }
+  },350);
+
+  // 暴露给父页：父页可安全要求当前 frame 重新检查，不会破坏已有 UI。
+  window.__mtUbbRetry=function(){
+    try{
+      window.__mtUbbDone=false;
+      retrySoon();
+    }catch(e){}
+  };
+  window.addEventListener('message',function(e){
+    try{
+      if(e.data&&e.data.__mtUbbRetry){window.__mtUbbRetry();}
+    }catch(err){}
+  });
+}'''
+          s = s[:a] + new_fn + s[b+2:]
+
+          # 版本递增，避免用户脚本管理器因缓存/版本未变而继续使用旧代码。
+          s = re.sub(r'(@version\s+)1\.0\.27', r'\g<1>1.0.28', s, count=1)
+
+          p.write_text(s, encoding="utf-8")
+      - name: Commit target fix and remove one-time workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "MT论坛脚本小窗.user.js"
+          git rm ".github/workflows/.mt-ubb-hotfix.yml"
+          git commit -m "fix: restore UBB toolbar in small-window reply editor"
+          git push origin main
