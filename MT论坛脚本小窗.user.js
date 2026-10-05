@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MT论坛移动端网页版增强
 // @namespace    https://bbs.binmt.cc/
-// @version 1.0.29
+// @version 1.0.30
 // @description  在侧边栏注入 12项功能独立开关
 // @match        https://bbs.binmt.cc/*
 // @match        http://bbs.binmt.cc/*
@@ -1775,8 +1775,16 @@ function injectUbbIntoIframe(ifr){
     // 正常 UBB 的快速回复形态：放在原生工具栏之后；如果是 swiper/独立回复页，
     // 同样放在工具栏外侧的下一行。
     var outer=wrap.closest('.comiis_post_ico.comiis_minipost_icot')||wrap;
-    if(outer&&outer.parentNode)outer.parentNode.insertBefore(bar,outer.nextSibling);
-    else if(wrap.parentNode)wrap.parentNode.appendChild(bar);
+    // 快速回复框的提交按钮通常紧跟工具栏。必须把 UBB 栏插在「原生工具栏 → 回复按钮」之间，
+    // 不能简单 append 到外层末尾，否则会出现 UBB 在蓝色「回复」按钮下面的情况。
+    var submitLine=doc.getElementById('fastpostsubmitline');
+    if(submitLine&&submitLine.parentNode){
+      submitLine.parentNode.insertBefore(bar,submitLine);
+    }else if(outer&&outer.parentNode){
+      outer.parentNode.insertBefore(bar,outer.nextSibling);
+    }else if(wrap.parentNode){
+      wrap.parentNode.appendChild(bar);
+    }
     return true;
   }
 
