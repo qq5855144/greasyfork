@@ -1594,21 +1594,100 @@ function injectUbbIntoIframe(ifr){
 
 // ========== 回复跳转：点击「回复」时直接进入独立回复页（有完整工具栏与 UBB 注入） ==========
 
-function ubbBar(){ if(!on('ubbBar'))return; if(window.__ubbDone)return; window.__ubbDone=true;
-  function tryBuild(){ var ta=document.getElementById('needmessage'); if(ta&&!window.__mtUbbDone)ubbBuildBar(); }
-  tryBuild();
-  var mo=new MutationObserver(function(){ clearTimeout(window.__ubbT); window.__ubbT=setTimeout(tryBuild,300); });
+function ubbBar(){
+  if(!on('ubbBar'))return;
+  // UBB 监听器只安装一次；编辑器本身可以被 Discuz/AJAX/PJAX 重新创建，
+  // 因此不能用「曾经注入过」作为永久状态。
+  if(window.__ubbLifecycleInstalled)return;
+  window.__ubbLifecycleInstalled=true;
+
+  var lastTa=null,lastWrap=null,lastUrl='';
+  function currentWrap(){
+    return document.querySelector('.swiper-wrapper.comiis_post_ico') ||
+      document.querySelector('.comiis_post_ico.comiis_minipost_icot');
+  }
+  function tryBuild(force){
+    try{
+      var ta=document.getElementById('needmessage');
+      var wrap=currentWrap();
+      var href=String(location.href||'');
+      if(!ta||!wrap)return;
+
+      // 小窗进入「回复编辑页」后，论坛可能复用当前 iframe/document，
+      // 只替换 textarea 与工具栏；此时必须重新允许 ubbBuildBar() 注入。
+      if(force || ta!==lastTa || wrap!==lastWrap || href!==lastUrl){
+        window.__mtUbbDone=false;
+        window.__mtUbbWrap=null;
+        lastTa=ta;
+        lastWrap=wrap;
+        lastUrl=href;
+      }
+      if(!window.__mtUbbDone) ubbBuildBar();
+    }catch(e){}
+  }
+
+  tryBuild(true);
+
+  var mo=new MutationObserver(function(){
+    clearTimeout(window.__ubbT);
+    window.__ubbT=setTimeout(function(){tryBuild(false);},120);
+  });
   mo.observe(document.documentElement,{childList:true,subtree:true});
-  window.addEventListener('focus',function(){setTimeout(tryBuild,100);},true);
-  // 兜底：iframe（小窗）内脚本运行时机可能晚于 needmessage 的首次渲染，
-  // 或快速回复框由异步脚本在 load 后才补齐；这里在 load 后及延时时再重试一次，确保注入。
-  if(document.readyState==='complete'){ setTimeout(tryBuild,200); }
-  else { window.addEventListener('load',function(){ setTimeout(tryBuild,200); setTimeout(tryBuild,800); }); }
-  // 暴露给父页：小窗 iframe 内脚本运行后，父页可调用它强制完整重建 UBB 栏（同源复用完整逻辑）。
-  // 同时监听父页 postMessage 的「重试」通知，解决 iframe 内脚本运行时机晚于工具栏渲染的问题。
-  window.__mtUbbRetry=function(){ try{ window.__mtUbbDone=false; window.__ubbDone=false; tryBuild(); }catch(e){} };
+
+  function retrySoon(){
+    tryBuild(true);
+    setTimeout(function(){tryBuild(false);},100);
+    setTimeout(function(){tryBuild(false);},300);
+    setTimeout(function(){tryBuild(false);},700);
+    setTimeout(function(){tryBuild(false);},1200);
+    setTimeout(function(){tryBuild(false);},2000);
+  }
+
+  window.addEventListener('focus',function(){
+    setTimeout(function(){tryBuild(false);},100);
+  },true);
+  window.addEventListener('pageshow',retrySoon,true);
+  window.addEventListener('load',retrySoon,true);
+  window.addEventListener('popstate',retrySoon,true);
+  window.addEventListener('hashchange',retrySoon,true);
+
+  // 部分论坛模板通过 history.pushState/replaceState 切换回复编辑器，
+  // 没有真正刷新 iframe，因此补充 URL 变化后的重建。
+  try{
+    ['pushState','replaceState'].forEach(function(name){
+      var fn=window.history&&window.history[name];
+      if(typeof fn==='function'&&!fn.__mtUbbWrapped){
+        var wrapped=function(){
+          var r=fn.apply(this,arguments);
+          setTimeout(retrySoon,0);
+          return r;
+        };
+        wrapped.__mtUbbWrapped=true;
+        window.history[name]=wrapped;
+      }
+    });
+  }catch(e){}
+
+  // 覆盖小窗/异步编辑器比 iframe load 更晚出现的情况。
+  var endAt=Date.now()+12000;
+  var timer=setInterval(function(){
+    try{
+      tryBuild(false);
+      if(Date.now()>endAt)clearInterval(timer);
+    }catch(e){clearInterval(timer);}
+  },350);
+
+  // 父页可以通知当前 iframe 重新检查；同源小窗继续复用同一套完整 UBB UI。
+  window.__mtUbbRetry=function(){
+    try{
+      window.__mtUbbDone=false;
+      retrySoon();
+    }catch(e){}
+  };
   window.addEventListener('message',function(e){
-    try{ if(e.data&&e.data.__mtUbbRetry){ window.__mtUbbRetry(); } }catch(err){}
+    try{
+      if(e.data&&e.data.__mtUbbRetry)window.__mtUbbRetry();
+    }catch(err){}
   });
 }
 
