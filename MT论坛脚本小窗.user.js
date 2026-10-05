@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MT论坛移动端网页版增强
 // @namespace    https://bbs.binmt.cc/
-// @version 1.0.28
+// @version 1.0.29
 // @description  在侧边栏注入 12项功能独立开关
 // @match        https://bbs.binmt.cc/*
 // @match        http://bbs.binmt.cc/*
@@ -1574,22 +1574,249 @@ function autoOpenReplyBox(){
 //   3) 定时重试多次，覆盖 iframe 内快速回复框工具栏懒渲染/折叠后才出现的场景。
 // 这样小窗内的 UBB 栏与正常回复/发帖编辑器完全一致，且不会与 iframe 内脚本冲突。
 function injectUbbIntoIframe(ifr){
-  function poke(){
+  // 小窗 iframe 有些环境（尤其移动端用户脚本管理器）不会为动态创建的
+  // iframe 单独执行 userscript。先优先调用 iframe 内完整 UBB 生命周期；
+  // 如果入口不存在，则由父页直接对同源 iframe 的回复编辑器做兜底注入。
+  var fallbackTimer=0,observer=null;
+
+  function getDoc(){
+    try{return ifr.contentDocument||ifr.contentWindow.document||null;}catch(e){return null;}
+  }
+
+  function insertText(doc,ta,str,wrapEnd){
     try{
-      var iwin=ifr.contentWindow; if(!iwin)return;
-      var idoc=ifr.contentDocument; if(!idoc)return;
-      var ta=idoc.getElementById('needmessage');
-      if(!ta)return; // 编辑器还没渲染，等下次
-      // 优先走 iframe 内脚本完整逻辑
-      if(typeof iwin.__mtUbbRetry==='function'){ iwin.__mtUbbRetry(); return; }
-      // 兜底：postMessage 通知 iframe 内脚本重试
-      try{ iwin.postMessage({__mtUbbRetry:true},'*'); }catch(e){}
+      var st=typeof ta.selectionStart==='number'?ta.selectionStart:ta.value.length;
+      var en=typeof ta.selectionEnd==='number'?ta.selectionEnd:ta.value.length;
+      if(st>en){var z=st;st=en;en=z;}
+      var all=ta.value||'',sel=all.substring(st,en);
+      var text=str+(wrapEnd?sel+wrapEnd:'');
+      ta.value=all.substring(0,st)+text+all.substring(en);
+      var pos=st+text.length;
+      ta.selectionStart=ta.selectionEnd=pos;
+      ta.focus();
+      try{ta.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){}
     }catch(e){}
   }
-  poke();
-  setTimeout(poke,300);
-  setTimeout(poke,800);
-  setTimeout(poke,1500);
+
+  function changeText(doc,ta,a,b){
+    try{
+      var st=typeof ta.selectionStart==='number'?ta.selectionStart:ta.value.length;
+      var en=typeof ta.selectionEnd==='number'?ta.selectionEnd:ta.value.length;
+      if(st>en){var z=st;st=en;en=z;}
+      var all=ta.value||'',sel=all.substring(st,en);
+      ta.value=all.substring(0,st)+a+sel+(b||'')+all.substring(en);
+      var pos=st+a.length+sel.length+(b?b.length:0);
+      ta.selectionStart=ta.selectionEnd=pos;
+      ta.focus();
+      try{ta.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){}
+    }catch(e){}
+  }
+
+  function simpleDialog(doc,title,placeholder,apply){
+    try{
+      var old=doc.getElementById('mt-sw-ubb-dialog');
+      if(old)old.parentNode.removeChild(old);
+      var mask=doc.createElement('div');
+      mask.id='mt-sw-ubb-dialog';
+      mask.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;';
+      var box=doc.createElement('div');
+      box.style.cssText='width:100%;max-width:320px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.22);';
+      var h=doc.createElement('div'); h.textContent=title;
+      h.style.cssText='font-size:17px;font-weight:600;color:#1a1a1a;padding:22px 22px 8px;';
+      var inp=doc.createElement('input'); inp.type='text'; inp.placeholder=placeholder||'';
+      inp.style.cssText='display:block;width:calc(100% - 44px);height:40px;margin:8px 22px 12px;padding:0 2px;border:none;border-bottom:1.5px solid #e0e2e6;box-sizing:border-box;font-size:16px;outline:none;';
+      var acts=doc.createElement('div'); acts.style.cssText='display:flex;justify-content:flex-end;gap:6px;padding:4px 14px 14px;';
+      var cancel=doc.createElement('button'); cancel.textContent='取消';
+      var ok=doc.createElement('button'); ok.textContent='确定';
+      [cancel,ok].forEach(function(x){x.style.cssText='min-width:56px;padding:10px 14px;border:0;background:none;font-size:15px;border-radius:8px;';});
+      ok.style.color='#3a76f0';
+      cancel.onclick=function(){try{mask.remove();}catch(e){}};
+      ok.onclick=function(){apply(inp.value||'');try{mask.remove();}catch(e){}};
+      inp.onkeydown=function(e){if(e.key==='Enter')ok.click();};
+      acts.appendChild(cancel);acts.appendChild(ok);
+      box.appendChild(h);box.appendChild(inp);box.appendChild(acts);mask.appendChild(box);
+      mask.onclick=function(e){if(e.target===mask)cancel.click();};
+      (doc.body||doc.documentElement).appendChild(mask);
+      inp.focus();
+    }catch(e){}
+  }
+
+  function buildFallback(){
+    var doc=getDoc(); if(!doc)return false;
+    var ta=doc.getElementById('needmessage');
+    if(!ta)return false;
+    var wrap=doc.querySelector('.swiper-wrapper.comiis_post_ico') ||
+      doc.querySelector('.comiis_post_ico.comiis_minipost_icot') ||
+      doc.querySelector('.comiis_post_ico');
+    if(!wrap)return false;
+
+    // 如果 iframe 内脚本已经接管，直接交给原版逻辑，绝不生成第二套工具栏。
+    try{
+      if(ifr.contentWindow && typeof ifr.contentWindow.__mtUbbRetry==='function'){
+        ifr.contentWindow.__mtUbbRetry();
+        return true;
+      }
+    }catch(e){}
+
+    var old=doc.querySelector('.mt-ubb-row[data-mt-ubb-fallback="1"]');
+    if(old && old.parentNode){
+      // 编辑器被论坛重新创建时，旧 fallback 可能还挂在旧 DOM 上。
+      if(!doc.documentElement.contains(wrap)||!wrap.contains(old)&&old.parentNode!==wrap.parentNode){
+        try{old.parentNode.removeChild(old);}catch(e){}
+        old=null;
+      }
+    }
+    if(old)return true;
+
+    // 与正常回复页保持相同的按钮顺序和文字。
+    var list=[
+      ['隐藏文本','[hide]','[/hide]'],
+      ['URL超连','url','',''],
+      ['网络图片','image','',''],
+      ['代码文本','[code]','[/code]'],
+      ['彩色文字','rainbow','',''],
+      ['字号文字','size','',''],
+      ['加粗','[b]','[/b]'],
+      ['斜体','[i]','[/i]'],
+      ['下划线','[u]','[/u]'],
+      ['删除线','[s]','[/s]'],
+      ['颜色文字','color','',''],
+      ['Email超','email','',''],
+      ['水平线','[hr]\\n','',''],
+      ['对齐文本','align','',''],
+      ['引用文本','[quote]','[/quote]'],
+      ['网络视频','media','',''],
+      ['表格','[table][tr][td]文本[/td][/tr][/table]\\n','',''],
+      ['列表','[list=A]\\n[*] list可以是字母或者数字。\\n[*] 他将会自动依次排列。\\n[/list]\\n','','']
+    ];
+
+    var style=doc.getElementById('mt-sw-ubb-fallback-style');
+    if(!style){
+      style=doc.createElement('style');style.id='mt-sw-ubb-fallback-style';
+      style.textContent='.mt-sw-ubb-fallback{display:flex!important;flex-wrap:nowrap!important;align-items:center;gap:6px;padding:6px 10px;overflow-x:auto!important;overflow-y:hidden!important;touch-action:pan-x!important;-webkit-overflow-scrolling:touch;scrollbar-width:none;background:#fff;border-bottom:1px solid #eef1f4;box-sizing:border-box;}.mt-sw-ubb-fallback::-webkit-scrollbar{display:none}.mt-sw-ubb-fallback .ub{display:inline-flex!important;align-items:center;justify-content:center;height:28px;padding:0 11px!important;border:1px solid #e0e4e8;border-radius:14px;background:#fff;color:#444;font-size:12.5px;flex:none!important;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;box-sizing:border-box!important;line-height:1;white-space:nowrap!important}.mt-sw-ubb-fallback .ub:active{background:#3a76f0;color:#fff;border-color:#3a76f0;}';
+      (doc.head||doc.documentElement).appendChild(style);
+    }
+
+    var bar=doc.createElement('div');
+    bar.className='mt-sw-ubb-fallback';
+    bar.setAttribute('data-mt-ubb-fallback','1');
+
+    function action(item){
+      var ta2=doc.getElementById('needmessage');if(!ta2)return;
+      if(item[1]==='url'){
+        simpleDialog(doc,'插入链接','https://example.com',function(v){
+          if(v)changeText(doc,ta2,'[url='+v+']','[/url]');
+        });return;
+      }
+      if(item[1]==='email'){
+        simpleDialog(doc,'插入邮箱链接','name@example.com',function(v){
+          if(v)changeText(doc,ta2,'[email='+v+']','[/email]');
+        });return;
+      }
+      if(item[1]==='image'){
+        simpleDialog(doc,'网络图片','图片链接',function(v){
+          if(v)changeText(doc,ta2,'[img]'+v+'[/img]',''); 
+        });return;
+      }
+      if(item[1]==='rainbow'){
+        var sel=(ta2.selectionStart!=null&&ta2.selectionEnd!=null)?ta2.value.substring(ta2.selectionStart,ta2.selectionEnd):'';
+        if(!sel){try{ifr.contentWindow.alert('请选中一段文字');}catch(e){}return;}
+        var r=255,g=0,b=0,i=1,step=40,out='';
+        function hx(v){var q=parseInt(v).toString(16);return q.length===1?'0'+q:q;}
+        for(var k=0;k<sel.length;k++){
+          var ch=sel.charAt(k);
+          if(ch.charCodeAt(0)!==32){
+            if(g+step<256){if(i===1)g+=step;}else if(i===1){i=2;g=255;}
+            if(r-step>-1){if(i===2)r-=step;}else if(i===2){i=3;r=0;}
+            if(b+step<256){if(i===3)b+=step;}else if(i===3){i=4;b=255;}
+            if(g-step>-1){if(i===4)g-=step;}else if(i===4){i=5;g=0;}
+            if(r+step<256){if(i===5)r+=step;}else if(i===5){i=6;r=255;}
+            if(b-step>-1){if(i===6)b-=step;}else if(i===6){i=1;b=0;}
+            out+='[color=#'+(hx(r)+hx(g)+hx(b)).toUpperCase()+']'+ch+'[/color]';
+          }else out+=ch;
+        }
+        changeText(doc,ta2,out,'');return;
+      }
+      if(item[1]==='size'){
+        simpleDialog(doc,'文字大小','1~7',function(v){
+          var n=parseInt(v,10);if(!n||n<1||n>7)return;
+          changeText(doc,ta2,'[size='+n+']','[/size]');
+        });return;
+      }
+      if(item[1]==='color'){
+        simpleDialog(doc,'颜色文字','#RRGGBB',function(v){
+          v=(v||'').trim();if(!/^#?[0-9a-f]{6}$/i.test(v))return;
+          if(v.charAt(0)!=='#')v='#'+v;
+          changeText(doc,ta2,'[color='+v.toUpperCase()+']','[/color]');
+        });return;
+      }
+      if(item[1]==='align'){
+        simpleDialog(doc,'对齐文本','left / center / right',function(v){
+          v=(v||'left').trim().toLowerCase();if(['left','center','right'].indexOf(v)<0)v='left';
+          changeText(doc,ta2,'[align='+v+']','[/align]');
+        });return;
+      }
+      if(item[1]==='media'){
+        simpleDialog(doc,'网络视频','视频地址',function(v){
+          if(v)changeText(doc,ta2,'[media=x,500,375]'+v+'[/media]','');
+        });return;
+      }
+      changeText(doc,ta2,item[1],item[2]);
+    }
+
+    for(var i=0;i<list.length;i++){
+      (function(item){
+        var btn=doc.createElement('span');btn.className='ub';btn.textContent=item[0];
+        btn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();action(item);},true);
+        bar.appendChild(btn);
+      })(list[i]);
+    }
+
+    // 正常 UBB 的快速回复形态：放在原生工具栏之后；如果是 swiper/独立回复页，
+    // 同样放在工具栏外侧的下一行。
+    var outer=wrap.closest('.comiis_post_ico.comiis_minipost_icot')||wrap;
+    if(outer&&outer.parentNode)outer.parentNode.insertBefore(bar,outer.nextSibling);
+    else if(wrap.parentNode)wrap.parentNode.appendChild(bar);
+    return true;
+  }
+
+  function poke(){
+    try{
+      var iwin=ifr.contentWindow;if(!iwin)return;
+      var idoc=getDoc();if(!idoc)return;
+      var ta=idoc.getElementById('needmessage');
+      if(!ta)return;
+      if(typeof iwin.__mtUbbRetry==='function'){
+        iwin.__mtUbbRetry();return;
+      }
+      buildFallback();
+    }catch(e){}
+  }
+
+  function observe(){
+    var doc=getDoc();if(!doc||!doc.documentElement)return;
+    try{
+      if(observer)observer.disconnect();
+      observer=new MutationObserver(function(){
+        clearTimeout(fallbackTimer);
+        fallbackTimer=setTimeout(poke,80);
+      });
+      observer.observe(doc.documentElement,{childList:true,subtree:true});
+    }catch(e){}
+  }
+
+  function retry(){
+    poke();observe();
+    [100,300,700,1200,2000,3500].forEach(function(ms){
+      setTimeout(function(){poke();},ms);
+    });
+  }
+
+  retry();
+  if(!ifr.__mtUbbFrameLoadBound){
+    ifr.__mtUbbFrameLoadBound=true;
+    ifr.addEventListener('load',function(){retry();});
+  }
 }
 
 // ========== 回复跳转：点击「回复」时直接进入独立回复页（有完整工具栏与 UBB 注入） ==========
