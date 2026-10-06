@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://bbs.binmt.cc/
-// @version      2.2.0
+// @version      2.3.0
 // @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单与沉浸式顶栏
 // @match        *://*/*
 // @run-at       document-idle
@@ -11,9 +11,11 @@
 (function () {
   'use strict';
 
-  if (window.top !== window.self) return;
-  if (window.__MT_GLOBAL_LINK_WINDOW__) return;
-  window.__MT_GLOBAL_LINK_WINDOW__ = true;
+  var FRAME_MODE = window.top !== window.self;
+  if (!FRAME_MODE) {
+    if (window.__MT_GLOBAL_LINK_WINDOW__) return;
+    window.__MT_GLOBAL_LINK_WINDOW__ = true;
+  }
 
   var KEY = 'mt-global-link-window-v2';
   var DEFAULTS = {
@@ -488,7 +490,49 @@
 
   function titleFromAnchor(a){return(a.getAttribute('title')||a.getAttribute('aria-label')||a.textContent||hostOf(a.href)||'网页').replace(/\s+/g,' ').trim().slice(0,80);}
 
+  function postFrameLink(url,title){
+    try{
+      window.top.postMessage({
+        type:'MT_GLOBAL_LINK_WINDOW_OPEN',
+        url:url,
+        title:title||hostOf(url)||'网页'
+      },'*');
+    }catch(e){}
+  }
+
+  function initFrameMode(){
+    // 小窗 iframe 中不再创建第二层小窗，只把点击请求交给外层小窗。
+    document.addEventListener('click',function(e){
+      if(e.defaultPrevented||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
+      var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;
+      if(!shouldIntercept(a))return;
+      e.preventDefault();e.stopImmediatePropagation();
+      postFrameLink(a.href,titleFromAnchor(a));
+    },true);
+  }
+
+  function installFrameMessageBridge(){
+    window.addEventListener('message',function(e){
+      if(!e.data||e.data.type!=='MT_GLOBAL_LINK_WINDOW_OPEN'||!state.opened)return;
+      var source=e.source;
+      var matched=null;
+      for(var i=0;i<state.tabs.length;i++){
+        var t=state.tabs[i];
+        if(t.frame&&t.frame.contentWindow===source){matched=t;break;}
+      }
+      if(!matched||!isWeb(e.data.url))return;
+      try{
+        var expected=new URL(matched.url).origin;
+        if(e.origin!=='null'&&e.origin!==expected)return;
+      }catch(err){return;}
+      var host=hostOf(e.data.url);
+      if(isSearchEngine(e.data.url)||inList(host,cfg.whitelist)||inList(host,cfg.blacklist))return;
+      openTab(e.data.url,String(e.data.title||host||'网页').slice(0,80));
+    });
+  }
+
   document.addEventListener('click',function(e){
+    if(FRAME_MODE)return;
     if(e.defaultPrevented||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
     var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;
     if(!shouldIntercept(a))return;
@@ -496,12 +540,17 @@
   },true);
 
   window.addEventListener('popstate',function(e){
+    if(FRAME_MODE)return;
     if(state.historyMarker&&!e.state){
       state.historyMarker=false;
       if(state.opened)finishClose();
     }
   });
 
-  function init(){addStyle();}
+  function init(){
+    if(FRAME_MODE){initFrameMode();return;}
+    addStyle();
+    installFrameMessageBridge();
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
