@@ -139,7 +139,7 @@
       '.mt-sw-panel{position:fixed;left:0;right:0;bottom:0;z-index:999999;height:' + CONFIG.panelHeight + ';background:#fff;border-radius:18px 18px 0 0;' +
         'transform:translateY(100%);transition:transform ' + CONFIG.animationMs + 'ms cubic-bezier(.32,.72,.36,1);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 24px rgba(0,0,0,.2);}' +
       '.mt-sw-panel.mt-sw-show{transform:translateY(0);}' +
-      '.mt-sw-head{display:flex;align-items:center;justify-content:flex-end;padding:8px 12px;border-bottom:1px solid #53BCF5;flex:none;background:#53BCF5;}' +
+      '.mt-sw-head{display:flex;align-items:center;justify-content:flex-end;padding:8px 12px;border-bottom:1px solid var(--mt-sw-color,#53BCF5);flex:none;background:var(--mt-sw-color,#53BCF5);transition:background .25s ease,border-color .25s ease;}' +
       '.mt-sw-acts{flex:none;display:flex;align-items:center;gap:12px;}' +
       '.mt-sw-btn{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;' +
         'background:rgba(255,255,255,.22);color:#fff;cursor:pointer;user-select:none;transition:background .15s ease,transform .1s ease;}' +
@@ -160,6 +160,134 @@
 
     if (mask) mask.remove();
     if (panel) panel.remove();
+  }
+
+  function colorLuma(r, g, b) {
+    return (r * 299 + g * 587 + b * 114) / 1000;
+  }
+
+  function normalizeColor(value) {
+    if (!value) return null;
+    value = String(value).trim();
+
+    // rgb()/rgba()
+    var m = value.match(/^rgba?\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)(?:\\s*,\\s*([\\d.]+))?\\s*\\)$/i);
+    if (m) {
+      var a = m[4] == null ? 1 : parseFloat(m[4]);
+      if (a <= 0) return null;
+      return {
+        r: parseInt(m[1], 10),
+        g: parseInt(m[2], 10),
+        b: parseInt(m[3], 10),
+        a: a
+      };
+    }
+
+    // #rgb / #rrggbb
+    m = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (m) {
+      var hex = m[1];
+      if (hex.length === 3) {
+        return {
+          r: parseInt(hex[0] + hex[0], 16),
+          g: parseInt(hex[1] + hex[1], 16),
+          b: parseInt(hex[2] + hex[2], 16),
+          a: 1
+        };
+      }
+      return {
+        r: parseInt(hex.slice(0, 2), 16),
+        g: parseInt(hex.slice(2, 4), 16),
+        b: parseInt(hex.slice(4, 6), 16),
+        a: 1
+      };
+    }
+
+    return null;
+  }
+
+  function colorToCss(c) {
+    if (!c) return '#53BCF5';
+    return 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
+  }
+
+  function getReadableButtonColor(c) {
+    // 深色顶栏使用白色按钮；很浅的页面顶部使用深色按钮。
+    return c && colorLuma(c.r, c.g, c.b) > 205 ? 'rgba(0,0,0,.58)' : '#fff';
+  }
+
+  function detectIframeTopColor(iframe, callback) {
+    // 同源页面：直接读取顶部实际渲染区域。
+    try {
+      var doc = iframe.contentDocument;
+      if (!doc) throw new Error('no document');
+
+      var candidates = [];
+      if (doc.body) candidates.push(doc.body);
+      if (doc.documentElement) candidates.push(doc.documentElement);
+
+      // 优先寻找常见页面顶栏/导航区域。
+      var selectors = [
+        'header',
+        '[role="banner"]',
+        'nav',
+        '.header',
+        '.navbar',
+        '.topbar',
+        '.top-bar',
+        '.site-header',
+        '.page-header'
+      ];
+
+      for (var i = 0; i < selectors.length; i++) {
+        try {
+          var nodes = doc.querySelectorAll(selectors[i]);
+          for (var j = 0; j < Math.min(nodes.length, 3); j++) {
+            candidates.unshift(nodes[j]);
+          }
+        } catch (e) {}
+      }
+
+      for (var k = 0; k < candidates.length; k++) {
+        var el = candidates[k];
+        if (!el) continue;
+
+        var rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+        if (rect && (rect.height <= 0 || rect.bottom <= 0)) continue;
+
+        var cs = iframe.contentWindow.getComputedStyle(el);
+        var bg = normalizeColor(cs.backgroundColor);
+        if (bg && bg.a > 0.05) {
+          callback(bg);
+          return;
+        }
+      }
+
+      // 没找到明显的顶栏时，读取 body/html 的背景色。
+      var fallback = null;
+      for (var n = 0; n < candidates.length; n++) {
+        var elem = candidates[n];
+        if (elem === doc.body || elem === doc.documentElement) {
+          var style = iframe.contentWindow.getComputedStyle(elem);
+          fallback = normalizeColor(style.backgroundColor);
+          if (fallback) break;
+        }
+      }
+
+      callback(fallback || {r: 83, g: 188, b: 245, a: 1});
+    } catch (e) {
+      // 跨域页面无法读取 iframe DOM。此时保持原来的蓝色兜底，不影响小窗使用。
+      callback({r: 83, g: 188, b: 245, a: 1});
+    }
+  }
+
+  function applyAdaptiveColor(head, acts, iframe) {
+    detectIframeTopColor(iframe, function (color) {
+      if (!head) return;
+      var css = colorToCss(color);
+      head.style.setProperty('--mt-sw-color', css);
+      if (acts) acts.style.color = getReadableButtonColor(color);
+    });
   }
 
   function openSmallWindow(url, title) {
@@ -210,6 +338,13 @@
     iframe.src = url;
     iframe.setAttribute('scrolling', 'auto');
     iframe.setAttribute('loading', 'eager');
+
+    iframe.addEventListener('load', function () {
+      applyAdaptiveColor(head, acts, iframe);
+      // 页面异步渲染顶栏时再次检测。
+      setTimeout(function () { applyAdaptiveColor(head, acts, iframe); }, 500);
+      setTimeout(function () { applyAdaptiveColor(head, acts, iframe); }, 1500);
+    });
 
     panel.appendChild(head);
     panel.appendChild(iframe);
