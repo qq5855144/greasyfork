@@ -13,7 +13,6 @@
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
 // @run-at       document-idle
-// @noframes
 // ==/UserScript==
 
 (function () {
