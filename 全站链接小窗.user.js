@@ -84,12 +84,12 @@
   }
 
   function hostOf(url) {
-    try { return new URL(url, location.href).hostname.toLowerCase().replace(/^www\\./, ''); }
+    try { return new URL(url, location.href).hostname.toLowerCase().replace(/^www\./, ''); }
     catch (e) { return ''; }
   }
 
   function domainMatch(host, domain) {
-    domain = String(domain || '').toLowerCase().replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0];
+    domain = String(domain || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
     return !!domain && (host === domain || host.endsWith('.' + domain));
   }
 
@@ -112,7 +112,7 @@
     if (!a || !a.href || !isWeb(a.href)) return false;
     if (a.closest && a.closest('.mt-sw-root')) return false;
     if (a.hasAttribute('download')) return false;
-    if ((a.getAttribute('rel') || '').toLowerCase().split(/\\s+/).indexOf('external') >= 0) return false;
+    if ((a.getAttribute('rel') || '').toLowerCase().split(/\s+/).indexOf('external') >= 0) return false;
 
     var url = a.href, host = hostOf(url);
     if (isSearchEngine(url)) return false;
@@ -172,10 +172,10 @@
     if (!cfg.mediaPreview) return 'html';
     var p = '';
     try { p = new URL(url).pathname.toLowerCase(); } catch (e) {}
-    if (/\\.(png|jpe?g|gif|webp|bmp|svg|avif|ico)(?:$|\\?)/i.test(p)) return 'image';
-    if (/\\.(mp4|webm|m4v|mov|ogv)(?:$|\\?)/i.test(p)) return 'video';
-    if (/\\.(mp3|m4a|aac|ogg|wav|flac)(?:$|\\?)/i.test(p)) return 'audio';
-    if (/\\.pdf(?:$|\\?)/i.test(p)) return 'pdf';
+    if (/\.(png|jpe?g|gif|webp|bmp|svg|avif|ico)(?:$|\?)/i.test(p)) return 'image';
+    if (/\.(mp4|webm|m4v|mov|ogv)(?:$|\?)/i.test(p)) return 'video';
+    if (/\.(mp3|m4a|aac|ogg|wav|flac)(?:$|\?)/i.test(p)) return 'audio';
+    if (/\.pdf(?:$|\?)/i.test(p)) return 'pdf';
     return 'html';
   }
 
@@ -225,7 +225,7 @@
 
   function parseColor(v) {
     if (!v || v === 'transparent') return null;
-    var m = String(v).match(/^rgba?\\(\\s*(\\d+)\\D+(\\d+)\\D+(\\d+)(?:\\D+([\\d.]+))?\\s*\\)$/i);
+    var m = String(v).match(/^rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)(?:\D+([\d.]+))?\s*\)$/i);
     if (m && (m[4] == null || parseFloat(m[4]) > .05)) return {r:+m[1],g:+m[2],b:+m[3],a:m[4]==null?1:+m[4]};
     m = String(v).match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
     if (m) { var h=m[1]; if(h.length===3) h=h.split('').map(function(x){return x+x}).join(''); return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16),a:1}; }
@@ -234,7 +234,7 @@
 
   function gradientColor(v) {
     if (!v || v === 'none') return null;
-    var m = String(v).match(/(?:linear|radial)-gradient\\([^)]*?((?:#[0-9a-f]{3,6}|rgba?\\([^)]*\\)))/i);
+    var m = String(v).match(/(?:linear|radial)-gradient\([^)]*?((?:#[0-9a-f]{3,6}|rgba?\([^)]*\)))/i);
     return m ? parseColor(m[1]) : null;
   }
 
@@ -530,8 +530,8 @@
       '<div class="mt-sw-setting"><label>记忆网站小窗高度 <input data-set="rememberHeight" type="checkbox" '+(cfg.rememberHeight?'checked':'')+'></label></div>' +
       '<div class="mt-sw-setting"><label>多标签模式 <input data-set="multiTab" type="checkbox" '+(cfg.multiTab?'checked':'')+'></label></div>' +
       '<div class="mt-sw-setting"><label>媒体智能预览 <input data-set="mediaPreview" type="checkbox" '+(cfg.mediaPreview?'checked':'')+'></label><div class="mt-sw-tip">图片、视频、音频、PDF 优先使用对应预览器。</div></div>' +
-      '<div class="mt-sw-setting"><b>白名单域名</b><textarea data-set="whitelist" placeholder="每行一个，例如 example.com">'+esc(cfg.whitelist.join('\\n'))+'</textarea><div class="mt-sw-tip">白名单网站的链接保持正常浏览器打开。</div></div>' +
-      '<div class="mt-sw-setting"><b>黑名单域名</b><textarea data-set="blacklist" placeholder="每行一个">'+esc(cfg.blacklist.join('\\n'))+'</textarea><div class="mt-sw-tip">黑名单网站完全不进入小窗。</div></div>' +
+      '<div class="mt-sw-setting"><b>白名单域名</b><textarea data-set="whitelist" placeholder="每行一个，例如 example.com">'+esc(cfg.whitelist.join('\n'))+'</textarea><div class="mt-sw-tip">白名单网站的链接保持正常浏览器打开。</div></div>' +
+      '<div class="mt-sw-setting"><b>黑名单域名</b><textarea data-set="blacklist" placeholder="每行一个">'+esc(cfg.blacklist.join('\n'))+'</textarea><div class="mt-sw-tip">黑名单网站完全不进入小窗。</div></div>' +
       '<div class="mt-sw-settings-actions"><button class="mt-sw-secondary" data-cancel>取消</button><button class="mt-sw-primary" data-save>保存</button></div>';
 
     box.querySelector('[data-cancel]').onclick=function(){toggleSettings(false);};
@@ -539,7 +539,7 @@
       cfg.height=Math.max(45,Math.min(98,Number(box.querySelector('[data-set=height]').value)||92));
       ['adaptiveColor','rememberHeight','multiTab','mediaPreview'].forEach(function(k){cfg[k]=box.querySelector('[data-set='+k+']').checked;});
       ['whitelist','blacklist'].forEach(function(k){
-        cfg[k]=box.querySelector('[data-set='+k+']').value.split(/\\r?\\n|,/).map(function(x){return x.trim().toLowerCase();}).filter(Boolean);
+        cfg[k]=box.querySelector('[data-set='+k+']').value.split(/\r?\n|,/).map(function(x){return x.trim().toLowerCase();}).filter(Boolean);
       });
       saveConfig(); setPanelHeight(cfg.height); toggleSettings(false);
       var t=activeTab();if(t)applyColor(t);
@@ -547,7 +547,7 @@
   }
 
   function titleFromAnchor(a) {
-    return (a.getAttribute('title')||a.getAttribute('aria-label')||a.textContent||hostOf(a.href)||'网页').replace(/\\s+/g,' ').trim().slice(0,80);
+    return (a.getAttribute('title')||a.getAttribute('aria-label')||a.textContent||hostOf(a.href)||'网页').replace(/\s+/g,' ').trim().slice(0,80);
   }
 
   document.addEventListener('click',function(e){
