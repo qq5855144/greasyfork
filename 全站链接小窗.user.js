@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://bbs.binmt.cc/
-// @version      2.1.0
+// @version      2.2.0
 // @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单与沉浸式顶栏
 // @match        *://*/*
 // @run-at       document-idle
@@ -195,28 +195,68 @@
     return m?parseColor(m[1]):null;
   }
 
-  function detectColor(t,done){
+  function colorDistance(a,b){return Math.sqrt(Math.pow(a.r-b.r,2)+Math.pow(a.g-b.g,2)+Math.pow(a.b-b.b,2));}
+  
+  function detectTopColor(t,done){
     var fallback={r:83,g:188,b:245,a:1};
     try{
-      var doc=t.frame&&t.frame.contentDocument;
-      if(!doc)throw 0;
+      var doc=t.frame&&t.frame.contentDocument, win=t.frame&&t.frame.contentWindow;
+      if(!doc||!win)throw 0;
+
       var meta=doc.querySelector('meta[name="theme-color"],meta[name="msapplication-navbutton-color"]');
       var mc=meta&&parseColor(meta.content);
-      if(mc)return done(mc);
-      var selectors=['header','[role="banner"]','nav','.header','.navbar','.topbar','.top-bar','.site-header','.page-header'];
-      var list=[];
-      selectors.forEach(function(sel){try{Array.prototype.slice.call(doc.querySelectorAll(sel)).slice(0,4).forEach(function(x){list.push(x);});}catch(e){}});
-      list.push(doc.body,doc.documentElement);
-      for(var i=0;i<list.length;i++){
-        var el=list[i];if(!el)continue;
-        var r=el.getBoundingClientRect?el.getBoundingClientRect():null;
-        if(r&&(r.height<=0||r.bottom<=0||r.top>160))continue;
-        var cs=t.frame.contentWindow.getComputedStyle(el);
-        var c=parseColor(cs.backgroundColor)||gradientColor(cs.backgroundImage);
-        if(c)return done(c);
-      }
+      if(mc && (luma(mc)<245 || colorDistance(mc,{r:255,g:255,b:255})>18)) return done(mc);
+
+      var candidates=[];
+      var selectors=[
+        'header','nav','[role="banner"]',
+        '.header','.navbar','.nav','.topbar','.top-bar','.site-header','.page-header',
+        '.header-wrap','.header-inner','.top-header','.main-header',
+        '.head','.headbar','.top','.topnav','.menu','.menu-bar'
+      ];
+      selectors.forEach(function(sel){
+        try{Array.prototype.slice.call(doc.querySelectorAll(sel)).slice(0,12).forEach(function(el){candidates.push(el);});}catch(e){}
+      });
+
+      // 补充扫描首屏顶部元素，兼容论坛使用自定义 class 的情况。
+      try{
+        Array.prototype.slice.call(doc.body.querySelectorAll('*')).slice(0,800).forEach(function(el){
+          var r=el.getBoundingClientRect();
+          if(r.top<=80 && r.bottom>=20 && r.width>=Math.min(win.innerWidth*.55,360) && r.height>=24 && r.height<=180) candidates.push(el);
+        });
+      }catch(e){}
+
+      var best=null,bestScore=-Infinity,seen=[];
+      candidates.forEach(function(el){
+        if(seen.indexOf(el)>=0)return; seen.push(el);
+        try{
+          var r=el.getBoundingClientRect();
+          if(!r||r.width<win.innerWidth*.35||r.height<18||r.top>140||r.bottom<0)return;
+          var cs=win.getComputedStyle(el);
+          var c=parseColor(cs.backgroundColor)||gradientColor(cs.backgroundImage);
+          if(!c)return;
+
+          var area=Math.min(r.width,win.innerWidth)*Math.min(r.height,180);
+          var topBonus=Math.max(0,100-Math.max(0,r.top))*3;
+          var heightBonus=Math.min(r.height,100);
+          var nonWhiteBonus=luma(c)<238 ? 260 : 0;
+          var score=area*.003+topBonus+heightBonus+nonWhiteBonus;
+
+          // 白色/接近白色的 body 大背景不能把真正的彩色顶部覆盖掉。
+          if(luma(c)>248 && r.height>120) score-=500;
+          if(score>bestScore){bestScore=score;best=c;}
+        }catch(e){}
+      });
+
+      if(best)return done(best);
       done(fallback);
     }catch(e){done(fallback);}
+  }
+
+  function detectColor(t,done){
+    detectTopColor(t,function(c){
+      done(c);
+    });
   }
 
   function applyColor(t){
@@ -228,6 +268,16 @@
       state.head.style.setProperty('--mt-sw-color',color);
       state.head.style.setProperty('--mt-sw-fg',fg);
       if(state.panel){state.panel.style.setProperty('--mt-sw-color',color);state.panel.style.setProperty('--mt-sw-fg',fg);}
+    });
+  }
+
+  function retryColor(t){
+    if(!cfg.adaptiveColor||!t||!t.frame)return;
+    [80,260,700,1400].forEach(function(delay){
+      setTimeout(function(){
+        if(state.opened&&activeTab()===t&&!t.frame)return;
+        if(state.opened&&activeTab()===t)applyColor(t);
+      },delay);
     });
   }
 
@@ -310,7 +360,7 @@
       el.addEventListener('load',function(){
         t.loading=false;
         try{t.sameOrigin=!!el.contentDocument;}catch(e){t.sameOrigin=false;}
-        applyColor(t);installSameOriginBridge(t);
+        applyColor(t);retryColor(t);installSameOriginBridge(t);
         if(t.title==='网页'||t.title==='新标签页'){try{t.title=el.contentDocument.title||hostOf(t.url)||'网页';}catch(e){}}
         updateTabs();
       });
