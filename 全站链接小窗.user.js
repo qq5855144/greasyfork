@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://bbs.binmt.cc/
-// @version      1.0.0
+// @version      1.0.1
 // @description  将网页中的普通链接改为底部滑入式小窗打开，搜索引擎域名自动排除
 // @match        *://*/*
 // @run-at       document-idle
