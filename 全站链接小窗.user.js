@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://bbs.binmt.cc/
-// @version      2.7.2
-// @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏；小窗内跳转地址同步（含跨域回传
+// @version      2.7.3
+// @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏（浅色/深色主题自适应+颜色记忆）；小窗内跳转地址同步（含跨域回传）
 // @match        *://*/*
 // @run-at       document-idle
 // @grant        none
@@ -156,6 +156,11 @@
 
     (document.head || document.documentElement).appendChild(s);
 
+    // 主题变量覆盖样式：让标签/按钮跟随顶栏明暗（主样式行过长，单独注入）
+    var tv = document.createElement('style');
+    tv.textContent = '.mt-sw-tab{background:var(--mt-sw-tab-bg,rgba(255,255,255,.18));color:var(--mt-sw-tab-fg,#fff)}.mt-sw-tab.active{background:var(--mt-sw-tab-active-bg,rgba(255,255,255,.92));color:var(--mt-sw-tab-active-fg,#222)}.mt-sw-tab b{opacity:.72}.mt-sw-add{background:var(--mt-sw-add-bg,rgba(255,255,255,.14));color:var(--mt-sw-tab-fg,#fff)}.mt-sw-btn{background:var(--mt-sw-btn-bg,rgba(255,255,255,.2))}.mt-sw-tabbar{border-bottom-color:var(--mt-sw-tabline,rgba(255,255,255,.24))}';
+    (document.head || document.documentElement).appendChild(tv);
+
     // 严格 CSP 站点可能拦截内联 <style>，改用 CSSOM insertRule 兜底（不受 style-src 限制）
     var needCssom = false;
     try { needCssom = !s.sheet || !s.sheet.cssRules || s.sheet.cssRules.length === 0; }
@@ -206,6 +211,20 @@
   function saveSiteHeight(host,height) {
     if(!cfg.rememberHeight||!host)return;
     try { var s=JSON.parse(localStorage.getItem(KEY+':sites')||'{}');s[host]={height:Math.round(height)};localStorage.setItem(KEY+':sites',JSON.stringify(s)); } catch(e){}
+  }
+
+  function getSiteColor(host){
+    try { var s=JSON.parse(localStorage.getItem(KEY+':sites')||'{}'); return s[host]&&s[host].color; }
+    catch(e){return null;}
+  }
+
+  function saveSiteColor(host,c){
+    if(!host||!c)return;
+    try{
+      var s=JSON.parse(localStorage.getItem(KEY+':sites')||'{}');
+      var e=s[host]||{};e.color={r:c.r,g:c.g,b:c.b};
+      s[host]=e;localStorage.setItem(KEY+':sites',JSON.stringify(s));
+    }catch(err){}
   }
 
   function luma(c){return(c.r*299+c.g*587+c.b*114)/1000;}
@@ -279,6 +298,13 @@
       });
 
       if(best)return done(best);
+      // 白底页面用浅色主题兜底，避免白页配蓝顶栏
+      var bodyBg=null;
+      try{
+        var bcs=win.getComputedStyle(doc.body);
+        bodyBg=parseColor(bcs.backgroundColor)||gradientColor(bcs.backgroundImage);
+      }catch(e){}
+      if(bodyBg&&luma(bodyBg)>238)return done({r:248,g:248,b:248,a:1});
       done(fallback);
     }catch(e){done(fallback);}
   }
@@ -291,13 +317,37 @@
 
   function applyColor(t){
     if(!state.head||!cfg.adaptiveColor)return;
+    // 图片/视频/音频预览用固定深色顶栏
+    if(t&&t.view&&(t.view.tagName==='IMG'||t.view.tagName==='VIDEO'||t.view.tagName==='AUDIO')){
+      applyThemeVars({r:34,g:34,b:34,a:1});
+      return;
+    }
     detectColor(t,function(c){
       state.color=c;
-      var color='rgb('+c.r+','+c.g+','+c.b+')';
-      var fg=luma(c)>205?'rgba(0,0,0,.65)':'#fff';
-      state.head.style.setProperty('--mt-sw-color',color);
-      state.head.style.setProperty('--mt-sw-fg',fg);
-      if(state.panel){state.panel.style.setProperty('--mt-sw-color',color);state.panel.style.setProperty('--mt-sw-fg',fg);}
+      applyThemeVars(c);
+      var host=hostOf(t&&t.url);
+      if(host)saveSiteColor(host,c);
+    });
+  }
+
+  // 按顶栏明暗设置整套主题变量（标签/按钮/分隔线均适配浅色主题）
+  function applyThemeVars(c){
+    if(!state.head||!state.panel)return;
+    var dark=luma(c)<=205;
+    var vars={
+      '--mt-sw-color':'rgb('+c.r+','+c.g+','+c.b+')',
+      '--mt-sw-fg':dark?'#fff':'rgba(0,0,0,.7)',
+      '--mt-sw-tab-bg':dark?'rgba(255,255,255,.18)':'rgba(0,0,0,.07)',
+      '--mt-sw-tab-fg':dark?'rgba(255,255,255,.92)':'rgba(0,0,0,.62)',
+      '--mt-sw-tab-active-bg':dark?'rgba(255,255,255,.92)':'#ffffff',
+      '--mt-sw-tab-active-fg':dark?'#222':'#111',
+      '--mt-sw-add-bg':dark?'rgba(255,255,255,.14)':'rgba(0,0,0,.06)',
+      '--mt-sw-btn-bg':dark?'rgba(255,255,255,.2)':'rgba(0,0,0,.08)',
+      '--mt-sw-tabline':dark?'rgba(255,255,255,.24)':'rgba(0,0,0,.08)'
+    };
+    Object.keys(vars).forEach(function(k){
+      state.head.style.setProperty(k,vars[k]);
+      state.panel.style.setProperty(k,vars[k]);
     });
   }
 
@@ -392,6 +442,10 @@
       el.setAttribute('allowfullscreen','');
       el.setAttribute('allow','accelerometer; autoplay; camera; clipboard-read; clipboard-write; display-capture; encrypted-media; fullscreen; geolocation; gyroscope; microphone; midi; payment; picture-in-picture; screen-wake-lock; usb; web-share; xr-spatial-tracking');
       t.frame=el;
+      // 打开时先用站点记忆色渲染顶栏，避免默认蓝色闪变
+      if(cfg.adaptiveColor){
+        applyThemeVars(getSiteColor(hostOf(t.url))||{r:83,g:188,b:245,a:1});
+      }
       el.addEventListener('load',function(){
         t.loading=false;
         try{t.sameOrigin=!!el.contentDocument;}catch(e){t.sameOrigin=false;}
