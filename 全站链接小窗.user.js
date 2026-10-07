@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://bbs.binmt.cc/
-// @version      2.7.3
+// @version      2.7.4
 // @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏（浅色/深色主题自适应+颜色记忆）；小窗内跳转地址同步（含跨域回传）
 // @match        *://*/*
 // @run-at       document-idle
@@ -380,8 +380,8 @@
     state.tabbar.innerHTML='';
     state.tabs.forEach(function(t,i){
       var b=document.createElement('button');b.className='mt-sw-tab'+(i===state.active?' active':'');b.title=t.title||'网页';
-      b.innerHTML='<span>'+esc(tabLabel(t.title))+'</span><b title="关闭">×</b>';
-      b.onclick=function(e){if(e.target===b.querySelector('b'))closeTab(i);else activateTab(i);};
+      b.innerHTML='<span>'+esc(tabLabel(t.title))+'</span><b title="关闭" style="padding:2px 6px;margin-right:-3px">×</b>';
+      b.onclick=function(e){var hitB=e.target&&e.target.closest?e.target.closest('b'):null;if(hitB===b.querySelector('b'))closeTab(i);else activateTab(i);};
       state.tabbar.appendChild(b);
     });
     var add=document.createElement('button');add.className='mt-sw-add';add.innerHTML=icon('plus');add.title='新标签页';
@@ -401,7 +401,12 @@
     var t=state.tabs[i];if(!t)return;
     if(t.element)t.element.remove();
     state.tabs.splice(i,1);
-    if(!state.tabs.length){closePanel(true);return;}
+    if(!state.tabs.length){
+      // 最后一个标签关闭时不关小窗，改为打开默认主页
+      var nt=createTab(cfg.newTabUrl||'about:blank','新标签页');
+      renderTabContent(nt);renderTabs();
+      return;
+    }
     if(state.active>i)state.active--;else if(state.active>=state.tabs.length)state.active=state.tabs.length-1;
     activateTab(state.active);
   }
@@ -555,7 +560,13 @@
 
   function closePanel(useHistory){
     if(!state.opened)return;
-    if(useHistory&&state.historyMarker&&!state.closingByHistory){state.closingByHistory=true;try{history.back();}catch(e){finishClose();}return;}
+    if(useHistory&&state.historyMarker&&!state.closingByHistory){
+      state.closingByHistory=true;
+      // 某些环境 history.back() 不触发 popstate，300ms 后仍未关闭则强制关闭
+      setTimeout(function(){ if(state.opened)finishClose(); },300);
+      try{history.back();}catch(e){finishClose();}
+      return;
+    }
     finishClose();
   }
 
@@ -725,9 +736,9 @@
 
   window.addEventListener('popstate',function(e){
     if(FRAME_MODE)return;
-    if(state.historyMarker&&!e.state){
+    if(state.historyMarker&&state.opened){
       state.historyMarker=false;
-      if(state.opened)finishClose();
+      finishClose();
     }
   });
 
