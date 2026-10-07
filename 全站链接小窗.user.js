@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://bbs.binmt.cc/
-// @version      2.7.4
+// @version      2.7.5
 // @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏（浅色/深色主题自适应+颜色记忆）；小窗内跳转地址同步（含跨域回传）
 // @match        *://*/*
 // @run-at       document-idle
@@ -40,6 +40,7 @@
     openMode: 'window',   // 'window' 小窗 iframe 预览 | 'tab' 浏览器新标签页（用户脚本100%生效）
     autoFallback: true,   // iframe 被 X-Frame-Options/CSP 拦截时自动转新标签页
     newTabUrl: 'https://qq5855144.github.io/Minimal-Desktop/', // 新建标签页默认打开的地址
+    noFrame: ['github.com','gist.github.com','gitee.com','gitlab.com'], // 已知禁止被嵌入 iframe 的站点，直接新标签页打开
     whitelist: [],
     blacklist: [],
     searchEngines: [
@@ -63,6 +64,7 @@
     opened: false, tabs: [], active: -1, panel: null, mask: null,
     head: null, tabbar: null, content: null,
     color: {r:83,g:188,b:245,a:1},
+    noFrameHosts: {},
     historyMarker: false, closingByHistory: false, drag: null
   };
 
@@ -96,6 +98,22 @@
 
   function inList(host, list) { return (list || []).some(function (d) { return domainMatch(host, d); }); }
   function isSearchEngine(url) { return inList(hostOf(url), cfg.searchEngines); }
+
+  // 禁止嵌入小窗的站点（默认名单 + 本次会话学到的）
+  function isNoFrameSite(url) {
+    var h = hostOf(url);
+    return !!h && (inList(h, cfg.noFrame) || !!state.noFrameHosts[h]);
+  }
+  function learnNoFrame(host) {
+    if (!host || state.noFrameHosts[host]) return;
+    state.noFrameHosts[host] = true;
+    try {
+      if (!inList(host, cfg.noFrame)) {
+        cfg.noFrame = (cfg.noFrame || []).concat([host]);
+        saveConfig();
+      }
+    } catch (e) {}
+  }
 
   function isWeb(url) {
     try { var p = new URL(url, location.href).protocol; return p === 'http:' || p === 'https:'; }
@@ -468,12 +486,14 @@
       });
       el.addEventListener('error',function(){
         t.frame=null;
+        // 记住这个禁嵌站点，下次点击直接用新标签页打开
+        learnNoFrame(hostOf(t.url));
         var autoOpened=false;
         if(cfg.autoFallback&&!t.fallbackTried){
           t.fallbackTried=true;
           try{autoOpened=!!window.open(t.url,'_blank','noopener');}catch(e){}
         }
-        showTabError(t,'页面无法嵌入，可能被网站禁止 iframe。'+(autoOpened?'已自动在新标签页打开。':(cfg.autoFallback?'自动转新标签页可能被浏览器拦截，请点击下方按钮。':'点击下方按钮用新标签页打开。')));
+        showTabError(t,'该网站禁止被嵌入小窗（X-Frame-Options/CSP）。'+(autoOpened?'已在新标签页打开，此后该站点链接将直接新标签页打开。':'点击下方按钮用新标签页打开，此后该站点链接将直接新标签页打开。'));
       });
     }
     t.view=el;t.element=el;state.content.appendChild(el);
@@ -516,6 +536,8 @@
 
   function openTab(url,title){
     if(!isWeb(url))return;
+    // 禁嵌站点（GitHub 等）直接新标签页打开
+    if(isNoFrameSite(url)){try{window.open(url,'_blank','noopener');}catch(e){}return;}
     if(!state.opened)openPanel(url);
     var t=createTab(url,title,true);
     if(cfg.multiTab||state.tabs.length===1)renderTabContent(t);
@@ -597,12 +619,21 @@
       '<div class="mt-sw-setting"><b>黑名单域名</b><textarea data-set="blacklist" placeholder="每行一个">'+esc(cfg.blacklist.join('\n'))+'</textarea><div class="mt-sw-tip">黑名单网站完全不进入小窗。</div></div>'+
       '<div class="mt-sw-settings-actions"><button class="mt-sw-secondary" data-cancel>取消</button><button class="mt-sw-primary" data-save>保存</button></div>';
 
+    // 动态插入「禁嵌小窗站点」编辑行
+    (function(){
+      var bl=box.querySelector('[data-set=blacklist]');
+      if(bl){
+        bl.closest('.mt-sw-setting').insertAdjacentHTML('afterend',
+          '<div class="mt-sw-setting"><b>禁嵌小窗站点</b><textarea data-set="noFrame" placeholder="每行一个，例如 github.com">'+esc((cfg.noFrame||[]).join('\n'))+'</textarea><div class="mt-sw-tip">这些站点禁止被 iframe 嵌入（如 GitHub），其链接将直接在新标签页打开；加载失败的站点也会自动加入此列表。</div></div>');
+      }
+    })();
+
     box.querySelector('[data-cancel]').onclick=function(){toggleSettings(false);};
     box.querySelector('[data-save]').onclick=function(){
       cfg.height=Math.max(45,Math.min(98,Number(box.querySelector('[data-set=height]').value)||92));
       ['adaptiveColor','rememberHeight','multiTab','mediaPreview','autoFallback'].forEach(function(k){cfg[k]=box.querySelector('[data-set='+k+']').checked;});
       cfg.openMode=box.querySelector('[data-set=openMode]').value==='tab'?'tab':'window';
-      ['whitelist','blacklist'].forEach(function(k){cfg[k]=box.querySelector('[data-set='+k+']').value.split(/\r?\n|,/).map(function(x){return x.trim().toLowerCase();}).filter(Boolean);});
+      ['whitelist','blacklist','noFrame'].forEach(function(k){cfg[k]=box.querySelector('[data-set='+k+']').value.split(/\r?\n|,/).map(function(x){return x.trim().toLowerCase();}).filter(Boolean);});
       saveConfig();setPanelHeight(cfg.height);toggleSettings(false);var t=activeTab();if(t)applyColor(t);
     };
   }
@@ -727,6 +758,10 @@
     var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;
     if(!shouldIntercept(a))return;
     e.preventDefault();e.stopPropagation();
+    if(isNoFrameSite(a.href)){
+      try{ window.open(a.href,'_blank','noopener'); }catch(err){}
+      return;
+    }
     if(cfg.openMode==='tab'){
       try{ window.open(a.href,'_blank','noopener'); }catch(err){}
       return;
