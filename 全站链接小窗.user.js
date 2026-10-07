@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://bbs.binmt.cc/
-// @version      2.3.0
-// @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单与沉浸式顶栏
+// @version      2.4.0
+// @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏；支持新标签页模式与 iframe 拦截自动兜底，兼容页面内用户脚本
 // @match        *://*/*
 // @run-at       document-idle
 // @grant        none
@@ -15,6 +15,16 @@
   if (!FRAME_MODE) {
     if (window.__MT_GLOBAL_LINK_WINDOW__) return;
     window.__MT_GLOBAL_LINK_WINDOW__ = true;
+    // 供同源 iframe 快速识别小窗宿主并读取当前配置
+    try {
+      Object.defineProperty(window, '__MT_SW_PANEL_HOST__', {
+        get: function () { return { openMode: cfg.openMode }; },
+        configurable: true
+      });
+    } catch (e) {}
+  } else {
+    // 供其他用户脚本识别"我正运行在小窗 iframe 中"
+    try { window.__MT_SW_FRAME__ = true; } catch (e) {}
   }
 
   var KEY = 'mt-global-link-window-v2';
@@ -27,6 +37,8 @@
     sameOriginHistory: true,
     mediaPreview: true,
     openExternal: false,
+    openMode: 'window',   // 'window' 小窗 iframe 预览 | 'tab' 浏览器新标签页（用户脚本100%生效）
+    autoFallback: true,   // iframe 被 X-Frame-Options/CSP 拦截时自动转新标签页
     whitelist: [],
     blacklist: [],
     searchEngines: [
@@ -105,7 +117,7 @@
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'"'}[c];
     });
   }
 
@@ -139,9 +151,24 @@
       '.mt-sw-tab{height:30px;min-width:64px;max-width:76px;display:flex;align-items:center;gap:3px;padding:0 7px;border:0;border-radius:8px;background:rgba(255,255,255,.18);font-size:12px;color:inherit;flex:none;cursor:pointer;transition:background .18s ease,color .18s ease}.mt-sw-tab.active{background:rgba(255,255,255,.92);color:#222;box-shadow:none}.mt-sw-tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:center}.mt-sw-tab b{font-weight:400;font-size:15px;line-height:1;color:inherit;opacity:.72}.mt-sw-add{width:30px;height:30px;border:0;border-radius:8px;background:rgba(255,255,255,.14);color:inherit;flex:none}' +
       '.mt-sw-content{position:relative;flex:1;min-height:0;background:#fff}.mt-sw-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}.mt-sw-media{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#111}.mt-sw-audio{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);width:calc(100% - 32px)}' +
       '.mt-sw-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#666;background:#fff;padding:24px;text-align:center}.mt-sw-error button{border:0;border-radius:9px;padding:9px 14px;background:#eee}' +
-      '.mt-sw-settings{position:absolute;inset:0;background:rgba(255,255,255,.98);z-index:8;overflow:auto;padding:18px;display:none}.mt-sw-settings.show{display:block}.mt-sw-settings h3{margin:0 0 16px;font-size:18px}.mt-sw-setting{padding:12px 0;border-bottom:1px solid #eee}.mt-sw-setting label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}.mt-sw-setting input[type=number]{width:76px}.mt-sw-setting textarea{width:100%;box-sizing:border-box;min-height:70px;margin-top:8px;border:1px solid #ddd;border-radius:8px;padding:8px;resize:vertical}.mt-sw-settings-actions{display:flex;gap:8px;margin-top:16px}.mt-sw-settings-actions button{flex:1;border:0;border-radius:9px;padding:10px}.mt-sw-primary{background:#53BCF5;color:#fff}.mt-sw-secondary{background:#eee}.mt-sw-tip{font-size:11px;color:#999;line-height:1.5;margin-top:5px}';
+      '.mt-sw-settings{position:absolute;inset:0;background:rgba(255,255,255,.98);z-index:8;overflow:auto;padding:18px;display:none}.mt-sw-settings.show{display:block}.mt-sw-settings h3{margin:0 0 16px;font-size:18px}.mt-sw-setting{padding:12px 0;border-bottom:1px solid #eee}.mt-sw-setting label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}.mt-sw-setting input[type=number]{width:76px}.mt-sw-setting select{font-size:14px;padding:6px 8px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#333}.mt-sw-setting textarea{width:100%;box-sizing:border-box;min-height:70px;margin-top:8px;border:1px solid #ddd;border-radius:8px;padding:8px;resize:vertical}.mt-sw-settings-actions{display:flex;gap:8px;margin-top:16px}.mt-sw-settings-actions button{flex:1;border:0;border-radius:9px;padding:10px}.mt-sw-primary{background:#53BCF5;color:#fff}.mt-sw-secondary{background:#eee}.mt-sw-tip{font-size:11px;color:#999;line-height:1.5;margin-top:5px}';
 
     (document.head || document.documentElement).appendChild(s);
+
+    // 严格 CSP 站点可能拦截内联 <style>，改用 CSSOM insertRule 兜底（不受 style-src 限制）
+    var needCssom = false;
+    try { needCssom = !s.sheet || !s.sheet.cssRules || s.sheet.cssRules.length === 0; }
+    catch (e) { needCssom = true; }
+    if (needCssom) {
+      try {
+        var css = s.textContent; s.textContent = '';
+        var parts = css.split('}');
+        for (var i = 0; i < parts.length; i++) {
+          var rule = parts[i].trim();
+          if (rule && s.sheet) s.sheet.insertRule(rule + '}', s.sheet.cssRules.length);
+        }
+      } catch (e) {}
+    }
   }
 
   function mediaType(url) {
@@ -156,7 +183,7 @@
   }
 
   function createTab(url, title, activate) {
-    var t = {id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),url:url,title:title||hostOf(url)||'网页',history:[url],historyIndex:0,view:null,frame:null,element:null,loading:true,sameOrigin:false};
+    var t = {id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),url:url,title:title||hostOf(url)||'网页',history:[url],historyIndex:0,view:null,frame:null,element:null,loading:true,sameOrigin:false,fallbackTried:false};
     state.tabs.push(t);
     if (activate !== false) state.active=state.tabs.length-1;
     return t;
@@ -198,7 +225,7 @@
   }
 
   function colorDistance(a,b){return Math.sqrt(Math.pow(a.r-b.r,2)+Math.pow(a.g-b.g,2)+Math.pow(a.b-b.b,2));}
-  
+
   function detectTopColor(t,done){
     var fallback={r:83,g:188,b:245,a:1};
     try{
@@ -343,8 +370,8 @@
   function navigateTab(t,url,addHistory){
     if(!t)return;
     if(addHistory)pushHistory(t,url);
-    t.url=url;t.loading=true;
-    if(t.view){t.view.remove();t.view=null;t.frame=null;}
+    t.url=url;t.loading=true;t.frame=null;t.fallbackTried=false;
+    if(t.view){t.view.remove();t.view=null;}
     renderTabContent(t);updateNav();
   }
 
@@ -358,7 +385,11 @@
     }else if(type==='audio'){
       el=document.createElement('audio');el.className='mt-sw-audio';el.controls=true;el.src=t.url;el.onerror=function(){showTabError(t,'音频无法播放');};
     }else{
-      el=document.createElement('iframe');el.className='mt-sw-frame';el.src=t.url;el.setAttribute('loading','eager');t.frame=el;
+      el=document.createElement('iframe');el.className='mt-sw-frame';el.src=t.url;el.setAttribute('loading','eager');
+      // 不添加 sandbox（保证用户脚本可注入），并尽量放开能力，接近真实标签页环境
+      el.setAttribute('allowfullscreen','');
+      el.setAttribute('allow','accelerometer; autoplay; camera; clipboard-read; clipboard-write; display-capture; encrypted-media; fullscreen; geolocation; gyroscope; microphone; midi; payment; picture-in-picture; screen-wake-lock; usb; web-share; xr-spatial-tracking');
+      t.frame=el;
       el.addEventListener('load',function(){
         t.loading=false;
         try{t.sameOrigin=!!el.contentDocument;}catch(e){t.sameOrigin=false;}
@@ -366,15 +397,24 @@
         if(t.title==='网页'||t.title==='新标签页'){try{t.title=el.contentDocument.title||hostOf(t.url)||'网页';}catch(e){}}
         updateTabs();
       });
-      el.addEventListener('error',function(){showTabError(t,'页面无法嵌入，可能被网站禁止 iframe。');});
+      el.addEventListener('error',function(){
+        t.frame=null;
+        var autoOpened=false;
+        if(cfg.autoFallback&&!t.fallbackTried){
+          t.fallbackTried=true;
+          try{autoOpened=!!window.open(t.url,'_blank','noopener');}catch(e){}
+        }
+        showTabError(t,'页面无法嵌入，可能被网站禁止 iframe。'+(autoOpened?'已自动在新标签页打开。':(cfg.autoFallback?'自动转新标签页可能被浏览器拦截，请点击下方按钮。':'点击下方按钮用新标签页打开。')));
+      });
     }
     t.view=el;t.element=el;state.content.appendChild(el);
     state.tabs.forEach(function(x,i){if(x.element)x.element.style.display=i===state.active?'block':'none';});
   }
 
   function showTabError(t,msg){
+    if(t.frame){t.frame=null;}
     var box=document.createElement('div');box.className='mt-sw-error';box.innerHTML='<div>'+esc(msg)+'</div><button>在新窗口打开</button>';
-    box.querySelector('button').onclick=function(){window.open(t.url,'_blank');};
+    box.querySelector('button').onclick=function(){window.open(t.url,'_blank','noopener');};
     if(t.element)t.element.remove();t.view=box;t.element=box;state.content.appendChild(box);renderTabs();
   }
 
@@ -407,7 +447,7 @@
 
   function openTab(url,title){
     if(!isWeb(url))return;
-    if(!state.opened)openPanel();
+    if(!state.opened)openPanel(url);
     var t=createTab(url,title,true);
     if(cfg.multiTab||state.tabs.length===1)renderTabContent(t);
     else{
@@ -417,7 +457,7 @@
     updateTabs();
   }
 
-  function openPanel(initialUrl,initialTitle){
+  function openPanel(initialUrl){
     if(state.opened)return;
     addStyle();state.opened=true;state.tabs=[];state.active=-1;
     var root=document.createElement('div');root.className='mt-sw-root';
@@ -438,14 +478,13 @@
     state.panel=panel;state.mask=mask;state.head=head;state.tabbar=tabbar;state.content=content;
     var savedHeight=initialUrl&&cfg.rememberHeight?getSiteHeight(hostOf(initialUrl)):null;setPanelHeight(savedHeight||cfg.height);
     back.onclick=function(){goHistory(-1);};forward.onclick=function(){goHistory(1);};
-    reload.onclick=function(){var t=activeTab();if(t){if(t.view&&t.view.tagName==='IFRAME')t.frame.src=t.url;else navigateTab(t,t.url,false);}};
-    external.onclick=function(){var t=activeTab();if(t)window.open(t.url,'_blank');};
+    reload.onclick=function(){var t=activeTab();if(t){if(t.frame)t.frame.src=t.url;else navigateTab(t,t.url,false);}};
+    external.onclick=function(){var t=activeTab();if(t)window.open(t.url,'_blank','noopener');};
     close.onclick=function(){closePanel(true);};mask.onclick=function(){closePanel(true);};settings.onclick=function(){toggleSettings(true);};
     resize.addEventListener('pointerdown',function(e){e.preventDefault();state.drag={startY:e.clientY,startHeight:panel.getBoundingClientRect().height,host:hostOf(activeTab()&&activeTab().url)};resize.setPointerCapture&&resize.setPointerCapture(e.pointerId);});
     resize.addEventListener('pointermove',function(e){if(!state.drag)return;var h=state.drag.startHeight+(state.drag.startY-e.clientY);setPanelHeight(Math.max(45,Math.min(98,h/window.innerHeight*100)));});
     resize.addEventListener('pointerup',function(){if(!state.drag)return;var host=state.drag.host;if(host)saveSiteHeight(host,parseFloat(panel.dataset.height)||92);state.drag=null;});
     buildSettings(settingsBox);
-    if(initialUrl){createTab(initialUrl,initialTitle||hostOf(initialUrl)||'网页',true);renderTabContent(activeTab());}
     updateTabs();requestAnimationFrame(function(){root.classList.add('mt-sw-show');});
     if(!state.historyMarker){try{history.pushState({mtGlobalWindow:true},'',location.href);state.historyMarker=true;}catch(e){}}
   }
@@ -476,13 +515,17 @@
       '<div class="mt-sw-setting"><label>记忆网站小窗高度 <input data-set="rememberHeight" type="checkbox" '+(cfg.rememberHeight?'checked':'')+'></label></div>'+
       '<div class="mt-sw-setting"><label>多标签模式 <input data-set="multiTab" type="checkbox" '+(cfg.multiTab?'checked':'')+'></label></div>'+
       '<div class="mt-sw-setting"><label>媒体智能预览 <input data-set="mediaPreview" type="checkbox" '+(cfg.mediaPreview?'checked':'')+'></label><div class="mt-sw-tip">图片、视频、音频、PDF 优先使用对应预览器。</div></div>'+
+      '<div class="mt-sw-setting"><label>链接打开方式 <select data-set="openMode"><option value="window"'+(cfg.openMode!=='tab'?' selected':'')+'>小窗预览（iframe）</option><option value="tab"'+(cfg.openMode==='tab'?' selected':'')+'>浏览器新标签页</option></select></label><div class="mt-sw-tip">新标签页模式下已安装的用户脚本 100% 生效；小窗模式依赖脚本管理器允许向 iframe 注入脚本（见下方说明）。</div></div>'+
+      '<div class="mt-sw-setting"><label>被拦截时自动转新标签页 <input data-set="autoFallback" type="checkbox" '+(cfg.autoFallback?'checked':'')+'></label><div class="mt-sw-tip">部分网站通过 X-Frame-Options / CSP frame-ancestors 禁止被嵌入 iframe，开启后自动改用新标签页打开（可能被浏览器弹窗拦截）。</div></div>'+
+      '<div class="mt-sw-setting"><b>关于用户脚本生效</b><div class="mt-sw-tip">Tampermonkey / Violentmonkey 等管理器默认会向小窗内的 iframe 注入用户脚本，且本小窗 iframe 未加 sandbox，已开启全屏、剪贴板、自动播放等权限。若某个脚本在小窗中不生效，通常是该脚本声明了 @noframes 或检测 top!==self 主动退出，本脚本无法代为修改；此类情况请点击顶栏 ⧉ 按钮或改用「新标签页模式」打开。</div></div>'+
       '<div class="mt-sw-setting"><b>白名单域名</b><textarea data-set="whitelist" placeholder="每行一个，例如 example.com">'+esc(cfg.whitelist.join('\n'))+'</textarea><div class="mt-sw-tip">白名单网站的链接保持正常浏览器打开。</div></div>'+
       '<div class="mt-sw-setting"><b>黑名单域名</b><textarea data-set="blacklist" placeholder="每行一个">'+esc(cfg.blacklist.join('\n'))+'</textarea><div class="mt-sw-tip">黑名单网站完全不进入小窗。</div></div>'+
       '<div class="mt-sw-settings-actions"><button class="mt-sw-secondary" data-cancel>取消</button><button class="mt-sw-primary" data-save>保存</button></div>';
     box.querySelector('[data-cancel]').onclick=function(){toggleSettings(false);};
     box.querySelector('[data-save]').onclick=function(){
       cfg.height=Math.max(45,Math.min(98,Number(box.querySelector('[data-set=height]').value)||92));
-      ['adaptiveColor','rememberHeight','multiTab','mediaPreview'].forEach(function(k){cfg[k]=box.querySelector('[data-set='+k+']').checked;});
+      ['adaptiveColor','rememberHeight','multiTab','mediaPreview','autoFallback'].forEach(function(k){cfg[k]=box.querySelector('[data-set='+k+']').checked;});
+      cfg.openMode=box.querySelector('[data-set=openMode]').value==='tab'?'tab':'window';
       ['whitelist','blacklist'].forEach(function(k){cfg[k]=box.querySelector('[data-set='+k+']').value.split(/\r?\n|,/).map(function(x){return x.trim().toLowerCase();}).filter(Boolean);});
       saveConfig();setPanelHeight(cfg.height);toggleSettings(false);var t=activeTab();if(t)applyColor(t);
     };
@@ -500,34 +543,92 @@
     }catch(e){}
   }
 
+  var frameBridge = { ready: false, cfg: null };
+
   function initFrameMode(){
-    // 小窗 iframe 中不再创建第二层小窗，只把点击请求交给外层小窗。
+    // 同源快速通道：直接读外层宿主标记（跨域时抛异常，走下面的握手）
+    try{
+      if(window.top && window.top.__MT_SW_PANEL_HOST__){
+        frameBridge.ready = true;
+        frameBridge.cfg = window.top.__MT_SW_PANEL_HOST__;
+      }
+    }catch(e){}
+
+    // 握手：向外层发送 HELLO，只有小窗宿主会回复 CFG。
+    // 这样本脚本在"其他网站的 iframe"里运行时不会劫持链接点击。
+    function hello(){
+      if(frameBridge.ready)return;
+      try{ window.top.postMessage({type:'MT_GLOBAL_LINK_WINDOW_HELLO'}, '*'); }catch(e){}
+    }
+    hello();
+    [300,1000,2500,5000].forEach(function(d){ setTimeout(hello, d); });
+
+    window.addEventListener('message',function(e){
+      var d=e.data;
+      if(!d||d.type!=='MT_GLOBAL_LINK_WINDOW_CFG')return;
+      try{ if(e.source!==window.top)return; }catch(err){return;}
+      frameBridge.ready=true;
+      frameBridge.cfg=d.cfg||{};
+    });
+
+    // 小窗 iframe 中不再创建第二层小窗，只把点击请求交给外层小窗（或按配置直接开新标签页）
     document.addEventListener('click',function(e){
+      if(!frameBridge.ready)return;
       if(e.defaultPrevented||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
       var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;
       if(!shouldIntercept(a))return;
+      // 用外层配置再过滤一次，避免吞掉外层白名单/黑名单/搜索引擎的链接
+      var fcfg=frameBridge.cfg;
+      if(fcfg){
+        var h=hostOf(a.href);
+        if(inList(h,fcfg.whitelist||[])||inList(h,fcfg.blacklist||[])||inList(h,fcfg.searchEngines||[]))return;
+      }
       e.preventDefault();e.stopImmediatePropagation();
-      postFrameLink(a.href,titleFromAnchor(a));
+      if(fcfg&&fcfg.openMode==='tab'){
+        try{ window.open(a.href,'_blank','noopener'); }catch(err){}
+      }else{
+        postFrameLink(a.href,titleFromAnchor(a));
+      }
     },true);
+  }
+
+  function findFrameBySource(source){
+    for(var i=0;i<state.tabs.length;i++){
+      var t=state.tabs[i];
+      if(t.frame&&t.frame.contentWindow===source)return t;
+    }
+    return null;
   }
 
   function installFrameMessageBridge(){
     window.addEventListener('message',function(e){
-      if(!e.data||e.data.type!=='MT_GLOBAL_LINK_WINDOW_OPEN'||!state.opened)return;
-      var source=e.source;
-      var matched=null;
-      for(var i=0;i<state.tabs.length;i++){
-        var t=state.tabs[i];
-        if(t.frame&&t.frame.contentWindow===source){matched=t;break;}
+      var d=e.data;
+      if(!d)return;
+
+      // iframe 握手：确认父页面是小窗宿主后才回复配置
+      if(d.type==='MT_GLOBAL_LINK_WINDOW_HELLO'){
+        if(!state.opened)return;
+        var t0=findFrameBySource(e.source);
+        if(!t0)return;
+        try{
+          e.source.postMessage({
+            type:'MT_GLOBAL_LINK_WINDOW_CFG',
+            cfg:{openMode:cfg.openMode,whitelist:cfg.whitelist,blacklist:cfg.blacklist,searchEngines:cfg.searchEngines}
+          },'*');
+        }catch(err){}
+        return;
       }
-      if(!matched||!isWeb(e.data.url))return;
+
+      if(d.type!=='MT_GLOBAL_LINK_WINDOW_OPEN'||!state.opened)return;
+      var matched=findFrameBySource(e.source);
+      if(!matched||!isWeb(d.url))return;
       try{
         var expected=new URL(matched.url).origin;
-        if(e.origin!=='null'&&e.origin!==expected)return;
+        if(e.origin!==''&&e.origin!==expected)return;
       }catch(err){return;}
-      var host=hostOf(e.data.url);
-      if(isSearchEngine(e.data.url)||inList(host,cfg.whitelist)||inList(host,cfg.blacklist))return;
-      openTab(e.data.url,String(e.data.title||host||'网页').slice(0,80));
+      var host=hostOf(d.url);
+      if(isSearchEngine(d.url)||inList(host,cfg.whitelist)||inList(host,cfg.blacklist))return;
+      openTab(d.url,String(d.title||host||'网页').slice(0,80));
     });
   }
 
@@ -536,7 +637,12 @@
     if(e.defaultPrevented||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;
     var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;
     if(!shouldIntercept(a))return;
-    e.preventDefault();e.stopPropagation();openTab(a.href,titleFromAnchor(a));
+    e.preventDefault();e.stopPropagation();
+    if(cfg.openMode==='tab'){
+      try{ window.open(a.href,'_blank','noopener'); }catch(err){}
+      return;
+    }
+    openTab(a.href,titleFromAnchor(a));
   },true);
 
   window.addEventListener('popstate',function(e){
