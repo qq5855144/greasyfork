@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://bbs.binmt.cc/
-// @version      2.7.5
+// @version      2.7.7
 // @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏（浅色/深色主题自适应+颜色记忆）；小窗内跳转地址同步（含跨域回传）
 // @match        *://*/*
 // @run-at       document-idle
@@ -207,7 +207,11 @@
   }
 
   function createTab(url, title, activate) {
-    var t = {id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),url:url,title:title||hostOf(url)||'网页',history:[url],historyIndex:0,view:null,frame:null,element:null,loading:true,sameOrigin:false,fallbackTried:false,bridged:false};
+    // 激活新标签前先保存当前标签滚动位置（点标签栏、点帖子开新标签等所有路径统一在此保存）
+    if (activate !== false && state.active >= 0 && state.tabs[state.active]) {
+      saveScroll(state.tabs[state.active]);
+    }
+    var t = {id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),url:url,title:title||hostOf(url)||'网页',history:[url],historyIndex:0,view:null,frame:null,element:null,loading:true,sameOrigin:false,fallbackTried:false,bridged:false,scrollY:0,scrollX:0};
     state.tabs.push(t);
     if (activate !== false) state.active=state.tabs.length-1;
     return t;
@@ -410,9 +414,41 @@
 
   function activateTab(i){
     if(i<0||i>=state.tabs.length)return;
+    // 切走前保存当前标签滚动位置（双保险，跨域时静默跳过）
+    if(state.active>=0&&state.active!==i)saveScroll(state.tabs[state.active]);
     state.active=i;
     renderTabs();
-    var t=activeTab();if(t)applyColor(t);
+    var t=activeTab();
+    if(t){
+      restoreScroll(t);
+      // 渲染时机兜底：iframe 刚显示或重新加载后再次恢复
+      [50,250].forEach(function(d){
+        setTimeout(function(){ if(state.opened&&activeTab()===t)restoreScroll(t); },d);
+      });
+      applyColor(t);
+    }
+  }
+
+  function saveScroll(t){
+    if(!t||!t.frame)return;
+    try{
+      var d=t.frame.contentDocument;
+      if(d&&d.scrollingElement){
+        t.scrollY=d.scrollingElement.scrollTop;
+        t.scrollX=d.scrollingElement.scrollLeft;
+      }
+    }catch(e){}
+  }
+
+  function restoreScroll(t){
+    if(!t||!t.frame||(!t.scrollY&&!t.scrollX))return;
+    try{
+      var d=t.frame.contentDocument;
+      if(d&&d.scrollingElement){
+        d.scrollingElement.scrollTop=t.scrollY;
+        d.scrollingElement.scrollLeft=t.scrollX;
+      }
+    }catch(e){}
   }
 
   function closeTab(i){
@@ -430,8 +466,18 @@
   }
 
   function renderTabs(){
+    // 用 visibility 而非 display 切换：隐藏的 iframe 保持布局尺寸，
+    // 页面不重排、滚动位置不丢失（display:none 在 WebView 中会把视口压成 0×0）
     state.tabs.forEach(function(t,i){
-      if(t.element)t.element.style.display=i===state.active?'block':'none';
+      if(t.element){
+        if(i===state.active){
+          t.element.style.visibility='visible';
+          t.element.style.zIndex='1';
+        }else{
+          t.element.style.visibility='hidden';
+          t.element.style.zIndex='0';
+        }
+      }
     });
     updateTabs();
   }
@@ -445,7 +491,7 @@
   function navigateTab(t,url,addHistory){
     if(!t)return;
     if(addHistory)pushHistory(t,url);
-    t.url=url;t.loading=true;t.frame=null;t.fallbackTried=false;t.bridged=false;
+    t.url=url;t.loading=true;t.frame=null;t.fallbackTried=false;t.bridged=false;t.scrollY=0;t.scrollX=0;
     if(t.view){t.view.remove();t.view=null;}
     renderTabContent(t);updateNav();
   }
@@ -482,6 +528,7 @@
           }catch(e){}
         }
         applyColor(t);retryColor(t);installSameOriginBridge(t);
+        restoreScroll(t);
         updateTabs();
       });
       el.addEventListener('error',function(){
