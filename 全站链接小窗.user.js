@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://bbs.binmt.cc/
-// @version      2.4.0
-// @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏；支持新标签页模式与 iframe 拦截自动兜底，兼容页面内用户脚本
+// @version      2.7.2
+// @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏；小窗内跳转地址同步（含跨域回传
 // @match        *://*/*
 // @run-at       document-idle
 // @grant        none
@@ -39,6 +39,7 @@
     openExternal: false,
     openMode: 'window',   // 'window' 小窗 iframe 预览 | 'tab' 浏览器新标签页（用户脚本100%生效）
     autoFallback: true,   // iframe 被 X-Frame-Options/CSP 拦截时自动转新标签页
+    newTabUrl: 'https://qq5855144.github.io/Minimal-Desktop/', // 新建标签页默认打开的地址
     whitelist: [],
     blacklist: [],
     searchEngines: [
@@ -183,7 +184,7 @@
   }
 
   function createTab(url, title, activate) {
-    var t = {id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),url:url,title:title||hostOf(url)||'网页',history:[url],historyIndex:0,view:null,frame:null,element:null,loading:true,sameOrigin:false,fallbackTried:false};
+    var t = {id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),url:url,title:title||hostOf(url)||'网页',history:[url],historyIndex:0,view:null,frame:null,element:null,loading:true,sameOrigin:false,fallbackTried:false,bridged:false};
     state.tabs.push(t);
     if (activate !== false) state.active=state.tabs.length-1;
     return t;
@@ -247,7 +248,7 @@
         try{Array.prototype.slice.call(doc.querySelectorAll(sel)).slice(0,12).forEach(function(el){candidates.push(el);});}catch(e){}
       });
 
-      // 补充扫描首屏顶部元素，兼容论坛使用自定义 class 的情况。
+      // 补充扫描首屏顶部元素，兼容使用自定义 class 的情况。
       try{
         Array.prototype.slice.call(doc.body.querySelectorAll('*')).slice(0,800).forEach(function(el){
           var r=el.getBoundingClientRect();
@@ -334,7 +335,7 @@
       state.tabbar.appendChild(b);
     });
     var add=document.createElement('button');add.className='mt-sw-add';add.innerHTML=icon('plus');add.title='新标签页';
-    add.onclick=function(){createTab('about:blank','新标签页');renderTabs();};
+    add.onclick=function(){var nt=createTab(cfg.newTabUrl||'about:blank','新标签页');renderTabContent(nt);renderTabs();};
     state.tabbar.appendChild(add);
     updateNav();
   }
@@ -342,8 +343,7 @@
   function activateTab(i){
     if(i<0||i>=state.tabs.length)return;
     state.active=i;
-    state.tabs.forEach(function(t,n){if(t.element)t.element.style.display=n===i?'block':'none';});
-    updateTabs();
+    renderTabs();
     var t=activeTab();if(t)applyColor(t);
   }
 
@@ -357,7 +357,9 @@
   }
 
   function renderTabs(){
-    state.tabs.forEach(function(t,i){if(t.element)t.element.style.display=i===state.active?'block':'none';});
+    state.tabs.forEach(function(t,i){
+      if(t.element)t.element.style.display=i===state.active?'block':'none';
+    });
     updateTabs();
   }
 
@@ -370,7 +372,7 @@
   function navigateTab(t,url,addHistory){
     if(!t)return;
     if(addHistory)pushHistory(t,url);
-    t.url=url;t.loading=true;t.frame=null;t.fallbackTried=false;
+    t.url=url;t.loading=true;t.frame=null;t.fallbackTried=false;t.bridged=false;
     if(t.view){t.view.remove();t.view=null;}
     renderTabContent(t);updateNav();
   }
@@ -393,8 +395,16 @@
       el.addEventListener('load',function(){
         t.loading=false;
         try{t.sameOrigin=!!el.contentDocument;}catch(e){t.sameOrigin=false;}
+        if(t.sameOrigin){
+          // 同源：直接读取 iframe 内跳转后的地址与标题，同步到标签页历史
+          try{
+            var doc=el.contentDocument;
+            var cur=doc&&doc.location.href;
+            if(cur&&cur!==t.url&&cur!=='about:blank'){pushHistory(t,cur);t.url=cur;}
+            if(doc&&doc.title){t.title=String(doc.title).slice(0,80);}
+          }catch(e){}
+        }
         applyColor(t);retryColor(t);installSameOriginBridge(t);
-        if(t.title==='网页'||t.title==='新标签页'){try{t.title=el.contentDocument.title||hostOf(t.url)||'网页';}catch(e){}}
         updateTabs();
       });
       el.addEventListener('error',function(){
@@ -408,7 +418,7 @@
       });
     }
     t.view=el;t.element=el;state.content.appendChild(el);
-    state.tabs.forEach(function(x,i){if(x.element)x.element.style.display=i===state.active?'block':'none';});
+    renderTabs();
   }
 
   function showTabError(t,msg){
@@ -521,6 +531,7 @@
       '<div class="mt-sw-setting"><b>白名单域名</b><textarea data-set="whitelist" placeholder="每行一个，例如 example.com">'+esc(cfg.whitelist.join('\n'))+'</textarea><div class="mt-sw-tip">白名单网站的链接保持正常浏览器打开。</div></div>'+
       '<div class="mt-sw-setting"><b>黑名单域名</b><textarea data-set="blacklist" placeholder="每行一个">'+esc(cfg.blacklist.join('\n'))+'</textarea><div class="mt-sw-tip">黑名单网站完全不进入小窗。</div></div>'+
       '<div class="mt-sw-settings-actions"><button class="mt-sw-secondary" data-cancel>取消</button><button class="mt-sw-primary" data-save>保存</button></div>';
+
     box.querySelector('[data-cancel]').onclick=function(){toggleSettings(false);};
     box.querySelector('[data-save]').onclick=function(){
       cfg.height=Math.max(45,Math.min(98,Number(box.querySelector('[data-set=height]').value)||92));
@@ -558,7 +569,7 @@
     // 这样本脚本在"其他网站的 iframe"里运行时不会劫持链接点击。
     function hello(){
       if(frameBridge.ready)return;
-      try{ window.top.postMessage({type:'MT_GLOBAL_LINK_WINDOW_HELLO'}, '*'); }catch(e){}
+      try{ window.top.postMessage({type:'MT_GLOBAL_LINK_WINDOW_HELLO',url:location.href,title:document.title}, '*'); }catch(e){}
     }
     hello();
     [300,1000,2500,5000].forEach(function(d){ setTimeout(hello, d); });
@@ -610,6 +621,19 @@
         if(!state.opened)return;
         var t0=findFrameBySource(e.source);
         if(!t0)return;
+        t0.bridged=true;
+        // 跨域 iframe 内部跳转后，由 iframe 内的本脚本回传新地址，同步标签页 URL/标题/历史
+        if(d.url&&isWeb(d.url)){
+          try{
+            var nu=new URL(d.url);
+            if(nu.origin===e.origin&&d.url!==t0.url){
+              pushHistory(t0,d.url);
+              t0.url=d.url;
+              if(d.title)t0.title=String(d.title).slice(0,80);
+              updateTabs();
+            }
+          }catch(err){}
+        }
         try{
           e.source.postMessage({
             type:'MT_GLOBAL_LINK_WINDOW_CFG',
