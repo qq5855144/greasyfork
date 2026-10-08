@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         全站链接小窗
-// @namespace    https://bbs.binmt.cc/
+// @namespace    https://qq5855144.github.io/
 // @version      1.0.0
 // @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏、手势滑动切换标签（屏蔽浏览器横滑手势，关闭后自动恢复）；小窗内跳转地址同步（含跨域回传）
 // @match        *://*/*
