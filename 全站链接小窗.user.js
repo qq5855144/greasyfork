@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全站链接小窗
 // @namespace    https://qq5855144.github.io/
-// @version      1.0.0
+// @version      1.0.1
 // @description  全站链接小窗浏览器：多标签、历史导航、拖拽高度、站点记忆、媒体预览、黑白名单、沉浸式顶栏、手势滑动切换标签（屏蔽浏览器横滑手势，关闭后自动恢复）；小窗内跳转地址同步（含跨域回传）
 // @match        *://*/*
 // @run-at       document-idle
@@ -127,6 +127,9 @@
     if (a.hasAttribute('download')) return false;
     if ((a.getAttribute('rel') || '').toLowerCase().split(/\s+/).indexOf('external') >= 0) return false;
     var url = a.href, host = hostOf(url);
+    // 用户脚本/样式安装文件放行：交给浏览器顶层打开（Via/Tampermonkey 会弹出安装确认），
+    // 若被小窗 iframe 拦截则只是显示源码文本，无法安装
+    if (/\.user\.(js|css)($|[?#])/i.test(url)) return false;
     if (isSearchEngine(url) || inList(host, cfg.whitelist) || inList(host, cfg.blacklist)) return false;
     try {
       var u = new URL(url), c = new URL(location.href);
